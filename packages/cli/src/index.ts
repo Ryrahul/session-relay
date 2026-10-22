@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { login } from "./commands/login.js";
+import { invite, list, localSessions, members, pull, remove, search, share, show } from "./commands/sessions.js";
+import { setup } from "./commands/setup.js";
 import { whoami } from "./commands/whoami.js";
+import { runMcp } from "./mcp.js";
 
 const program = new Command()
   .name("relay")
-  .description("Share coding-agent sessions with your team")
-  .version("0.0.1");
+  .description("Share coding-agent sessions (Claude Code, OpenCode, Codex) with your team")
+  .version("0.1.0");
 
 program
   .command("login")
@@ -17,25 +20,78 @@ program
 
 program.command("whoami").description("Show the current user, org and server").action(whoami);
 
-const planned: [string, string, string][] = [
-  ["share", "Pick a recent session and share it", "Phase 1–2"],
-  ["list", "List the team's shared sessions", "Phase 2"],
-  ["search", "Search shared sessions", "Phase 2"],
-  ["show", "Print a shared session's summary", "Phase 2"],
-  ["pull", "Write a shared session to a local handoff file", "Phase 2"],
-  ["delete", "Delete one of your shares", "Phase 2"],
-  ["mcp", "Run the MCP server for Claude Code, Codex and OpenCode", "Phase 3"],
-];
-for (const [name, description, phase] of planned) {
-  program
-    .command(name)
-    .description(`${description} (coming in ${phase})`)
-    .allowUnknownOption()
-    .action(() => {
-      console.error(`relay ${name} is not built yet (${phase}).`);
-      process.exitCode = 2;
-    });
-}
+program
+  .command("sessions")
+  .description("List your local agent sessions for this repo")
+  .option("--tool <tool>", "claude, opencode or codex")
+  .action(localSessions);
+
+program
+  .command("share")
+  .description("Pick a local session and share it with your team")
+  .option("--tool <tool>", "claude, opencode or codex")
+  .option("--id <id>", "native session id (prefix is fine)")
+  .option("--latest", "share the newest session without asking")
+  .option("--include <mode>", "summary | summary+tail | full")
+  .option("--tail <n>", "messages to keep with summary+tail", "30")
+  .option("--title <title>", "title shown to teammates")
+  .option("--people <names>", "comma-separated names/emails; default is the whole team")
+  .option("--summary-file <file>", "JSON summary {goal, decisions, done, next, open_questions}")
+  .option("--dry-run", "write what would be uploaded to .relay/ and stop")
+  .option("-y, --yes", "don't ask questions")
+  .option("--json", "print the result as JSON")
+  .action(share);
+
+const listOpts = (cmd: Command) =>
+  cmd
+    .option("--repo <repo>", "e.g. github.com/acme/api")
+    .option("--author <name>", 'name, email or "me"')
+    .option("--tool <tool>", "claude, opencode or codex")
+    .option("--limit <n>", "max results", "20")
+    .option("--json", "print JSON");
+
+listOpts(program.command("list").description("List shared sessions (this repo by default)"))
+  .option("--all", "all repos")
+  .option("--branch <branch>")
+  .action(list);
+
+listOpts(program.command("search <query>").description("Search shared sessions")).action(search);
+
+program
+  .command("show <id>")
+  .description("Print a shared session as a handoff")
+  .option("--full", "full transcript (first page)")
+  .option("--summary-only", "no messages")
+  .option("--tail <n>", "number of recent messages")
+  .option("--json", "print JSON")
+  .action(show);
+
+program
+  .command("pull <id>")
+  .description("Write a shared session to .relay/handoff-<id>.md for your agent to read")
+  .option("--full", "include the full transcript")
+  .option("--summary-only", "no messages")
+  .option("--out <file>", "output file")
+  .action(pull);
+
+program.command("delete <id>").description("Delete one of your shares").option("-y, --yes").action(remove);
+program.command("members").description("List people in your org").action(members);
+program
+  .command("invite <email>")
+  .description("Add someone to your org (admins) and print their login command")
+  .requiredOption("--name <name>")
+  .option("--role <role>", "member | admin | owner", "member")
+  .action(invite);
+
+program
+  .command("setup")
+  .description("Connect Claude Code, OpenCode and Codex to relay (MCP server + /share and /pickup commands)")
+  .option("--tools <list>", "comma-separated: claude,opencode,codex")
+  .option("--scope <scope>", "user (default) or project", "user")
+  .option("--relay-config <file>", "relay config file the MCP server should use")
+  .action(setup);
+
+program.command("mcp").description("Run the MCP server on stdio (started by your agent)").action(runMcp);
 
 program.parseAsync().catch((err: Error) => {
   console.error(`Error: ${err.message}`);

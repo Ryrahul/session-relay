@@ -1,20 +1,68 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import type { MeResponse } from "@session-relay/shared";
+import { api, getToken, setToken } from "./api";
+import { parseRoute, type Route } from "./format";
+import { Login } from "./Login";
+import { Members } from "./Members";
+import { SessionList } from "./SessionList";
+import { SessionView } from "./SessionView";
 
-// Placeholder until Phase 2 adds sign-in and the session list.
 export function App() {
-  const [health, setHealth] = useState<"checking" | "ok" | "down">("checking");
+  const [me, setMe] = useState<MeResponse | null>(null);
+  const [checking, setChecking] = useState(Boolean(getToken()));
+  const [route, setRoute] = useState<Route>(parseRoute(location.hash));
 
   useEffect(() => {
-    fetch("/health")
-      .then((r) => setHealth(r.ok ? "ok" : "down"))
-      .catch(() => setHealth("down"));
+    const onHash = () => setRoute(parseRoute(location.hash));
+    addEventListener("hashchange", onHash);
+    return () => removeEventListener("hashchange", onHash);
   }, []);
 
+  useEffect(() => {
+    if (!getToken()) return;
+    api
+      .me()
+      .then(setMe)
+      .catch(() => setToken(null))
+      .finally(() => setChecking(false));
+  }, []);
+
+  const signOut = useCallback(() => {
+    setToken(null);
+    setMe(null);
+  }, []);
+
+  if (checking) return <div className="center muted">Loading…</div>;
+  if (!me) return <Login onSignedIn={setMe} />;
+
   return (
-    <main style={{ fontFamily: "system-ui, sans-serif", maxWidth: 640, margin: "48px auto", padding: "0 16px" }}>
-      <h1>Session Relay</h1>
-      <p>Browse and read the sessions your team has shared. The session list arrives in Phase 2.</p>
-      <p>Server: {health}</p>
-    </main>
+    <div className="shell">
+      <header className="top">
+        <a href="#/" className="brand">
+          Session Relay
+        </a>
+        <nav>
+          <a href="#/" className={route.page !== "members" ? "on" : ""}>
+            Sessions
+          </a>
+          <a href="#/members" className={route.page === "members" ? "on" : ""}>
+            Members
+          </a>
+        </nav>
+        <div className="who">
+          <span>
+            {me.user.name} · {me.org.name}
+          </span>
+          <button type="button" className="link" onClick={signOut}>
+            Sign out
+          </button>
+        </div>
+      </header>
+      <main>
+        {route.page === "list" && <SessionList />}
+        {route.page === "session" && <SessionView id={route.id} me={me} />}
+        {route.page === "members" && <Members me={me} />}
+      </main>
+    </div>
   );
 }

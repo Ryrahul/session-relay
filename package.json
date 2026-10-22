@@ -14,7 +14,11 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "dev:all": "node scripts/dev.mjs",
+    "bootstrap:dev": "DATABASE_URL=postgres://relay:relay@localhost:54320/relay PUBLIC_URL=http://localhost:5173 npm run build -w @session-relay/shared -w @session-relay/server >/dev/null && DATABASE_URL=postgres://relay:relay@localhost:54320/relay PUBLIC_URL=http://localhost:5173 node packages/server/dist/bootstrap.js",
+    "test:integration": "./scripts/test-integration.sh",
+    "test:e2e": "./scripts/e2e.sh"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

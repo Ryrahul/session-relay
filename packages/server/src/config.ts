@@ -7,6 +7,8 @@ const Env = z.object({
   PUBLIC_URL: z.string().url().default("http://localhost:8787"),
   STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
   STORAGE_LOCAL_DIR: z.string().default("./data/transcripts"),
+  /** Directory of the built web app (packages/web/dist). Served at / when set. */
+  WEB_DIST: z.string().optional(),
   S3_BUCKET: z.string().optional(),
   S3_REGION: z.string().optional(),
   S3_ENDPOINT: z.string().url().optional(),

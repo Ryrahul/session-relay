@@ -49,16 +49,21 @@ share_current_session(summary, include, visibility)
 | 4 | Install script, onboarding doc, pilot with 2–3 people | 1–2 days |
 | 5 | Optional: auto-share hooks, native resume, semantic search, Slack post | 3–5 days |
 
-## Done in the scaffold
+## Status (22 Oct 2026)
 
-- Monorepo, builds and tests.
-- Multi-tenant schema: orgs, users, memberships with roles, hashed API tokens, org settings, sessions, per-person visibility, usage events, audit log.
-- Server: health, token auth scoped to org, `GET /v1/me`, migrations on start, bootstrap command.
-- Storage interface with local disk driver.
-- CLI: `login` (server URL configurable, token stored with 0600), `whoami`, placeholders for the rest.
-- Docker Compose for self-hosting.
+Phases 0–3b are built and tested locally:
+
+- **Phase 0:** formats checked against real Claude Code 2.1 and OpenCode 1.19 sessions; fixtures in `fixtures/`. Codex 0.145 could not complete a run on the dev laptop (no provider key), so its fixture is constructed from the known rollout format.
+- **Phase 1:** adapters for all three tools, redaction, `relay share --dry-run`.
+- **Phase 2:** sessions API (share, list, search, get with tail/full paging, update, delete), members, tokens, retention purge, audit and usage; all CLI commands.
+- **Phase 3:** `relay mcp` with four tools; `/share` and `/pickup` for Claude Code, OpenCode and Codex; `relay setup`.
+- **Phase 3b:** web app served by the server.
+- **Tests:** unit tests, API integration tests against Postgres (including org isolation), `scripts/e2e.sh` (Docker stack, three users, real sessions, MCP client), and a manual run where Claude Code shared via `/share` and OpenCode continued it via `/pickup`.
+
+Next: Phase 4 (deploy to our server, publish the CLI, onboard the team).
 
 ## Open questions
 
 - License before any outside use.
 - Final product name (check npm and domain availability).
+- Codex: replace the constructed fixture with a real redacted session once Codex is logged in.

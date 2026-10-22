@@ -69,7 +69,10 @@ CREATE TABLE sessions (
   expires_at           timestamptz,
   deleted_at           timestamptz,
   search               tsvector GENERATED ALWAYS AS (
-    to_tsvector('english', title || ' ' || coalesce(summary->>'goal', '') || ' ' || repo)
+    setweight(to_tsvector('english', title), 'A') ||
+    setweight(jsonb_to_tsvector('english', summary, '["string"]'), 'B') ||
+    setweight(to_tsvector('simple', repo || ' ' || coalesce(branch, '')), 'B') ||
+    setweight(jsonb_to_tsvector('english', messages, '["string"]'), 'D')
   ) STORED
 );
 

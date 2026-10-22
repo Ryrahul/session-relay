@@ -12,6 +12,7 @@ export interface CliConfig {
 }
 
 export function configPath(env: NodeJS.ProcessEnv = process.env): string {
+  if (env.RELAY_CONFIG) return env.RELAY_CONFIG;
   const base = env.XDG_CONFIG_HOME || path.join(homedir(), ".config");
   return path.join(base, "session-relay", "config.json");
 }

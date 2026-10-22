@@ -3,6 +3,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  # The deploy workflow runs the same checks before shipping.
+  workflow_call:
 
 jobs:
   test:

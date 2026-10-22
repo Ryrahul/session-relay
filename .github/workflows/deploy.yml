@@ -1,0 +1,126 @@
+name: Deploy
+# Anything merged into the `deploy` branch ships to production.
+# Promote with: scripts/release.sh  (opens a PR from main to deploy)
+on:
+  push:
+    branches: [deploy]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to deploy (a commit SHA from an earlier build). Empty = build this commit."
+        required: false
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/session-relay
+
+jobs:
+  test:
+    if: ${{ !inputs.tag }}
+    uses: ./.github/workflows/ci.yml
+
+  image:
+    needs: test
+    if: ${{ !inputs.tag }}
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: meta
+        run: |
+          echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/server.Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+            ${{ steps.meta.outputs.image }}:deploy
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  server:
+    needs: image
+    # Runs after a build, or on its own when re-deploying an existing tag.
+    if: ${{ always() && (needs.image.result == 'success' || (inputs.tag && needs.image.result == 'skipped')) }}
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || needs.image.outputs.tag }}
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/session-relay' }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check server secrets
+        id: check
+        run: |
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "${{ secrets.DEPLOY_SSH_KEY }}" ]; then
+            echo "::warning::Image ${TAG} is built, but DEPLOY_HOST / DEPLOY_USER / DEPLOY_SSH_KEY are not set, so nothing was deployed. See docs/DEPLOY.md."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up SSH
+        if: steps.check.outputs.ready == 'true'
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          if [ -n "$KNOWN_HOSTS" ]; then
+            printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            echo "::warning::DEPLOY_KNOWN_HOSTS is not set; trusting the host key on first use."
+            ssh-keyscan -p "$DEPLOY_PORT" "$DEPLOY_HOST" > ~/.ssh/known_hosts 2>/dev/null
+          fi
+          cat > ~/.ssh/config <<CFG
+          Host prod
+            HostName $DEPLOY_HOST
+            User $DEPLOY_USER
+            Port $DEPLOY_PORT
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+          CFG
+
+      - name: Copy deploy files
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          # shellcheck disable=SC2029 # values are meant to expand on the runner
+          ssh prod "mkdir -p '$DEPLOY_PATH'"
+          scp deploy/docker-compose.prod.yml prod:"$DEPLOY_PATH/docker-compose.yml"
+          scp deploy/Caddyfile deploy/deploy-remote.sh prod:"$DEPLOY_PATH/"
+
+      - name: Deploy ${{ env.TAG }}
+        if: steps.check.outputs.ready == 'true'
+        env:
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          IMAGE_LC="${IMAGE,,}"
+          # The registry token only lives for this job; the remote script logs out after pulling.
+          # shellcheck disable=SC2029 # values are meant to expand on the runner
+          printf '%s' "$REGISTRY_TOKEN" | ssh prod "cd '$DEPLOY_PATH' && IMAGE='$IMAGE_LC' REGISTRY_USER='$REGISTRY_USER' bash deploy-remote.sh '$TAG'"
+
+      - name: Summary
+        if: always() && steps.check.outputs.ready == 'true'
+        run: echo "Deployed \`${IMAGE,,}:${TAG}\` to ${DEPLOY_HOST}" >> "$GITHUB_STEP_SUMMARY"

@@ -33,6 +33,8 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env exec server \
 
 Put a reverse proxy with TLS (Caddy, nginx) in front of `SERVER_PORT`. Open `PUBLIC_URL` in a browser and sign in with your token.
 
+For production, use the `deploy` branch: merging into it tests, builds, backs up, deploys and health-checks automatically, with rollback. See [docs/DEPLOY.md](docs/DEPLOY.md).
+
 ## Set up each laptop
 
 ```sh
@@ -75,6 +77,9 @@ What goes up by default: an agent-written summary (or the first request and last
 - Every share, pull and delete is in the audit log.
 
 ## Develop
+
+Work on `feature/*` branches, open PRs to `main`, release with `scripts/release.sh` (PR `main` → `deploy`).
+
 
 ```sh
 npm install

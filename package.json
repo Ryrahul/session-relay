@@ -1,0 +1,29 @@
+{
+  "name": "session-relay",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/cli",
+    "packages/web"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "dev:all": "node scripts/dev.mjs",
+    "bootstrap:dev": "DATABASE_URL=postgres://relay:relay@localhost:54320/relay PUBLIC_URL=http://localhost:5173 npm run build -w @session-relay/shared -w @session-relay/server >/dev/null && DATABASE_URL=postgres://relay:relay@localhost:54320/relay PUBLIC_URL=http://localhost:5173 node packages/server/dist/bootstrap.js",
+    "test:integration": "./scripts/test-integration.sh",
+    "test:e2e": "./scripts/e2e.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  }
+}

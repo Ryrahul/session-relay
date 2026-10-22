@@ -1,0 +1,61 @@
+# Production stack, run from the deploy directory on the server (copied there as docker-compose.yml).
+# The image tag is set by deploy-remote.sh; secrets live in .env next to this file.
+name: session-relay
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: relay
+      POSTGRES_USER: relay
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U relay -d relay"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  server:
+    # deploy-remote.sh sets IMAGE_TAG; manual commands use the image it last tagged :current.
+    image: ${IMAGE:-ghcr.io/ryrahul/session-relay}:${IMAGE_TAG:-current}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://relay:${POSTGRES_PASSWORD}@postgres:5432/relay
+      PORT: 8787
+      PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL in .env}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      STORAGE_LOCAL_DIR: /data/transcripts
+    volumes:
+      - transcripts:/data/transcripts
+    # Only reachable from the host; Caddy (or your own proxy) faces the internet.
+    ports:
+      - "127.0.0.1:${SERVER_PORT:-8787}:8787"
+
+  # HTTPS with automatic certificates. Disable by setting COMPOSE_PROFILES= in .env
+  # if the server already has nginx or another proxy (point it at 127.0.0.1:SERVER_PORT).
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["tls"]
+    restart: unless-stopped
+    depends_on: [server]
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  transcripts:
+  caddy_data:
+  caddy_config:

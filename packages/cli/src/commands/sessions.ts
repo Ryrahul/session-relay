@@ -1,0 +1,187 @@
+import { readFile, mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { IncludeMode, SourceTool, Summary, type DetailMode } from "@session-relay/shared";
+import { findSessions } from "../adapters/index.js";
+import { RelayClient } from "../client.js";
+import { repoInfo } from "../git.js";
+import { renderHandoff } from "../handoff.js";
+import { describeRedactions, prepareShare, relayDir, writeDryRun } from "../share.js";
+import { ago, ask, choose, confirm, interactive, toolLabel } from "../ui.js";
+
+interface ShareOpts {
+  tool?: string;
+  id?: string;
+  latest?: boolean;
+  include?: string;
+  tail?: string;
+  title?: string;
+  people?: string;
+  summaryFile?: string;
+  dryRun?: boolean;
+  yes?: boolean;
+  json?: boolean;
+}
+
+function parseTool(t?: string): SourceTool | undefined {
+  if (!t) return undefined;
+  const alias: Record<string, SourceTool> = { claude: "claude-code", "claude-code": "claude-code", opencode: "opencode", codex: "codex" };
+  const tool = alias[t.toLowerCase()];
+  if (!tool) throw new Error(`Unknown tool "${t}". Use claude, opencode or codex.`);
+  return tool;
+}
+
+/** relay sessions: local sessions for this repo, across tools. */
+export async function localSessions(opts: { tool?: string }): Promise<void> {
+  const repo = await repoInfo();
+  const refs = await findSessions(repo.root, parseTool(opts.tool));
+  if (!refs.length) return console.log(`No local sessions found for ${repo.root}.`);
+  for (const r of refs.slice(0, 20)) {
+    console.log(`${toolLabel(r.tool)} ${ago(r.updatedAt).padEnd(9)} ${r.nativeId.slice(0, 14).padEnd(14)}  ${r.title}`);
+  }
+}
+
+export async function share(opts: ShareOpts): Promise<void> {
+  const tool = parseTool(opts.tool);
+  const client = opts.dryRun ? await RelayClient.fromConfig().catch(() => null) : await RelayClient.fromConfig();
+  const repo = await repoInfo();
+  let include = opts.include ? IncludeMode.parse(opts.include) : undefined;
+  let people = opts.people ? opts.people.split(",").map((s) => s.trim()).filter(Boolean) : undefined;
+  const summary = opts.summaryFile ? Summary.parse(JSON.parse(await readFile(opts.summaryFile, "utf8"))) : undefined;
+  const ask_ = interactive() && !opts.yes;
+
+  let ref;
+  if (!opts.id && !opts.latest && ask_) {
+    const refs = await findSessions(repo.root, tool);
+    if (!refs.length) throw new Error(`No Claude Code, OpenCode or Codex sessions found for ${repo.root}.`);
+    console.log(`Recent sessions in ${repo.repo}:`);
+    ref = await choose(
+      "Share which session?",
+      refs.slice(0, 10).map((r) => ({ label: `${toolLabel(r.tool)} ${ago(r.updatedAt).padEnd(9)} ${r.title}`, value: r })),
+    );
+  }
+  if (!include && ask_) {
+    include = await choose<IncludeMode>("Include", [
+      { label: "summary + last 30 messages", value: "summary+tail" },
+      { label: "summary only", value: "summary" },
+      { label: "full transcript", value: "full" },
+    ]);
+  }
+  if (people === undefined && ask_ && !opts.dryRun) {
+    const who = await ask("Visible to (Enter = whole team, or names separated by commas): ");
+    people = who ? who.split(",").map((s) => s.trim()).filter(Boolean) : [];
+  }
+
+  const prepared = await prepareShare(client, {
+    tool,
+    id: opts.id,
+    ref,
+    include: include ?? "summary+tail",
+    tail: opts.tail ? Number(opts.tail) : undefined,
+    summary,
+    title: opts.title,
+    people,
+  });
+  const { session, transcript } = prepared.built;
+  const redactNote = describeRedactions(prepared.built.redactions);
+
+  if (opts.dryRun) {
+    const file = await writeDryRun(prepared);
+    console.log(`${redactNote}\nDry run: nothing was uploaded. Review ${path.relative(process.cwd(), file) || file}`);
+    return;
+  }
+  if (!opts.json) {
+    console.log(`\n"${session.title}" · ${toolLabel(prepared.ref.tool).trim()} · ${session.include} · ${session.messages.length} messages · ${session.visibility.team ? "whole team" : `${session.visibility.people.length} people`}`);
+    console.log(redactNote);
+  }
+  if (ask_ && !(await confirm("Share it?"))) return console.log("Cancelled.");
+
+  const { id } = await client!.share({ session, transcript });
+  if (opts.json) return console.log(JSON.stringify({ id, title: session.title, redactions: session.redactions }));
+  console.log(`Shared as ${id}. Teammates can run: relay pull ${id}`);
+}
+
+interface ListOpts {
+  all?: boolean;
+  repo?: string;
+  branch?: string;
+  tool?: string;
+  author?: string;
+  limit?: string;
+  json?: boolean;
+}
+
+async function printList(query: Record<string, string | number | undefined>, json?: boolean) {
+  const client = await RelayClient.fromConfig();
+  const { sessions } = await client.list(query);
+  if (json) return console.log(JSON.stringify(sessions, null, 2));
+  if (!sessions.length) return console.log("No shared sessions found.");
+  for (const s of sessions) {
+    console.log(
+      `${s.id}  ${s.author.name.slice(0, 12).padEnd(12)} ${toolLabel(s.tool)} ${ago(s.created_at).padEnd(9)} ${(s.branch ?? "").slice(0, 18).padEnd(18)} ${s.title}`,
+    );
+  }
+}
+
+export async function list(opts: ListOpts): Promise<void> {
+  let repo = opts.repo;
+  if (!repo && !opts.all) repo = await repoInfo().then((r) => r.repo).catch(() => undefined);
+  await printList({ repo, branch: opts.branch, tool: parseTool(opts.tool), author: opts.author, limit: opts.limit }, opts.json);
+}
+
+export async function search(query: string, opts: ListOpts): Promise<void> {
+  await printList({ q: query, repo: opts.repo, author: opts.author, tool: parseTool(opts.tool), limit: opts.limit }, opts.json);
+}
+
+function mode(opts: { full?: boolean; summaryOnly?: boolean }): DetailMode {
+  return opts.full ? "full" : opts.summaryOnly ? "summary" : "tail";
+}
+
+export async function show(id: string, opts: { full?: boolean; summaryOnly?: boolean; tail?: string; json?: boolean }): Promise<void> {
+  const client = await RelayClient.fromConfig();
+  const s = await client.get(id, mode(opts), { tail: opts.tail ? Number(opts.tail) : undefined });
+  console.log(opts.json ? JSON.stringify(s, null, 2) : renderHandoff(s));
+}
+
+/** Writes the handoff file into .relay/ in the current repo (or the current folder). */
+export async function pull(id: string, opts: { full?: boolean; summaryOnly?: boolean; out?: string }): Promise<void> {
+  const client = await RelayClient.fromConfig();
+  let s = await client.get(id, mode(opts));
+  if (opts.full) {
+    // Fetch every page so the file has the whole transcript.
+    const messages = [...s.messages];
+    while (messages.length < s.message_total) {
+      const page = await client.get(id, "full", { offset: messages.length, limit: 1000 });
+      if (!page.messages.length) break;
+      messages.push(...page.messages);
+    }
+    s = { ...s, messages, message_offset: 0 };
+  }
+  const base = await repoInfo().then((r) => r.root).catch(() => process.cwd());
+  const file = opts.out ?? path.join(await relayDir(base), `handoff-${s.id}.md`);
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, renderHandoff(s));
+  const rel = path.relative(process.cwd(), file) || file;
+  console.log(`Wrote ${rel}\nTell your agent: "Read ${rel} and continue from where it stopped."`);
+}
+
+export async function remove(id: string, opts: { yes?: boolean }): Promise<void> {
+  const client = await RelayClient.fromConfig();
+  if (interactive() && !opts.yes && !(await confirm(`Delete ${id} for everyone? Copies already pulled are not recalled.`, false))) {
+    return console.log("Cancelled.");
+  }
+  await client.remove(id);
+  console.log(`Deleted ${id}.`);
+}
+
+export async function members(): Promise<void> {
+  const client = await RelayClient.fromConfig();
+  const { members } = await client.members();
+  for (const m of members) console.log(`${m.name.padEnd(20)} ${m.email.padEnd(30)} ${m.role}`);
+}
+
+export async function invite(email: string, opts: { name: string; role?: string }): Promise<void> {
+  const client = await RelayClient.fromConfig();
+  const { user, token } = await client.invite(email, opts.name, opts.role ?? "member");
+  console.log(`Added ${user.name} <${user.email}> as ${user.role}.`);
+  console.log(`\nSend them this privately (shown once):\n  relay login --server ${client.config.server} --token ${token}`);
+}

@@ -1,0 +1,24 @@
+{
+  "name": "@session-relay/cli",
+  "version": "0.0.1",
+  "description": "Share coding-agent sessions (Claude Code, Codex, OpenCode) with your team.",
+  "type": "module",
+  "bin": {
+    "relay": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "@session-relay/shared": "^0.0.1",
+    "commander": "^12.1.0",
+    "zod": "^3.25.76"
+  }
+}

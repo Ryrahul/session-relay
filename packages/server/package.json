@@ -1,0 +1,23 @@
+{
+  "name": "@session-relay/server",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "migrate": "node dist/db/migrate-cli.js",
+    "bootstrap": "node dist/bootstrap.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.17",
+    "@session-relay/shared": "^0.0.1",
+    "hono": "^4.13.13",
+    "postgres": "^3.4.9",
+    "zod": "^3.25.76"
+  }
+}

@@ -1,0 +1,176 @@
+name: Deploy
+# Anything merged into the `deploy` branch ships to production.
+# Promote with: scripts/release.sh  (opens a PR from main to deploy)
+on:
+  push:
+    branches: [deploy]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to deploy (a commit SHA from an earlier build). Empty = build this commit."
+        required: false
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/session-relay
+
+jobs:
+  test:
+    if: ${{ !inputs.tag }}
+    uses: ./.github/workflows/ci.yml
+
+  image:
+    needs: test
+    if: ${{ !inputs.tag }}
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: meta
+        run: |
+          echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE_NAME,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/server.Dockerfile
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+            ${{ steps.meta.outputs.image }}:deploy
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Deploys the same image, with the same scripts, to a throwaway server on this runner over SSH.
+  # Production only runs if this passes.
+  rehearse:
+    needs: image
+    if: ${{ always() && (needs.image.result == 'success' || (inputs.tag && needs.image.result == 'skipped')) }}
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || needs.image.outputs.tag }}
+      DEPLOY_PATH: /opt/session-relay
+      REGISTRY_USER: ${{ github.actor }}
+      REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start a local SSH server as the target
+        run: |
+          echo "IMAGE=${IMAGE_NAME,,}" >> "$GITHUB_ENV"
+          command -v sshd >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq openssh-server; }
+          sudo mkdir -p /run/sshd && (sudo systemctl start ssh 2>/dev/null || sudo /usr/sbin/sshd)
+          install -m 700 -d ~/.ssh
+          ssh-keygen -q -t ed25519 -N "" -f ~/.ssh/deploy_key
+          cat ~/.ssh/deploy_key.pub >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
+          ssh-keyscan -H localhost > ~/.ssh/known_hosts 2>/dev/null
+          printf 'Host prod\n  HostName localhost\n  User %s\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n' "$USER" > ~/.ssh/config
+          ssh prod true
+          sudo mkdir -p "$DEPLOY_PATH" && sudo chown "$USER" "$DEPLOY_PATH"
+          printf 'POSTGRES_PASSWORD=%s\nPUBLIC_URL=http://localhost:8787\nCOMPOSE_PROFILES=\nSERVER_PORT=8787\n' "$(openssl rand -hex 16)" > "$DEPLOY_PATH/.env"
+
+      - name: First deploy
+        run: scripts/ci-deploy.sh "$TAG"
+
+      - name: Smoke test the live server
+        run: |
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+          OUT=$(docker compose exec -T server node packages/server/dist/bootstrap.js --org "Rehearsal" --email ci@example.com --name CI)
+          TOKEN=$(grep -oE 'srk_[A-Za-z0-9_-]+' <<<"$OUT" | head -1)
+          curl -fsS http://127.0.0.1:8787/v1/me -H "authorization: Bearer $TOKEN" | grep -q '"Rehearsal"'
+          curl -fsS http://127.0.0.1:8787/ | grep -q '<div id="root">'
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/v1/me -H "authorization: Bearer srk_wrongwrongwrongwrongwrong")
+          [ "$code" = 401 ]
+          echo "API, auth and web app OK"
+
+      - name: Redeploy takes a backup and keeps data
+        run: |
+          set -euo pipefail
+          scripts/ci-deploy.sh "$TAG"
+          cd "$DEPLOY_PATH"
+          ls backups/*.sql.gz
+          # shellcheck disable=SC2012 # our own timestamped file names
+          gunzip -c "$(ls -1t backups/*.sql.gz | head -1)" | grep -q "Rehearsal"
+          [ "$(docker compose exec -T postgres psql -U relay -d relay -tAc 'select count(*) from orgs')" = 1 ]
+          echo "Backup contains the data; data survived the redeploy"
+
+      - name: A bad release leaves the live version running
+        run: |
+          set -uo pipefail
+          if scripts/ci-deploy.sh does-not-exist; then echo "deploying a missing tag should fail"; exit 1; fi
+          curl -fsS http://127.0.0.1:8787/health
+          [ "$(cat "$DEPLOY_PATH/.current_tag")" = "$TAG" ]
+          echo "Still serving $TAG after a failed release"
+
+  server:
+    needs: [image, rehearse]
+    if: ${{ always() && needs.rehearse.result == 'success' }}
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || needs.image.outputs.tag }}
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/session-relay' }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+      REGISTRY_USER: ${{ github.actor }}
+      REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check server secrets
+        id: check
+        env:
+          HAS_KEY: ${{ secrets.DEPLOY_SSH_KEY != '' }}
+        run: |
+          echo "IMAGE=${IMAGE_NAME,,}" >> "$GITHUB_ENV"
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ "$HAS_KEY" != "true" ]; then
+            echo "::warning::Image ${TAG} is built and passed the rehearsal, but DEPLOY_HOST / DEPLOY_USER / DEPLOY_SSH_KEY are not set, so production was not deployed. See docs/DEPLOY.md."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up SSH
+        if: steps.check.outputs.ready == 'true'
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          if [ -n "$KNOWN_HOSTS" ]; then
+            printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            echo "::warning::DEPLOY_KNOWN_HOSTS is not set; trusting the host key on first use."
+            ssh-keyscan -p "$DEPLOY_PORT" "$DEPLOY_HOST" > ~/.ssh/known_hosts 2>/dev/null
+          fi
+          printf 'Host prod\n  HostName %s\n  User %s\n  Port %s\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n' \
+            "$DEPLOY_HOST" "$DEPLOY_USER" "$DEPLOY_PORT" > ~/.ssh/config
+
+      - name: Deploy ${{ env.TAG }}
+        if: steps.check.outputs.ready == 'true'
+        run: scripts/ci-deploy.sh "$TAG"
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ "${{ steps.check.outputs.ready }}" = "true" ]; then
+            echo "Deployed \`$IMAGE:$TAG\` to $DEPLOY_HOST" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Built and rehearsed \`$IMAGE:$TAG\`; production not configured yet." >> "$GITHUB_STEP_SUMMARY"
+          fi

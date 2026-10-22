@@ -18,8 +18,14 @@ The Deploy workflow:
 
 1. Runs the full CI (build, unit tests, Postgres integration tests).
 2. Builds the image and pushes it to `ghcr.io/<owner>/session-relay:<commit>` (and `:deploy`).
-3. Copies `docker-compose.prod.yml`, `Caddyfile` and `deploy-remote.sh` to the server over SSH.
-4. On the server, `deploy-remote.sh`:
+3. **Rehearses** the release: starts a throwaway server on the runner, reachable over SSH, and deploys the same image with the same scripts. It then:
+   - bootstraps an org and checks the API, auth and web app,
+   - redeploys and checks that a backup was taken and the data kept,
+   - tries to deploy a tag that doesn't exist and checks the live version kept running.
+
+   Production is only touched if the rehearsal passes.
+4. Copies `docker-compose.prod.yml`, `Caddyfile` and `deploy-remote.sh` to the server over SSH.
+5. On the server, `deploy-remote.sh`:
    - backs up the database to `backups/` (keeps 14),
    - starts the new image,
    - checks `/health` for up to 90 s,

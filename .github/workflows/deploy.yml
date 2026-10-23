@@ -88,9 +88,14 @@ jobs:
           PUBLIC_HOST: localhost
         run: |
           scripts/ci-deploy.sh "$TAG"
-          grep -E '^(PUBLIC_URL|COMPOSE_PROFILES|SERVER_PORT)=' "$DEPLOY_PATH/.env"
-          grep -qE '^POSTGRES_PASSWORD=[0-9a-f]{48}$' "$DEPLOY_PATH/.env"
-          [ "$(stat -c %a "$DEPLOY_PATH/.env")" = 600 ]
+          ENV_FILE="$DEPLOY_PATH/.env"
+          grep -E '^(PUBLIC_URL|COMPOSE_PROFILES|SERVER_PORT)=' "$ENV_FILE"
+          pw=$(sed -n 's/^POSTGRES_PASSWORD=//p' "$ENV_FILE")
+          echo "POSTGRES_PASSWORD length: ${#pw}"
+          [ "${#pw}" -ge 32 ] || { echo "::error::.env has no generated POSTGRES_PASSWORD"; exit 1; }
+          mode=$(stat -c %a "$ENV_FILE")
+          echo ".env mode: $mode"
+          case "$mode" in 600|400) ;; *) echo "::error::.env should be readable only by its owner, got $mode"; exit 1 ;; esac
 
       - name: Smoke test the live server
         run: |

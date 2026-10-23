@@ -1,15 +1,15 @@
-#!/usr/bin/env node
 import { Command } from "commander";
 import { login } from "./commands/login.js";
 import { invite, list, localSessions, members, pull, remove, search, share, show } from "./commands/sessions.js";
 import { setup } from "./commands/setup.js";
 import { whoami } from "./commands/whoami.js";
 import { runMcp } from "./mcp.js";
+import { VERSION } from "./version.js";
 
 const program = new Command()
   .name("relay")
   .description("Share coding-agent sessions (Claude Code, OpenCode, Codex) with your team")
-  .version("0.1.0");
+  .version(VERSION);
 
 program
   .command("login")

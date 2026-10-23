@@ -9,6 +9,8 @@ const Env = z.object({
   STORAGE_LOCAL_DIR: z.string().default("./data/transcripts"),
   /** Directory of the built web app (packages/web/dist). Served at / when set. */
   WEB_DIST: z.string().optional(),
+  /** Fixed first-run setup code, instead of a random one printed at startup. */
+  SETUP_CODE: z.string().min(8).optional(),
   S3_BUCKET: z.string().optional(),
   S3_REGION: z.string().optional(),
   S3_ENDPOINT: z.string().url().optional(),

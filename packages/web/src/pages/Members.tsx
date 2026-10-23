@@ -66,7 +66,7 @@ export function Members({ me }: { me: MeResponse }) {
             </div>
             <div className="field">
               <label htmlFor="inv-email">Email</label>
-              <input id="inv-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <input id="inv-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required aria-describedby="inv-email-hint" />
             </div>
             <div className="field">
               <label htmlFor="inv-role">Role</label>
@@ -80,6 +80,9 @@ export function Members({ me }: { me: MeResponse }) {
               <Icon name="plus" size={14} /> Add
             </button>
           </form>
+          <p id="inv-email-hint" className="hint">
+            The email only identifies them in Session Relay. It doesn't need to match their Claude, OpenCode or Codex account; they log in with the token.
+          </p>
           {created && (
             <div className="reveal">
               <p>

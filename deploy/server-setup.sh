@@ -59,4 +59,6 @@ COMPOSE_PROFILES=$PROFILES
 SERVER_PORT=$PORT
 STORAGE_DRIVER=local
 ENV
+# Don't rely on umask alone (default ACLs can override it): the file holds the DB password.
+chmod 600 .env
 log "wrote .env (PUBLIC_URL=$URL, SERVER_PORT=$PORT)"

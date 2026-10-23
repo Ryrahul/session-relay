@@ -55,18 +55,38 @@ curl -s http://127.0.0.1:8787/health      # {"ok":true}
 
 Database migrations run automatically when the server starts.
 
-## 4. Create your team and first admin
+## 4. Create your organization (first-run setup)
 
-Run once:
+On a fresh server, the server prints a **one-time setup code** in its logs:
+
+```sh
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env logs server | grep -A2 "setup code"
+```
+
+```
+  Open https://relay.your-team.com and enter this one-time setup code:
+      GZUB-5QPU-TTLS
+```
+
+Open `PUBLIC_URL` in a browser. It shows **Set up Session Relay**. Enter the code, your organization's name, and your name and email. You become the **owner**, and your owner token is shown **once**. Save it in your password manager. You're signed in straight away.
+
+How it stays safe:
+- The setup page only exists while the server has no organization. After that it's gone for good.
+- Without the code from the server logs, nobody else can claim a new server.
+- 10 wrong codes lock setup for 15 minutes.
+- The code changes on every restart, until setup is done. To choose it yourself, set `SETUP_CODE`.
+
+<details><summary>Prefer the command line?</summary>
 
 ```sh
 docker compose -f deploy/docker-compose.yml --env-file deploy/.env exec server \
   node packages/server/dist/bootstrap.js --org "Your Team" --email you@your-team.com --name "Your Name"
 ```
 
-It prints an owner token **once**. Store it in your password manager.
+It prints the owner token once.
+</details>
 
-Open `PUBLIC_URL` in a browser and sign in with it. Then:
+Then:
 
 - **Members → Add a teammate** for each person. Each gets a one-time `relay login ...` command to send them privately.
 - **Settings:** set retention, and optionally an allowlist of repositories (`github.com/your-org/*`) and extra secret patterns.
@@ -112,6 +132,7 @@ Run the backup from cron, e.g. nightly, and copy the files somewhere off the ser
 | `COMPOSE_PROFILES` | | `tls` to run Caddy |
 | `SERVER_PORT` | `8787` | Host port of the API |
 | `SERVER_BIND` | `127.0.0.1` | Host interface the API port binds to |
+| `SETUP_CODE` | (random) | Fixed first-run setup code, instead of the one printed at startup |
 | `STORAGE_DRIVER` | `local` | Where full transcripts go. `local` = Docker volume. S3/R2 is planned |
 
 Org settings (retention, allowed repositories, secret patterns) are changed in the web app under **Settings**, not in env vars.

@@ -1,5 +1,6 @@
 {
-  "name": "session-relay",
+  "name": "session-relay-monorepo",
+  "license": "AGPL-3.0-only",
   "private": true,
   "type": "module",
   "workspaces": [

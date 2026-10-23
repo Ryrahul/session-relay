@@ -1,5 +1,8 @@
 # FAQ
 
+**Does my email have to match my Claude, OpenCode or Codex account?**
+No. In Session Relay the email is just how teammates are told apart (and stops someone being added twice). It isn't linked to any agent account. You log in with your token, never your email.
+
 **Can I continue a Claude Code session in OpenCode (or the other way round)?**
 Yes. That's the main use. The receiving agent gets the handoff (summary plus recent conversation) as context, not the other tool's internal session format.
 

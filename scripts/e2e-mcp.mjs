@@ -5,7 +5,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { fileURLToPath } from "node:url";
 
 const [cwd, config, expectId] = process.argv.slice(2);
-const cli = fileURLToPath(new URL("../packages/cli/dist/index.js", import.meta.url));
+const cli = fileURLToPath(new URL("../packages/cli/dist/relay.js", import.meta.url));
 const transport = new StdioClientTransport({ command: process.execPath, args: [cli, "mcp"], cwd, env: { ...process.env, RELAY_CONFIG: config } });
 const client = new Client({ name: "e2e-check", version: "1.0.0" });
 await client.connect(transport);

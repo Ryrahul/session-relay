@@ -1,5 +1,7 @@
 name: Website
-# Builds the public site (landing page + docs) from docs/*.md and publishes it to GitHub Pages.
+# Builds the public site (landing page + docs) from docs/*.md.
+# - Deploys it to https://relay.rahulweb.online (rsync over a key that can only write the site folder).
+# - Publishes redirects on GitHub Pages, so old ryrahul.github.io/session-relay links keep working.
 on:
   push:
     branches: [main]
@@ -12,7 +14,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: website
   cancel-in-progress: true
 
 jobs:
@@ -26,11 +28,46 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node site/build.mjs site/dist
+      - run: node site/build.mjs site/redirect --redirect-to https://relay.rahulweb.online
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: site/dist
+          include-hidden-files: true
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site/dist
+          path: site/redirect
 
-  deploy:
+  deploy-site:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: docs
+      url: https://relay.rahulweb.online
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: site
+      - name: Upload to relay.rahulweb.online
+        env:
+          SSH_KEY: ${{ secrets.DOCS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DOCS_KNOWN_HOSTS }}
+          DOCS_HOST: ${{ secrets.DOCS_HOST }}
+          DOCS_USER: ${{ secrets.DOCS_USER }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/docs_key && chmod 600 ~/.ssh/docs_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The key is pinned to rrsync on the server, so the destination is relative to the site folder.
+          rsync -az --delete -e "ssh -i ~/.ssh/docs_key -o IdentitiesOnly=yes -o BatchMode=yes" site/ "$DOCS_USER@$DOCS_HOST:"
+      - name: Check it is live
+        run: |
+          curl -fsS -o /dev/null https://relay.rahulweb.online/
+          curl -fsS https://relay.rahulweb.online/docs/getting-started.html | grep -q "Getting started"
+          echo "Live at https://relay.rahulweb.online" >> "$GITHUB_STEP_SUMMARY"
+
+  pages-redirect:
     needs: build
     runs-on: ubuntu-latest
     environment:

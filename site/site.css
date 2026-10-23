@@ -47,6 +47,20 @@ code { font-family: var(--mono); font-size: 0.86em; }
 .btn:hover { text-decoration: none; border-color: var(--accent); }
 .btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .btn-primary:hover { filter: brightness(1.06); }
+.btn-github { gap: 8px; background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn-github:hover { border-color: var(--ink); opacity: 0.9; }
+.btn svg, .nav-github svg { flex: none; }
+.nav-github { display: inline-flex; align-items: center; gap: 6px; }
+.hero-install { margin: 0; font-size: 14px; color: var(--muted); }
+.hero-install code { background: var(--surface-2); border: 1px solid var(--line); padding: 4px 10px; border-radius: 7px; }
+.oss-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 18px; align-items: center; padding: 22px 24px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.oss-card:hover { text-decoration: none; border-color: var(--accent); }
+.oss-card svg { width: 34px; height: 34px; }
+.oss-card h3 { font-size: 18px; margin-bottom: 4px; }
+.oss-card p { margin: 0; color: var(--muted); }
+.oss-cta { color: var(--accent); font-weight: 600; font-size: 14px; white-space: nowrap; }
+@media (max-width: 720px) { .oss-card { grid-template-columns: auto minmax(0, 1fr); } .oss-cta { grid-column: 1 / -1; } }
 
 /* Landing */
 .landing { max-width: 1120px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-left, 0px)); }

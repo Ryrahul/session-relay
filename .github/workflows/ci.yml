@@ -28,6 +28,8 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
+      - name: Website builds
+        run: node site/build.mjs /tmp/site
       - name: Server integration tests
         run: npx vitest run --root packages/server src/api.integration.test.ts
         env:

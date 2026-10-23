@@ -7,3 +7,4 @@ dist/
 .relay/
 data/
 .DS_Store
+site/dist/

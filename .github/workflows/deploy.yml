@@ -139,7 +139,7 @@ jobs:
         run: |
           echo "IMAGE=${IMAGE_NAME,,}" >> "$GITHUB_ENV"
           if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ "$HAS_KEY" != "true" ]; then
-            echo "::warning::Image ${TAG} is built and passed the rehearsal, but DEPLOY_HOST / DEPLOY_USER / DEPLOY_SSH_KEY are not set, so production was not deployed. See docs/DEPLOY.md."
+            echo "::warning::Image ${TAG} is built and passed the rehearsal, but DEPLOY_HOST / DEPLOY_USER / DEPLOY_SSH_KEY are not set, so production was not deployed. See docs/deploy-pipeline.md."
             echo "ready=false" >> "$GITHUB_OUTPUT"
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"

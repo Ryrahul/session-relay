@@ -5,15 +5,50 @@ export function ago(iso: string): string {
   if (s < 60) return "just now";
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
+  if (s < 86400 * 30) return `${Math.floor(s / 86400)}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
 
-/** Hash routes: #/ (list), #/s/<id> (session), #/members. */
-export type Route = { page: "list" } | { page: "session"; id: string } | { page: "members" };
+export function dateTime(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+/** "Today", "Yesterday", or a date, for grouping lists. */
+export function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  const today = new Date();
+  const start = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((start(today) - start(d)) / 86400000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  if (diff < 7) return d.toLocaleDateString(undefined, { weekday: "long" });
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "long", year: d.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+}
+
+export function bytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 ** 2) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 ** 3) return `${(n / 1024 ** 2).toFixed(1)} MB`;
+  return `${(n / 1024 ** 3).toFixed(2)} GB`;
+}
+
+export function shortRepo(repo: string): string {
+  return repo.split("/").slice(-2).join("/");
+}
+
+/** Hash routes. */
+export type Route =
+  | { page: "sessions" }
+  | { page: "session"; id: string }
+  | { page: "start" }
+  | { page: "members" }
+  | { page: "settings" };
 
 export function parseRoute(hash: string): Route {
   const m = /^#\/s\/([\w-]+)/.exec(hash);
   if (m) return { page: "session", id: m[1]! };
+  if (hash.startsWith("#/start")) return { page: "start" };
   if (hash.startsWith("#/members")) return { page: "members" };
-  return { page: "list" };
+  if (hash.startsWith("#/settings")) return { page: "settings" };
+  return { page: "sessions" };
 }

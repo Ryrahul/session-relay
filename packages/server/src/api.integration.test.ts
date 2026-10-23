@@ -222,6 +222,27 @@ describe.skipIf(!DB)("API (integration)", () => {
     expect((await call(created.body.token, "GET", "/v1/me")).status).toBe(401);
   });
 
+  it("lets admins edit org settings and validates patterns", async () => {
+    const before = await call(alice.token, "GET", "/v1/org");
+    expect(before.body).toMatchObject({ id: orgA, settings: { retention_days: 90 } });
+    expect(before.body.stats.members).toBeGreaterThanOrEqual(3);
+    expect((await call(alice.token, "PATCH", "/v1/org", { retention_days: 30 })).status).toBe(403);
+    expect((await call(owner.token, "PATCH", "/v1/org", { redaction_patterns: ["(unclosed"] })).status).toBe(400);
+    expect((await call(owner.token, "PATCH", "/v1/org", { retention_days: 0 })).status).toBe(400);
+    const ok = await call(owner.token, "PATCH", "/v1/org", {
+      name: "Team A Renamed",
+      retention_days: 30,
+      repo_allowlist: [" GitHub.com/Acme/* "],
+      redaction_patterns: ["ACME-[0-9]{6}"],
+    });
+    expect(ok.status).toBe(200);
+    const after = await call(alice.token, "GET", "/v1/me");
+    expect(after.body.org.name).toBe("Team A Renamed");
+    expect(after.body.settings).toEqual({ retention_days: 30, repo_allowlist: ["github.com/acme/*"], redaction_patterns: ["ACME-[0-9]{6}"] });
+    expect((await call(outsider.token, "GET", "/v1/org")).body.id).toBe(orgB);
+    await call(owner.token, "PATCH", "/v1/org", { retention_days: 90, repo_allowlist: [], redaction_patterns: [] });
+  });
+
   it("records usage and audit events", async () => {
     const [u] = await sql`SELECT count(*)::int AS n FROM usage_events WHERE org_id = ${orgA} AND kind = 'session.share'`;
     const [a] = await sql`SELECT count(*)::int AS n FROM audit_log WHERE org_id = ${orgA} AND action = 'session.pull'`;

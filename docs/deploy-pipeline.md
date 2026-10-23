@@ -34,7 +34,18 @@ The Deploy workflow:
 
 Only one deploy runs at a time.
 
-## One-time server setup
+## First deploy is automatic
+
+Before every deploy, `deploy/server-setup.sh` runs on the server. If there's no `.env` yet, it creates one:
+- a random database password,
+- `PUBLIC_URL` and `DOMAIN`: for a bare IP like `20.168.9.177` that's `relay.20-168-9-177.sslip.io`, so HTTPS works without owning a domain,
+- Caddy for HTTPS **only if ports 80 and 443 are free**. Otherwise the API listens on `127.0.0.1:<port>` for your existing proxy.
+
+It never overwrites an existing `.env`. To use your own domain later, edit `DOMAIN` and `PUBLIC_URL` in the server's `.env` and redeploy.
+
+The server only needs Docker, and the deploy user must be allowed to run it (`sudo usermod -aG docker <user>`). The setup script stops with a clear message if either is missing.
+
+## One-time server setup (manual alternative)
 
 On the server (Ubuntu/Debian):
 

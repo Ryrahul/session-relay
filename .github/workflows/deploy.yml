@@ -81,10 +81,16 @@ jobs:
           printf 'Host prod\n  HostName localhost\n  User %s\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n' "$USER" > ~/.ssh/config
           ssh prod true
           sudo mkdir -p "$DEPLOY_PATH" && sudo chown "$USER" "$DEPLOY_PATH"
-          printf 'POSTGRES_PASSWORD=%s\nPUBLIC_URL=http://localhost:8787\nCOMPOSE_PROFILES=\nSERVER_PORT=8787\n' "$(openssl rand -hex 16)" > "$DEPLOY_PATH/.env"
+          # No .env here on purpose: the first deploy creates it with server-setup.sh, as on a real server.
 
-      - name: First deploy
-        run: scripts/ci-deploy.sh "$TAG"
+      - name: First deploy (creates .env, like a fresh server)
+        env:
+          PUBLIC_HOST: localhost
+        run: |
+          scripts/ci-deploy.sh "$TAG"
+          grep -E '^(PUBLIC_URL|COMPOSE_PROFILES|SERVER_PORT)=' "$DEPLOY_PATH/.env"
+          grep -qE '^POSTGRES_PASSWORD=[0-9a-f]{48}$' "$DEPLOY_PATH/.env"
+          [ "$(stat -c %a "$DEPLOY_PATH/.env")" = 600 ]
 
       - name: Smoke test the live server
         run: |
@@ -139,7 +145,7 @@ jobs:
         run: |
           echo "IMAGE=${IMAGE_NAME,,}" >> "$GITHUB_ENV"
           if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ "$HAS_KEY" != "true" ]; then
-            echo "::warning::Image ${TAG} is built and passed the rehearsal, but DEPLOY_HOST / DEPLOY_USER / DEPLOY_SSH_KEY are not set, so production was not deployed. See docs/DEPLOY.md."
+            echo "::warning::Image ${TAG} is built and passed the rehearsal, but DEPLOY_HOST / DEPLOY_USER / DEPLOY_SSH_KEY are not set, so production was not deployed. See docs/deploy-pipeline.md."
             echo "ready=false" >> "$GITHUB_OUTPUT"
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
@@ -164,7 +170,20 @@ jobs:
 
       - name: Deploy ${{ env.TAG }}
         if: steps.check.outputs.ready == 'true'
+        env:
+          PUBLIC_HOST: ${{ secrets.DEPLOY_HOST }}
         run: scripts/ci-deploy.sh "$TAG"
+
+      - name: Check the live site
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          # shellcheck disable=SC2029
+          URL=$(ssh prod "grep -E '^PUBLIC_URL=' '$DEPLOY_PATH/.env' | cut -d= -f2-")
+          echo "PUBLIC_URL=$URL"
+          for _ in $(seq 1 30); do curl -fsS --max-time 10 "$URL/health" && break; sleep 5; done || {
+            echo "::warning::$URL/health is not reachable from the internet yet. If the server is an Azure/AWS VM, open ports 80 and 443 (or SERVER_PORT) in its firewall / security group."
+          }
+          echo "Live at $URL" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Summary
         if: always()

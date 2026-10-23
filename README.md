@@ -84,3 +84,7 @@ npm run test:e2e -- <repo>  # full stack, real agent sessions from <repo>, MCP c
 ```
 
 Work on `feature/*` branches with PRs to `main`. Releases go `main` → `deploy`; see [deploy-pipeline.md](docs/deploy-pipeline.md).
+
+## License
+
+[AGPL-3.0](LICENSE). You can use, modify and self-host Session Relay freely; if you run a modified version as a service for others, you must publish your changes under the same license.

@@ -2,6 +2,7 @@
   "name": "session-relay",
   "version": "0.1.0",
   "description": "Share coding-agent sessions (Claude Code, OpenCode, Codex) with your team. /share in one agent, /pickup in another.",
+  "license": "AGPL-3.0-only",
   "keywords": [
     "claude-code",
     "opencode",
@@ -28,7 +29,8 @@
   },
   "files": [
     "dist/relay.js",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=20"

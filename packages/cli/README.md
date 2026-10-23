@@ -33,3 +33,7 @@ Full reference: [CLI docs](https://ryrahul.github.io/session-relay/docs/cli.html
 ## Privacy
 
 Nothing is uploaded unless you share it. API keys, tokens, passwords and private keys are removed on your machine before upload, and `relay share --dry-run` shows exactly what would be sent. See [security & privacy](https://ryrahul.github.io/session-relay/docs/security.html).
+
+## License
+
+AGPL-3.0-only

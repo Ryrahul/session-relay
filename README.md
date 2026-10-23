@@ -25,6 +25,8 @@ Handing off agent work means copy-pasting chat logs, or the next person starting
 | **Self-hosted** · available now | One `docker compose up` on your own server. Your data stays with you. → [Self-hosting guide](docs/self-hosting.md) |
 | **Cloud** · coming soon | We run it for you: sign in with GitHub, invite your team, no server. → [Roadmap](docs/roadmap.md) |
 
+The CLI is on npm: [`session-relay`](https://www.npmjs.com/package/session-relay).
+
 ## Quick start
 
 **Run the server** (once per team):
@@ -40,8 +42,7 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env exec server \
 **Connect each laptop:**
 
 ```sh
-git clone https://github.com/Ryrahul/session-relay.git ~/.session-relay
-cd ~/.session-relay && npm ci && npm run build && npm link -w @session-relay/cli
+npm install -g session-relay
 relay login --server https://relay.your-team.com --token srk_...
 relay setup        # adds /share and /pickup to Claude Code, OpenCode and Codex
 ```
@@ -49,6 +50,9 @@ relay setup        # adds /share and /pickup to Claude Code, OpenCode and Codex
 Full walkthrough: [Getting started](docs/getting-started.md).
 
 ## Docs
+
+Online at **https://relay.rahulweb.online**. Sources are in [`docs/`](docs/).
+
 
 - [Getting started](docs/getting-started.md): laptop setup, sharing, picking up
 - [Self-hosting](docs/self-hosting.md): Docker, HTTPS, backups, upgrades
@@ -85,3 +89,7 @@ npm run test:e2e -- <repo>  # full stack, real agent sessions from <repo>, MCP c
 ```
 
 Work on `feature/*` branches with PRs to `main`. Releases go `main` → `deploy`; see [deploy-pipeline.md](docs/deploy-pipeline.md).
+
+## License
+
+[AGPL-3.0](LICENSE). You can use, modify and self-host Session Relay freely; if you run a modified version as a service for others, you must publish your changes under the same license.

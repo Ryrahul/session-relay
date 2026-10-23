@@ -3,7 +3,6 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { repoInfo } from "../git.js";
 
@@ -52,7 +51,8 @@ async function mcpCommand(): Promise<string[]> {
     await run("relay", ["--version"]);
     return ["relay", "mcp"];
   } catch {
-    const script = fileURLToPath(new URL("../index.js", import.meta.url));
+    // The script that is running right now (dist/relay.js when installed, or the dev entry).
+    const script = path.resolve(process.argv[1] ?? "");
     return [process.execPath, script, "mcp"];
   }
 }

@@ -18,10 +18,8 @@ export function Start({ me }: { me: MeResponse }) {
         <li className="step">
           <div className="step-body">
             <h2>Install the relay CLI</h2>
-            <p className="muted">Needs Node.js 20 or newer and git. The npm package is coming soon; for now install from source:</p>
-            <Command>{`git clone ${REPO}.git ~/.session-relay
-cd ~/.session-relay && npm ci && npm run build
-npm link -w @session-relay/cli`}</Command>
+            <p className="muted">Needs Node.js 20 or newer.</p>
+            <Command>npm install -g session-relay</Command>
           </div>
         </li>
         <li className="step">

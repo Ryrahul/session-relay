@@ -1,13 +1,19 @@
-// Builds the public website (GitHub Pages) from docs/*.md: a landing page plus one page per doc.
-//   node site/build.mjs [outDir]     (default site/dist)
+// Builds the public website from docs/*.md: a landing page plus one page per doc.
+//   node site/build.mjs [outDir]                       site for https://relay.rahulweb.online (default site/dist)
+//   node site/build.mjs <outDir> --redirect-to <url>   same paths, each redirecting to <url> (old GitHub Pages address)
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { marked } from "marked";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const OUT = path.resolve(process.argv[2] ?? path.join(ROOT, "site/dist"));
+const args = process.argv.slice(2);
+const flag = args.indexOf("--redirect-to");
+const REDIRECT_TO = flag >= 0 ? args[flag + 1]?.replace(/\/$/, "") : null;
+const positional = args.filter((a, i) => !a.startsWith("--") && (flag < 0 || i !== flag + 1));
+const OUT = path.resolve(positional[0] ?? path.join(ROOT, "site/dist"));
 const REPO = "https://github.com/Ryrahul/session-relay";
+const SITE_URL = (process.env.SITE_URL ?? "https://relay.rahulweb.online").replace(/\/$/, "");
 
 // Order and titles for the docs nav. Files not listed are still built.
 const NAV = [
@@ -51,7 +57,7 @@ marked.use({ renderer, gfm: true });
 const MARK = `<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="13" height="5" rx="2.5" fill="var(--accent)"/><rect x="9" y="14" width="13" height="5" rx="2.5" fill="var(--ink)" opacity="0.85"/></svg>`;
 const FAVICON = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='5' width='13' height='5' rx='2.5' fill='%230f7b6c'/%3E%3Crect x='9' y='14' width='13' height='5' rx='2.5' fill='%2316202b'/%3E%3C/svg%3E`;
 
-function page({ title, description, body, depth, active = "" }) {
+function page({ title, description, body, depth, active = "", urlPath = "/" }) {
   const up = "../".repeat(depth);
   return `<!doctype html>
 <html lang="en">
@@ -63,6 +69,8 @@ function page({ title, description, body, depth, active = "" }) {
 <meta name="description" content="${esc(description)}">
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
+<link rel="canonical" href="${SITE_URL}${urlPath}">
+<meta property="og:url" content="${SITE_URL}${urlPath}">
 <link rel="icon" href="${FAVICON}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -230,7 +238,32 @@ function docPage(slug, md) {
     body,
     depth: 1,
     active: "docs",
+    urlPath: `/docs/${slug}.html`,
   });
+}
+
+function redirectPage(urlPath) {
+  const to = `${REDIRECT_TO}${urlPath}`;
+  return `<!doctype html><meta charset="utf-8"><title>Moved to ${esc(REDIRECT_TO)}</title>
+<link rel="canonical" href="${to}"><meta http-equiv="refresh" content="0; url=${to}">
+<script>location.replace(${JSON.stringify(to)} + location.hash)</script>
+<p>Session Relay's site moved to <a href="${to}">${esc(to)}</a>.</p>
+`;
+}
+
+if (REDIRECT_TO) {
+  await rm(OUT, { recursive: true, force: true });
+  await mkdir(path.join(OUT, "docs"), { recursive: true });
+  await writeFile(path.join(OUT, ".nojekyll"), "");
+  await writeFile(path.join(OUT, "index.html"), redirectPage("/"));
+  await writeFile(path.join(OUT, "docs", "index.html"), redirectPage("/docs/getting-started.html"));
+  const names = (await readdir(path.join(ROOT, "docs"))).filter((f) => f.endsWith(".md") && f !== "README.md");
+  for (const f of names) {
+    const slug = f.replace(/\.md$/, "");
+    await writeFile(path.join(OUT, "docs", `${slug}.html`), redirectPage(`/docs/${slug}.html`));
+  }
+  console.log(`Built redirects to ${REDIRECT_TO}: index + ${names.length} doc pages → ${OUT}`);
+  process.exit(0);
 }
 
 await rm(OUT, { recursive: true, force: true });

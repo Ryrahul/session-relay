@@ -1,6 +1,7 @@
-# Self-hosted Session Relay: API server + Postgres.
-#   cp deploy/.env.example deploy/.env   # then fill it in
-#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
+# Self-hosted Session Relay, built from source: API + web app + Postgres, optional HTTPS via Caddy.
+#   cp deploy/.env.example deploy/.env      # then fill it in
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
+# See docs/self-hosting.md.
 services:
   postgres:
     image: postgres:16-alpine
@@ -34,8 +35,26 @@ services:
     volumes:
       - transcripts:/data/transcripts
     ports:
-      - "${SERVER_PORT:-8787}:8787"
+      - "${SERVER_BIND:-127.0.0.1}:${SERVER_PORT:-8787}:8787"
+
+  # HTTPS with automatic certificates: set DOMAIN and COMPOSE_PROFILES=tls in deploy/.env.
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["tls"]
+    restart: unless-stopped
+    depends_on: [server]
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   pgdata:
   transcripts:
+  caddy_data:
+  caddy_config:

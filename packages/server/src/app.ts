@@ -9,6 +9,7 @@ import { requireAuth } from "./auth.js";
 import type { Sql } from "./db/client.js";
 import type { BlobStorage } from "./storage/index.js";
 import { meRoutes } from "./routes/me.js";
+import { orgRoutes } from "./routes/org.js";
 import { memberRoutes, tokenRoutes } from "./routes/members.js";
 import { sessionRoutes } from "./routes/sessions.js";
 
@@ -30,6 +31,7 @@ export function createApp({ sql, storage, webDist }: AppDeps) {
   v1.use("*", bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => c.json({ error: "Request too large" }, 413) }));
   v1.use("*", requireAuth(sql));
   v1.route("/me", meRoutes(sql));
+  v1.route("/org", orgRoutes(sql));
   v1.route("/members", memberRoutes(sql));
   v1.route("/tokens", tokenRoutes(sql));
   v1.route("/sessions", sessionRoutes(sql, storage));

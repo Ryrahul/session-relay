@@ -1,4 +1,4 @@
-import type { Member, MeResponse, SessionDetail, SessionListItem } from "@session-relay/shared";
+import type { Member, MeResponse, OrgInfo, OrgPatch, SessionDetail, SessionListItem } from "@session-relay/shared";
 
 const KEY = "relay.token";
 
@@ -20,7 +20,10 @@ export function setToken(token: string | null) {
 }
 
 export class ApiError extends Error {
-  constructor(readonly status: number, message: string) {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
     super(message);
   }
 }
@@ -36,6 +39,14 @@ async function call<T>(method: string, path: string, body?: unknown, token = get
   return data as T;
 }
 
+export interface TokenInfo {
+  id: string;
+  name: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked: boolean;
+}
+
 export const api = {
   me: (token?: string) => call<MeResponse>("GET", "/v1/me", undefined, token),
   list: (params: Record<string, string>) => {
@@ -48,4 +59,10 @@ export const api = {
   members: () => call<{ members: Member[] }>("GET", "/v1/members"),
   invite: (email: string, name: string, role: string) =>
     call<{ user: Member; token: string }>("POST", "/v1/members", { email, name, role }),
+  removeMember: (userId: string) => call<{ ok: true }>("DELETE", `/v1/members/${encodeURIComponent(userId)}`),
+  org: () => call<OrgInfo>("GET", "/v1/org"),
+  updateOrg: (patch: OrgPatch) => call<{ ok: true }>("PATCH", "/v1/org", patch),
+  tokens: () => call<{ tokens: TokenInfo[] }>("GET", "/v1/tokens"),
+  createToken: (name: string) => call<{ id: string; name: string; token: string }>("POST", "/v1/tokens", { name }),
+  revokeToken: (id: string) => call<{ ok: true }>("DELETE", `/v1/tokens/${encodeURIComponent(id)}`),
 };

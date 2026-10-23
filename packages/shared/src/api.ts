@@ -75,3 +75,38 @@ export const InviteRequest = z.object({
   role: Role.default("member"),
 });
 export type InviteRequest = z.infer<typeof InviteRequest>;
+
+/** GET /v1/org */
+export const OrgInfo = z.object({
+  id: z.string(),
+  name: z.string(),
+  slug: z.string(),
+  settings: OrgSettings,
+  stats: z.object({ members: z.number().int(), sessions: z.number().int(), storage_bytes: z.number().int() }),
+});
+export type OrgInfo = z.infer<typeof OrgInfo>;
+
+/** PATCH /v1/org (admins). Patterns must be valid JavaScript regex sources. */
+export const OrgPatch = z.object({
+  name: z.string().min(1).max(100).optional(),
+  retention_days: z.number().int().min(1).max(3650).optional(),
+  repo_allowlist: z.array(z.string().min(1).max(300)).max(200).optional(),
+  redaction_patterns: z
+    .array(
+      z
+        .string()
+        .min(1)
+        .max(500)
+        .refine((s) => {
+          try {
+            new RegExp(s);
+            return true;
+          } catch {
+            return false;
+          }
+        }, "is not a valid regular expression"),
+    )
+    .max(50)
+    .optional(),
+});
+export type OrgPatch = z.infer<typeof OrgPatch>;

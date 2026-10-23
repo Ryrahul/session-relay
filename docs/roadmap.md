@@ -12,7 +12,6 @@
 
 ## Next
 
-- **npm package** for the CLI (`npm install -g`), instead of installing from source.
 - Prebuilt public Docker image, so self-hosting needs no build.
 - Full live test of Codex with a real session fixture.
 - S3 / Cloudflare R2 storage for full transcripts.

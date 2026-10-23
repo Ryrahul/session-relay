@@ -41,7 +41,7 @@ Files only count as "touched" when the write succeeded.
 
 ## Manual setup
 
-If you'd rather edit config yourself, the MCP server is just a command: `relay mcp`. If `relay` isn't on your PATH, use `node /path/to/session-relay/packages/cli/dist/index.js mcp`.
+If you'd rather edit config yourself, the MCP server is just a command: `relay mcp`. If `relay` isn't on your PATH, use `npx -y session-relay mcp`.
 
 **Claude Code**
 

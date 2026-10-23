@@ -40,8 +40,7 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env exec server \
 **Connect each laptop:**
 
 ```sh
-git clone https://github.com/Ryrahul/session-relay.git ~/.session-relay
-cd ~/.session-relay && npm ci && npm run build && npm link -w @session-relay/cli
+npm install -g session-relay
 relay login --server https://relay.your-team.com --token srk_...
 relay setup        # adds /share and /pickup to Claude Code, OpenCode and Codex
 ```

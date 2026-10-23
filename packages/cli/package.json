@@ -1,24 +1,56 @@
 {
-  "name": "@session-relay/cli",
-  "version": "0.0.1",
-  "description": "Share coding-agent sessions (Claude Code, Codex, OpenCode) with your team.",
+  "name": "session-relay",
+  "version": "0.1.0",
+  "description": "Share coding-agent sessions (Claude Code, OpenCode, Codex) with your team. /share in one agent, /pickup in another.",
+  "keywords": [
+    "claude-code",
+    "opencode",
+    "codex",
+    "mcp",
+    "ai-agents",
+    "handoff",
+    "sessions",
+    "cli"
+  ],
+  "homepage": "https://ryrahul.github.io/session-relay/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ryrahul/session-relay.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/Ryrahul/session-relay/issues"
+  },
   "type": "module",
   "bin": {
-    "relay": "dist/index.js"
+    "relay": "dist/relay.js",
+    "session-relay": "dist/relay.js"
   },
   "files": [
-    "dist"
+    "dist/relay.js",
+    "README.md"
   ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json --noEmit && node build.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "tsx src/index.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
-    "@session-relay/shared": "^0.0.1",
     "commander": "^12.1.0",
     "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2",
+    "@session-relay/shared": "*"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }

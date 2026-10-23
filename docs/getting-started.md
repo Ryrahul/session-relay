@@ -10,21 +10,26 @@ Teammate (OpenCode):     /pickup your webhook retry work
 You need:
 
 - A Session Relay server for your team. Someone sets this up once; see [Self-hosting](self-hosting.md). Cloud hosting is coming soon.
-- Node.js 20 or newer, and git, on your laptop.
+- Node.js 20 or newer on your laptop.
 - A personal token. An admin creates it for you (web app → **Members**, or `relay invite`).
 
 ## 1. Install the CLI
 
-The npm package is coming soon. Until then, install from source:
+```sh
+npm install -g session-relay
+relay --version
+```
+
+Update later with `npm install -g session-relay@latest`. Without a global install, `npx session-relay <command>` works too.
+
+<details><summary>Install from source instead</summary>
 
 ```sh
 git clone https://github.com/Ryrahul/session-relay.git ~/.session-relay
 cd ~/.session-relay && npm ci && npm run build
-npm link -w @session-relay/cli
-relay --version
+npm link -w session-relay
 ```
-
-To update later: `cd ~/.session-relay && git pull && npm ci && npm run build`.
+</details>
 
 ## 2. Log in
 

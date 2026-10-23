@@ -1,5 +1,5 @@
 {
-  "name": "session-relay",
+  "name": "session-relay-monorepo",
   "private": true,
   "type": "module",
   "workspaces": [

@@ -13,7 +13,7 @@ PORT="${E2E_PORT:-8799}"
 SERVER="http://localhost:$PORT"
 WORK="$(mktemp -d)"
 COMPOSE=(docker compose -p relay-e2e -f deploy/docker-compose.yml --env-file "$WORK/.env")
-RELAY=(node "$ROOT/packages/cli/dist/index.js")
+RELAY=(node "$ROOT/packages/cli/dist/relay.js")
 
 step() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 ok() { printf '  ✓ %s\n' "$*"; }

@@ -7,8 +7,8 @@ import { repoInfo } from "./git.js";
 import { renderHandoff } from "./handoff.js";
 import { describeRedactions, prepareShare } from "./share.js";
 import { ago } from "./ui.js";
+import { VERSION } from "./version.js";
 
-const VERSION = "0.1.0";
 
 const INSTRUCTIONS = `Session Relay shares coding-agent sessions between teammates (Claude Code, Codex, OpenCode).
 - To continue someone's work: search_sessions or list_sessions, then get_session (mode "tail") and read the summary, next steps and recent conversation before acting.

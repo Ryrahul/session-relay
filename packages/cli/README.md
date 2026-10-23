@@ -15,7 +15,7 @@ Then, in your agent:
 /pickup alice's webhook retry work
 ```
 
-You need a Session Relay server for your team; see [self-hosting](https://ryrahul.github.io/session-relay/docs/self-hosting.html). Cloud hosting is coming soon.
+You need a Session Relay server for your team; see [self-hosting](https://relay.rahulweb.online/docs/self-hosting.html). Cloud hosting is coming soon.
 
 ## Commands
 
@@ -28,11 +28,11 @@ You need a Session Relay server for your team; see [self-hosting](https://ryrahu
 | `relay setup` | Connect Claude Code, OpenCode and Codex |
 | `relay mcp` | The MCP server your agents start |
 
-Full reference: [CLI docs](https://ryrahul.github.io/session-relay/docs/cli.html).
+Full reference: [CLI docs](https://relay.rahulweb.online/docs/cli.html).
 
 ## Privacy
 
-Nothing is uploaded unless you share it. API keys, tokens, passwords and private keys are removed on your machine before upload, and `relay share --dry-run` shows exactly what would be sent. See [security & privacy](https://ryrahul.github.io/session-relay/docs/security.html).
+Nothing is uploaded unless you share it. API keys, tokens, passwords and private keys are removed on your machine before upload, and `relay share --dry-run` shows exactly what would be sent. See [security & privacy](https://relay.rahulweb.online/docs/security.html).
 
 ## License
 

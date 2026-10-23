@@ -7,6 +7,7 @@ import { Members } from "./pages/Members";
 import { SessionPage } from "./pages/SessionPage";
 import { Sessions } from "./pages/Sessions";
 import { Settings } from "./pages/Settings";
+import { Setup } from "./pages/Setup";
 import { Start } from "./pages/Start";
 import { Avatar, Icon, Mark, ThemeSwitch, useTheme } from "./ui";
 
@@ -20,7 +21,8 @@ const NAV: { page: Route["page"]; href: string; label: string; icon: string }[] 
 export function App() {
   useTheme();
   const [me, setMe] = useState<MeResponse | null>(null);
-  const [checking, setChecking] = useState(Boolean(getToken()));
+  const [checking, setChecking] = useState(true);
+  const [needsSetup, setNeedsSetup] = useState(false);
   const [route, setRoute] = useState<Route>(parseRoute(location.hash));
 
   useEffect(() => {
@@ -35,9 +37,12 @@ export function App() {
   const refreshMe = useCallback(() => api.me().then(setMe), []);
 
   useEffect(() => {
-    if (!getToken()) return;
-    refreshMe()
-      .catch(() => setToken(null))
+    // A fresh server shows first-run setup; otherwise sign in (or resume the saved session).
+    api
+      .setupStatus()
+      .then((s) => setNeedsSetup(s.needed))
+      .catch(() => setNeedsSetup(false))
+      .then(() => (getToken() ? refreshMe().catch(() => setToken(null)) : undefined))
       .finally(() => setChecking(false));
   }, [refreshMe]);
 
@@ -48,6 +53,15 @@ export function App() {
   }, []);
 
   if (checking) return <div className="boot" aria-busy="true" />;
+  if (!me && needsSetup)
+    return (
+      <Setup
+        onDone={(m) => {
+          setNeedsSetup(false);
+          setMe(m);
+        }}
+      />
+    );
   if (!me) return <Login onSignedIn={setMe} />;
 
   const active = route.page === "session" ? "sessions" : route.page;

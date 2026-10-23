@@ -31,7 +31,7 @@ jobs:
       - name: Website builds
         run: node site/build.mjs /tmp/site
       - name: Server integration tests
-        run: npx vitest run --root packages/server src/api.integration.test.ts
+        run: npx vitest run --root packages/server integration
         env:
           TEST_DATABASE_URL: postgres://postgres:test@localhost:5432/relay_test
       - name: Docker image builds

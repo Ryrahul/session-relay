@@ -15,4 +15,4 @@ done
 sleep 1
 
 npm run build -w @session-relay/shared >/dev/null
-TEST_DATABASE_URL="postgres://postgres:test@localhost:$PORT/relay_test" npx vitest run --root packages/server src/api.integration.test.ts
+TEST_DATABASE_URL="postgres://postgres:test@localhost:$PORT/relay_test" npx vitest run --root packages/server integration

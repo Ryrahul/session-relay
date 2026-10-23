@@ -11,10 +11,10 @@
 - Per-person visibility, roles, personal tokens, retention, repo allowlist, audit log.
 - Web app: browse, search, read, members, settings.
 - One-command Docker deployment with automatic HTTPS (Caddy), or behind your own nginx.
+- First-run setup in the browser: a one-time code from the server logs creates your organization and owner account.
 
 ## Next
 
-- **First-run setup in the web app**: create the first org from the browser with a one-time code from the server logs, instead of running `bootstrap` in a shell.
 - Prebuilt public Docker image, so self-hosting needs no build.
 - Full live test of Codex with a real session fixture.
 - S3 / Cloudflare R2 storage for full transcripts.

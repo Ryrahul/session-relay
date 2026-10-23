@@ -292,3 +292,7 @@ button:disabled { cursor: default; opacity: 0.55; }
 .login-card h1 { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; }
 .login-card form { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); margin-top: 6px; }
 .login-card .btn-primary { margin-top: 6px; }
+.setup-card { width: min(520px, 100%); }
+.setup-card .stack > label { margin-top: 6px; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 14px; font-weight: 500; color: var(--ink); }
+.check input { width: auto; accent-color: var(--accent); }

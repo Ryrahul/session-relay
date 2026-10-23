@@ -35,9 +35,10 @@ The CLI is on npm: [`session-relay`](https://www.npmjs.com/package/session-relay
 git clone https://github.com/Ryrahul/session-relay.git && cd session-relay
 cp deploy/.env.example deploy/.env          # set POSTGRES_PASSWORD, PUBLIC_URL, DOMAIN
 docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
-docker compose -f deploy/docker-compose.yml --env-file deploy/.env exec server \
-  node packages/server/dist/bootstrap.js --org "Your Team" --email you@your-team.com --name "You"
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env logs server | grep -A2 "setup code"
 ```
+
+Open your server's URL, enter the setup code, and create your organization. You're the owner.
 
 **Connect each laptop:**
 

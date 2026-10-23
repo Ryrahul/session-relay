@@ -12,20 +12,26 @@ import { meRoutes } from "./routes/me.js";
 import { orgRoutes } from "./routes/org.js";
 import { memberRoutes, tokenRoutes } from "./routes/members.js";
 import { sessionRoutes } from "./routes/sessions.js";
+import { setupRoutes, type SetupGate } from "./setup.js";
 
 export interface AppDeps {
   sql: Sql;
   storage: BlobStorage;
+  /** Present while first-run setup is possible (no org yet). */
+  setup?: SetupGate | null;
   /** Built web app to serve at `/`, if present. */
   webDist?: string;
 }
 
 const MAX_BODY_BYTES = 25 * 1024 * 1024;
 
-export function createApp({ sql, storage, webDist }: AppDeps) {
+export function createApp({ sql, storage, webDist, setup = null }: AppDeps) {
   const app = new Hono<AppEnv>();
 
   app.get("/health", (c) => c.json({ ok: true }));
+
+  // Unauthenticated: only usable with the one-time code while no org exists.
+  app.route("/v1/setup", setupRoutes(sql, setup));
 
   const v1 = new Hono<AppEnv>();
   v1.use("*", bodyLimit({ maxSize: MAX_BODY_BYTES, onError: (c) => c.json({ error: "Request too large" }, 413) }));

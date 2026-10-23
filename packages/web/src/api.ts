@@ -48,6 +48,9 @@ export interface TokenInfo {
 }
 
 export const api = {
+  setupStatus: () => call<{ needed: boolean }>("GET", "/v1/setup", undefined, ""),
+  setup: (body: { code: string; org: string; name: string; email: string }) =>
+    call<{ token: string; org: { id: string; name: string; slug: string } }>("POST", "/v1/setup", body, ""),
   me: (token?: string) => call<MeResponse>("GET", "/v1/me", undefined, token),
   list: (params: Record<string, string>) => {
     const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v));

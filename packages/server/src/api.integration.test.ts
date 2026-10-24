@@ -579,6 +579,28 @@ describe.skipIf(!DB)("API (integration)", () => {
     await call(owner.token, "PATCH", "/v1/org", { share_templates: [] });
   });
 
+  it("diffs: attached at share time, served as a patch, counted, exported, deleted with the share", async () => {
+    const diff = "diff --git a/x.ts b/x.ts\n--- a/x.ts\n+++ b/x.ts\n@@ -1 +1,2 @@\n-old\n+new\n+more\n";
+    const id = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo: "github.com/acme/diffs", title: "with diff" }), diff })).body.id;
+    const none = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo: "github.com/acme/diffs", title: "no diff" }) })).body.id;
+    expect((await call(bob.token, "GET", `/v1/sessions/${id}?mode=summary`)).body.diff).toEqual({ files: 1, additions: 2, deletions: 1 });
+    expect((await call(bob.token, "GET", `/v1/sessions/${none}?mode=summary`)).body.diff).toBeNull();
+    const rows = (await call(bob.token, "GET", "/v1/sessions?repo=github.com/acme/diffs")).body.sessions;
+    expect(Object.fromEntries(rows.map((r: any) => [r.title, r.has_diff]))).toEqual({ "with diff": true, "no diff": false });
+    const res = await app.request(`/v1/sessions/${id}/diff`, { headers: { authorization: `Bearer ${bob.token}` } });
+    expect(res.headers.get("content-type")).toContain("text/x-diff");
+    expect(await res.text()).toBe(diff);
+    expect((await call(bob.token, "GET", `/v1/sessions/${none}/diff`)).status).toBe(404);
+    expect((await call(outsider.token, "GET", `/v1/sessions/${id}/diff`)).status).toBe(404);
+    const md = await (await app.request(`/v1/sessions/${id}/export`, { headers: { authorization: `Bearer ${bob.token}` } })).text();
+    expect(md).toContain("## Uncommitted changes");
+    expect(md).toContain("+more");
+    expect(await storage.get(`${orgA}/${id}.diff.gz`)).not.toBeNull();
+    await call(alice.token, "DELETE", `/v1/sessions/${id}`);
+    expect(await storage.get(`${orgA}/${id}.diff.gz`)).toBeNull();
+    expect((await call(alice.token, "POST", "/v1/sessions", { session: upload(), diff: "x".repeat(1_000_001) })).status).toBe(400);
+  });
+
   it("records usage and audit events", async () => {
     const [u] = await sql`SELECT count(*)::int AS n FROM usage_events WHERE org_id = ${orgA} AND kind = 'session.share'`;
     const [a] = await sql`SELECT count(*)::int AS n FROM audit_log WHERE org_id = ${orgA} AND action = 'session.pull'`;

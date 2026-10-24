@@ -4,10 +4,14 @@ import { IncludeMode, Message, PrUrl, SessionRecord, SessionUpload, SourceTool, 
 export const Role = z.enum(["owner", "admin", "member"]);
 export type Role = z.infer<typeof Role>;
 
-/** POST /v1/sessions. `transcript` is only sent for include = "full". */
+/** Most uncommitted changes a share can carry (the CLI truncates before this). */
+export const MAX_DIFF_CHARS = 1_000_000;
+
+/** POST /v1/sessions. `transcript` is only sent for include = "full"; `diff` is `git diff` output, redacted. */
 export const ShareRequest = z.object({
   session: SessionUpload,
   transcript: z.array(Message).optional(),
+  diff: z.string().max(MAX_DIFF_CHARS).optional(),
 });
 export type ShareRequest = z.infer<typeof ShareRequest>;
 
@@ -30,6 +34,7 @@ export const SessionListItem = z.object({
   pr_url: z.string().nullable(),
   comment_count: z.number().int(),
   draft: z.boolean(),
+  has_diff: z.boolean(),
   created_at: z.string(),
   updated_at: z.string().nullable(),
 });
@@ -76,6 +81,8 @@ export const SessionDetail = SessionRecord.extend({
   comments: z.array(Comment),
   /** Required sections of the repo's template that this share leaves empty. */
   missing_sections: z.array(z.string()),
+  /** Uncommitted changes attached at share time (GET /v1/sessions/:id/diff). */
+  diff: z.object({ files: z.number().int(), additions: z.number().int(), deletions: z.number().int() }).nullable(),
 });
 export type SessionDetail = z.infer<typeof SessionDetail>;
 

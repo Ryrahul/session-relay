@@ -183,7 +183,7 @@ retry path. Starting with that now.</pre>
     </div>
     <div>
       <h3>Linked to your PRs</h3>
-      <p>Shares pick up the branch's open pull request automatically. Find every session that touched a file with <code>file:src/billing.ts</code>.</p>
+      <p>Shares pick up the branch's open pull request automatically, and can carry your uncommitted changes as a patch. Find every session that touched a file with <code>file:src/billing.ts</code>.</p>
     </div>
     <div>
       <h3>Small to run</h3>

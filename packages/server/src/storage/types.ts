@@ -11,3 +11,7 @@ export interface BlobStorage {
 export function transcriptKey(orgId: string, sessionId: string): string {
   return `${orgId}/${sessionId}.json.gz`;
 }
+
+export function diffKey(orgId: string, sessionId: string): string {
+  return `${orgId}/${sessionId}.diff.gz`;
+}

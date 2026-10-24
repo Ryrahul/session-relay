@@ -148,6 +148,11 @@ export function Sessions({ me }: { me: MeResponse }) {
                           <Icon name="pr" size={12} /> {prLabel(s.pr_url)}
                         </span>
                       )}
+                      {s.has_diff && (
+                        <span className="badge" title="Uncommitted changes attached">
+                          <Icon name="diff" size={12} /> Diff
+                        </span>
+                      )}
                       {s.continues_id && (
                         <span className="badge" title="Continues an earlier shared session">
                           <Icon name="chain" size={12} /> Continues

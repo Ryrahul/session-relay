@@ -4,3 +4,4 @@ export * from "./ids.js";
 export * from "./redact.js";
 export * from "./handoff.js";
 export * from "./templates.js";
+export * from "./diff.js";

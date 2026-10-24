@@ -19,6 +19,9 @@ export interface BuildOptions {
 export interface BuiltShare {
   session: SessionUpload;
   transcript?: Message[];
+  /** Uncommitted changes, redacted (only when asked for). */
+  diff?: string;
+  diffTruncated?: boolean;
   redactions: Record<string, number>;
 }
 

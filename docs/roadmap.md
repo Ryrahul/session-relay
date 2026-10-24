@@ -22,6 +22,7 @@
 - **Search by file and branch**: `file:` and `branch:` in any search, `--file` in the CLI.
 - **Comments** on sessions, in the web app, the CLI and from agents; the next agent reads them.
 - **Activity digest** and **stats**: web pages, `relay digest`, `relay stats`, and the `team_activity` MCP tool.
+- **Diff snapshots**: uncommitted changes attached to a share, viewable in the web app and `git apply`-able after `relay pull`.
 - **Handoff templates**: per-repo sections and instructions that `/share` follows; missing sections flagged.
 - **Audit log page** (admins) and `relay audit`; **export** of a session (Markdown/JSON) or many (NDJSON).
 - **Gemini CLI, Copilot CLI and Cursor** (experimental) adapters, with `relay setup` for each.

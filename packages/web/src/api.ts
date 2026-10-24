@@ -78,6 +78,11 @@ export const api = {
   comment: (id: string, body: string) => call<{ id: string }>("POST", `/v1/sessions/${encodeURIComponent(id)}/comments`, { body }),
   deleteComment: (id: string, commentId: string) =>
     call<{ ok: true }>("DELETE", `/v1/sessions/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}`),
+  diff: async (id: string) => {
+    const res = await fetch(`/v1/sessions/${encodeURIComponent(id)}/diff`, { headers: { authorization: `Bearer ${getToken() ?? ""}` } });
+    if (!res.ok) throw new ApiError(res.status, ((await res.json().catch(() => ({}))) as { error?: string }).error ?? res.statusText);
+    return res.text();
+  },
   update: (id: string, patch: SessionPatch) => call<{ ok: true }>("PATCH", `/v1/sessions/${encodeURIComponent(id)}`, patch),
   members: () => call<{ members: Member[] }>("GET", "/v1/members"),
   audit: (params: Record<string, string>) => {

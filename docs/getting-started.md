@@ -77,6 +77,7 @@ You can add instructions:
 /share only Bob
 /share for Akshat              # a handoff for them: first in their /pickup
 /share full transcript
+/share with the diff           # attach your uncommitted changes
 /share title: payment retry, half done
 ```
 
@@ -90,6 +91,7 @@ Or share from a terminal, inside the repo:
 relay share               # pick a session, choose what to include and who sees it
 relay share --dry-run     # see exactly what would be uploaded, upload nothing
 relay share --for akshat  # a handoff for someone
+relay share --diff        # attach uncommitted changes; teammates `git apply` them after relay pull
 ```
 
 Changed your mind? Edit a share later in the web app (**Edit** on the session), with `relay edit`, or ask your agent ("add a next step to my last share"):

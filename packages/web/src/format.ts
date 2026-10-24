@@ -1,4 +1,4 @@
-export const TOOL_NAMES: Record<string, string> = { "claude-code": "Claude Code", opencode: "OpenCode", codex: "Codex" };
+export const TOOL_NAMES: Record<string, string> = { "claude-code": "Claude Code", opencode: "OpenCode", codex: "Codex", zcode: "ZCode" };
 
 export function ago(iso: string): string {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;

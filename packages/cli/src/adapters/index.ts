@@ -2,12 +2,14 @@ import type { SourceTool } from "@session-relay/shared";
 import { claudeAdapter } from "./claude.js";
 import { codexAdapter } from "./codex.js";
 import { openCodeAdapter } from "./opencode.js";
+import { zcodeAdapter } from "./zcode.js";
 import type { Adapter, SessionRef } from "./types.js";
 
 export const ADAPTERS: Record<SourceTool, Adapter> = {
   "claude-code": claudeAdapter,
   opencode: openCodeAdapter,
   codex: codexAdapter,
+  zcode: zcodeAdapter,
 };
 
 /** Recent sessions for this repo across all (or one) tools, newest first. */

@@ -4,7 +4,7 @@
 
 **Self-hosted Session Relay**, open source under [AGPL-3.0](https://github.com/Ryrahul/session-relay/blob/main/LICENSE):
 
-- Share and pick up sessions across **Claude Code**, **OpenCode** and **Codex**:
+- Share and pick up sessions across **Claude Code**, **OpenCode**, **Codex** and **ZCode**:
   - `/share` and `/pickup` in each agent, through the relay MCP server
   - the `relay` CLI, installed with `npm install -g session-relay`
 - Local secret redaction, plus per-org patterns.
@@ -51,7 +51,7 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 
 | Area | Status |
 |---|---|
-| Adapters (Claude Code, OpenCode, Codex) | Done; Claude Code and OpenCode tested on real sessions |
+| Adapters (Claude Code, OpenCode, Codex, ZCode) | Done; Claude Code and OpenCode tested on real sessions |
 | Redaction | Done |
 | API, auth, roles, visibility, retention, audit | Done; integration-tested against Postgres, including org isolation |
 | CLI (npm `session-relay`) and MCP server | Done; published, end-to-end tested with three users |

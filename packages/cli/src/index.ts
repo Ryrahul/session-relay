@@ -8,7 +8,7 @@ import { VERSION } from "./version.js";
 
 const program = new Command()
   .name("relay")
-  .description("Share coding-agent sessions (Claude Code, OpenCode, Codex) with your team")
+  .description("Share coding-agent sessions (Claude Code, OpenCode, Codex, ZCode) with your team")
   .version(VERSION);
 
 program
@@ -24,13 +24,13 @@ program.command("whoami").description("Show the current user, org and server").a
 program
   .command("sessions")
   .description("List your local agent sessions for this repo")
-  .option("--tool <tool>", "claude, opencode or codex")
+  .option("--tool <tool>", "claude, opencode, codex or zcode")
   .action(localSessions);
 
 program
   .command("share")
   .description("Pick a local session and share it with your team")
-  .option("--tool <tool>", "claude, opencode or codex")
+  .option("--tool <tool>", "claude, opencode, codex or zcode")
   .option("--id <id>", "native session id (prefix is fine)")
   .option("--latest", "share the newest session without asking")
   .option("--include <mode>", "summary | summary+tail | full")
@@ -48,7 +48,7 @@ const listOpts = (cmd: Command) =>
   cmd
     .option("--repo <repo>", "e.g. github.com/acme/api")
     .option("--author <name>", 'name, email or "me"')
-    .option("--tool <tool>", "claude, opencode or codex")
+    .option("--tool <tool>", "claude, opencode, codex or zcode")
     .option("--limit <n>", "max results", "20")
     .option("--json", "print JSON");
 
@@ -89,8 +89,8 @@ program
 
 program
   .command("setup")
-  .description("Connect Claude Code, OpenCode and Codex to relay (MCP server + /share and /pickup commands)")
-  .option("--tools <list>", "comma-separated: claude,opencode,codex")
+  .description("Connect Claude Code, OpenCode, Codex and ZCode to relay (MCP server + /share and /pickup commands)")
+  .option("--tools <list>", "comma-separated: claude,opencode,codex,zcode")
   .option("--scope <scope>", "user (default) or project", "user")
   .option("--relay-config <file>", "relay config file the MCP server should use")
   .action(setup);

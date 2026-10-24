@@ -36,8 +36,8 @@ export function Start({ me }: { me: MeResponse }) {
           <div className="step-body">
             <h2>Connect your agents</h2>
             <p className="muted">
-              Adds the relay MCP server and the <code>/share</code> and <code>/pickup</code> commands to Claude Code, OpenCode and
-              Codex, whichever are installed. Restart your agents afterwards.
+              Adds the relay MCP server and the <code>/share</code> and <code>/pickup</code> commands to Claude Code, OpenCode,
+              Codex and ZCode, whichever are installed. Restart your agents afterwards.
             </p>
             <Command>relay setup</Command>
           </div>

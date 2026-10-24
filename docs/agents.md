@@ -1,6 +1,6 @@
 # Agents
 
-Session Relay works with **Claude Code**, **OpenCode** and **Codex**. Each one gets the same two things:
+Session Relay works with **Claude Code**, **OpenCode**, **Codex** and **ZCode**. Each one gets the same two things:
 
 1. **The relay MCP server** (`relay mcp`), which gives the agent four tools:
 
@@ -30,6 +30,7 @@ relay setup --scope project         # write config into the current repo instead
 | Claude Code | `~/.claude/projects/<folder>/*.jsonl` | Only conversation entries are read. System prompts and injected context are skipped |
 | OpenCode | `opencode session list` and `opencode export` | Uses OpenCode's own commands, not its database files |
 | Codex | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` | The user and agent message events, plus tool calls |
+| ZCode | `~/.zcode/cli/db/db.sqlite` (CLI and desktop app) | Opened read-only. Needs Node 22.5+ or the `sqlite3` command (built into macOS). Subagent and archived sessions are skipped |
 
 Tool calls become one line each, so any agent can read them:
 - `edited src/webhooks.ts`
@@ -78,6 +79,14 @@ args = ["mcp"]
 
 Prompts go in `~/.codex/prompts/share.md` and `pickup.md`.
 
+**ZCode**: `~/.zcode/cli/config.json`, or `.zcode/config.json` in a repo:
+
+```json
+{ "mcp": { "servers": { "relay": { "type": "stdio", "command": "relay", "args": ["mcp"] } } } }
+```
+
+Commands go in `~/.zcode/commands/` or `.zcode/commands/`. `relay setup` finds ZCode through the `zcode` command or the `~/.zcode` folder, so it works for the desktop app too.
+
 The command files `relay setup` writes are in [`packages/cli/src/commands/setup.ts`](../packages/cli/src/commands/setup.ts) (`SHARE_PROMPT`, `PICKUP_PROMPT`). Copy them if you set things up by hand.
 
 ## Handoff chains
@@ -114,3 +123,4 @@ Then tell the agent: *"Read .relay/handoff-rs_7KQ2M9XA.md and continue from wher
 | Claude Code 2.1 | Tested end to end: real sessions, `/share` via MCP |
 | OpenCode 1.19 | Tested end to end: real sessions, `/pickup` via MCP continued a Claude Code session |
 | Codex 0.145 | Session reading tested against the rollout format; full live run pending |
+| ZCode | Session reading tested against ZCode's own session tables; `relay setup` config checked against its config schema; live run pending |

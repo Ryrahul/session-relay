@@ -1,6 +1,6 @@
 # Getting started
 
-Session Relay lets your team hand coding-agent sessions to each other. You share a session from Claude Code, OpenCode or Codex. A teammate picks it up in whichever of those they use. Their agent reads the goal, the decisions, the next steps and the recent conversation, checks the code, and carries on.
+Session Relay lets your team hand coding-agent sessions to each other. You share a session from Claude Code, OpenCode, Codex or ZCode. A teammate picks it up in whichever of those they use. Their agent reads the goal, the decisions, the next steps and the recent conversation, checks the code, and carries on.
 
 ```
 You (Claude Code):       /share
@@ -47,7 +47,7 @@ The CLI's token is saved in `~/.config/session-relay/config.json`, readable only
 relay setup
 ```
 
-This adds the relay MCP server and two commands, `/share` and `/pickup`, to each agent that is installed: Claude Code, OpenCode and Codex. Restart your agents afterwards. Details and manual setup are in [Agents](agents.md).
+This adds the relay MCP server and two commands, `/share` and `/pickup`, to each agent that is installed: Claude Code, OpenCode, Codex and ZCode. Restart your agents afterwards. Details and manual setup are in [Agents](agents.md).
 
 ## 4. Share a session
 

@@ -1,6 +1,6 @@
 import { createInterface } from "node:readline/promises";
 
-const TOOL_LABEL: Record<string, string> = { "claude-code": "claude", opencode: "opencode", codex: "codex" };
+const TOOL_LABEL: Record<string, string> = { "claude-code": "claude", opencode: "opencode", codex: "codex", zcode: "zcode" };
 
 export function toolLabel(tool: string): string {
   return (TOOL_LABEL[tool] ?? tool).padEnd(8);

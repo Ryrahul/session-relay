@@ -18,14 +18,14 @@ The config is at `~/.config/session-relay/config.json` (mode `600`). Override it
 
 | Command | |
 |---|---|
-| `relay sessions [--tool claude\|opencode\|codex\|zcode]` | Your local agent sessions for this repo, across tools |
+| `relay sessions [--tool claude\|codex\|opencode\|gemini\|copilot\|cursor\|zcode]` | Your local agent sessions for this repo, across tools |
 | `relay share` | Pick a session, choose what to include and who sees it, confirm |
 
 `relay share` options:
 
 | Flag | |
 |---|---|
-| `--tool <tool>` | Only sessions from `claude`, `opencode`, `codex` or `zcode` |
+| `--tool <tool>` | Only sessions from `claude`, `codex`, `opencode`, `gemini`, `copilot`, `cursor` or `zcode` |
 | `--id <id>` | A specific session (prefix is fine; see `relay sessions`) |
 | `--latest` | The newest session, without asking |
 | `--include <mode>` | `summary`, `summary+tail` (default) or `full` |
@@ -94,7 +94,7 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 
 | Command | |
 |---|---|
-| `relay setup [--tools claude,opencode,codex,zcode] [--scope user\|project] [--relay-config <file>]` | Install the MCP server and `/share` `/pickup` into your agents |
-| `relay setup --auto-share on\|off` | Claude Code: save each session as a private draft when it ends (a `SessionEnd` hook in `~/.claude/settings.json`). `off` removes the hook |
-| `relay hook session-end --tool claude` | What that hook runs. It never fails the agent; it logs to `hook.log` next to your relay config |
+| `relay setup [--tools claude,codex,opencode,gemini,copilot,cursor,zcode] [--scope user\|project] [--relay-config <file>]` | Install the MCP server and `/share` `/pickup` into your agents |
+| `relay setup --auto-share on\|off` | Save each Claude Code, Gemini CLI and Copilot CLI session as a private draft when it ends (a session-end hook). `off` removes the hooks |
+| `relay hook session-end --tool <agent>` | What that hook runs. It never fails the agent; it logs to `hook.log` next to your relay config |
 | `relay mcp` | The MCP server on stdio. Your agent starts it; you don't run it yourself |

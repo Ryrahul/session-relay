@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import type { SourceTool } from "@session-relay/shared";
+import { SourceTool } from "@session-relay/shared";
 import { z } from "zod";
 import { RelayClient, resolvePeople, resolvePerson } from "./client.js";
 import type { SessionPatch } from "@session-relay/shared";
@@ -13,7 +13,7 @@ import { ago } from "./ui.js";
 import { VERSION } from "./version.js";
 
 
-const INSTRUCTIONS = `Session Relay shares coding-agent sessions between teammates (Claude Code, Codex, OpenCode, ZCode).
+const INSTRUCTIONS = `Session Relay shares coding-agent sessions between teammates (Claude Code, Codex, OpenCode, ZCode, Gemini CLI, Copilot CLI, Cursor).
 - To continue someone's work: search_sessions or list_sessions, then get_session (mode "tail") and read the summary, next steps and recent conversation before acting.
 - Handoffs assigned to you: list_sessions with for_me.
 - To share this session: write an honest handoff summary (goal, decisions, done, next, open questions; never secrets) and call share_current_session.
@@ -28,6 +28,9 @@ function callerTool(name?: string): SourceTool | undefined {
   if (n.includes("opencode")) return "opencode";
   if (n.includes("codex")) return "codex";
   if (n.includes("zcode")) return "zcode";
+  if (n.includes("gemini")) return "gemini";
+  if (n.includes("copilot")) return "copilot";
+  if (n.includes("cursor")) return "cursor";
   return undefined;
 }
 
@@ -57,7 +60,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         "List sessions teammates have shared. Defaults to the current repo; pass all_repos to see everything. for_me lists handoffs assigned to you (from any repo).",
       inputSchema: {
         author: z.string().optional().describe('Name, email or "me"'),
-        tool: z.enum(["claude-code", "codex", "opencode", "zcode"]).optional(),
+        tool: SourceTool.optional(),
         branch: z.string().optional(),
         file: z.string().optional().describe("Only sessions that touched this file (part of the path is fine)"),
         for_me: z.boolean().optional().describe("Only handoffs assigned to you"),

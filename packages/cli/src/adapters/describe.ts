@@ -35,18 +35,46 @@ export interface ToolDescription {
  * "edited src/a.ts" or "ran `npm test`". Tool names differ per agent, so match loosely.
  */
 /** Agent plumbing that says nothing about the work. */
-const INTERNAL = new Set(["toolsearch", "enterplanmode", "exitplanmode", "askuserquestion"]);
+const INTERNAL = new Set(["toolsearch", "enterplanmode", "exitplanmode", "askuserquestion", "report_intent", "save_memory", "think"]);
+
+/** Other agents' names for the same tools (Gemini CLI, Copilot CLI, Cursor). */
+const ALIASES: Record<string, string> = {
+  read_file: "read",
+  read_many_files: "read",
+  write_file: "write",
+  replace: "edit",
+  edit_file: "edit",
+  search_replace: "edit",
+  strreplace: "edit",
+  str_replace_editor: "edit",
+  run_shell_command: "bash",
+  run_terminal_cmd: "bash",
+  powershell: "bash",
+  search_file_content: "grep",
+  grep_search: "grep",
+  codebase_search: "search",
+  file_search: "glob",
+  list_directory: "ls",
+  list_dir: "ls",
+  google_web_search: "web_search",
+  write_todos: "todowrite",
+  todo_write: "todowrite",
+  update_todo: "todowrite",
+};
 
 export function isInternalTool(name: string): boolean {
   return INTERNAL.has(name.toLowerCase());
 }
 
 export function describeToolCall(name: string, input: Record<string, unknown>, root: string): ToolDescription {
-  const n = name.toLowerCase();
-  const file = str(input.file_path) ?? str(input.filePath) ?? str(input.path) ?? str(input.notebook_path);
+  const lower = name.toLowerCase();
+  const n = ALIASES[lower] ?? lower;
+  const file =
+    str(input.file_path) ?? str(input.filePath) ?? str(input.path) ?? str(input.notebook_path) ?? str(input.absolute_path) ?? str(input.target_file);
   const f = file ? rel(file, root) : undefined;
 
   if (n === "read" || n === "view") return { text: `read ${f ?? "a file"}`, files: [], showOutput: false };
+  if (lower === "delete_file") return { text: `deleted ${f ?? "a file"}`, files: file ? [file] : [], showOutput: false };
   if (n === "write" || n === "create") return { text: `wrote ${f ?? "a file"}`, files: file ? [file] : [], showOutput: false };
   if (n === "edit" || n === "multiedit" || n === "str_replace" || n === "notebookedit") {
     return { text: `edited ${f ?? "a file"}`, files: file ? [file] : [], showOutput: false };

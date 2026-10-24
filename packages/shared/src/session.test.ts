@@ -19,7 +19,7 @@ describe("SessionUpload", () => {
   it("rejects unknown tools", () => {
     expect(() =>
       SessionUpload.parse({
-        source: { tool: "cursor", native_id: "abc" },
+        source: { tool: "aider", native_id: "abc" },
         repo: "r",
         title: "t",
         summary: { goal: "g" },

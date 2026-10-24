@@ -1,6 +1,6 @@
 # FAQ
 
-**Does my email have to match my Claude, OpenCode, Codex or ZCode account?**
+**Does my email have to match my coding-agent accounts?**
 No. In Session Relay the email is just how teammates are told apart (and stops someone being added twice). It isn't linked to any agent account. You log in with your token, never your email.
 
 **Can I continue a Claude Code session in OpenCode (or the other way round)?**

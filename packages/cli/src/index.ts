@@ -9,7 +9,7 @@ import { VERSION } from "./version.js";
 
 const program = new Command()
   .name("relay")
-  .description("Share coding-agent sessions (Claude Code, OpenCode, Codex, ZCode) with your team")
+  .description("Share coding-agent sessions (Claude Code, OpenCode, Codex, ZCode, Gemini CLI, Copilot CLI, Cursor) with your team")
   .version(VERSION);
 
 program
@@ -25,13 +25,13 @@ program.command("whoami").description("Show the current user, org and server").a
 program
   .command("sessions")
   .description("List your local agent sessions for this repo")
-  .option("--tool <tool>", "claude, opencode, codex or zcode")
+  .option("--tool <tool>", "claude, opencode, codex, zcode, gemini, copilot or cursor")
   .action(localSessions);
 
 program
   .command("share")
   .description("Pick a local session and share it with your team")
-  .option("--tool <tool>", "claude, opencode, codex or zcode")
+  .option("--tool <tool>", "claude, opencode, codex, zcode, gemini, copilot or cursor")
   .option("--id <id>", "native session id (prefix is fine)")
   .option("--latest", "share the newest session without asking")
   .option("--include <mode>", "summary | summary+tail | full")
@@ -51,7 +51,7 @@ const listOpts = (cmd: Command) =>
   cmd
     .option("--repo <repo>", "e.g. github.com/acme/api")
     .option("--author <name>", 'name, email or "me"')
-    .option("--tool <tool>", "claude, opencode, codex or zcode")
+    .option("--tool <tool>", "claude, opencode, codex, zcode, gemini, copilot or cursor")
     .option("--branch <branch>")
     .option("--file <path>", "only sessions that touched this file (part of the path is fine)")
     .option("--for-me", "only handoffs assigned to you")
@@ -144,11 +144,11 @@ program
 
 program
   .command("setup")
-  .description("Connect Claude Code, OpenCode, Codex and ZCode to relay (MCP server + /share and /pickup commands)")
-  .option("--tools <list>", "comma-separated: claude,opencode,codex,zcode")
+  .description("Connect your agents to relay (MCP server + /share and /pickup commands)")
+  .option("--tools <list>", "comma-separated: claude,opencode,codex,zcode,gemini,copilot,cursor")
   .option("--scope <scope>", "user (default) or project", "user")
   .option("--relay-config <file>", "relay config file the MCP server should use")
-  .option("--auto-share <on|off>", "save each session as a private draft when it ends (Claude Code)")
+  .option("--auto-share <on|off>", "save each session as a private draft when it ends (Claude Code, Gemini CLI, Copilot CLI)")
   .action(setup);
 
 program

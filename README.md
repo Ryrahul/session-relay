@@ -1,6 +1,6 @@
 # Session Relay
 
-**Pick up where your teammate left off.** Share coding-agent sessions across **Claude Code**, **OpenCode**, **Codex** and **ZCode**. Your teammate continues in whichever tool they use, with the goal, decisions, next steps and recent conversation.
+**Pick up where your teammate left off.** Share coding-agent sessions across **Claude Code**, **Codex**, **OpenCode**, **Gemini CLI**, **Copilot CLI**, **Cursor** and **ZCode**. Your teammate continues in whichever tool they use, with the goal, decisions, next steps and recent conversation.
 
 ```
 You (Claude Code):      /share
@@ -14,10 +14,10 @@ Teammate (OpenCode):    /pickup your webhook retry work
 Handing off agent work means copy-pasting chat logs, or the next person starting from zero. With Session Relay:
 
 - **`/share`**: the agent writes a handoff (goal, decisions, done, next steps, open questions) and shares it with the recent conversation and the files touched.
-- **`/pickup`**: the next person's agent finds it, reads it, checks the code and continues, in any of the four agents.
+- **`/pickup`**: the next person's agent finds it, reads it, checks the code and continues, in any of the supported agents.
 - **Handoff chains**: work picked up and shared again is linked, so every session shows who started it and who continued it.
 - **Handoffs for someone**: share "for Akshat" and it's first in their `/pickup`. Edit a share any time (next steps, title, who it's for).
-- **Auto-share drafts** (opt-in): every Claude Code session is saved as a private draft when it ends; publish it when it's ready.
+- **Auto-share drafts** (opt-in): every Claude Code, Gemini CLI and Copilot CLI session is saved as a private draft when it ends; publish it when it's ready.
 - **Comments**: teammates leave notes on a session; the agent that picks it up reads them.
 - **Linked to PRs and files**: shares carry the branch's pull request; find every session that touched a file with `file:src/billing.ts`.
 - **Web app**: browse, search and read everything your team has shared, plus an **Activity** digest and team **Stats**.
@@ -53,7 +53,7 @@ Open your server's URL, enter the setup code, and create your organization. You'
 ```sh
 npm install -g session-relay
 relay login --server https://relay.your-team.com    # approve in the browser
-relay setup        # adds /share and /pickup to Claude Code, OpenCode, Codex and ZCode
+relay setup        # adds /share and /pickup to every agent you have installed
 ```
 
 Full walkthrough: [Getting started](docs/getting-started.md).
@@ -76,10 +76,13 @@ Online at **https://relay.rahulweb.online**. Sources are in [`docs/`](docs/).
 ## How it works
 
 ```
- Claude Code ─┐                         ┌─ web app (browse, search, read, edit)
+ Claude Code ─┐
+ Codex       ─┤                         ┌─ web app (browse, search, read, edit)
  OpenCode    ─┤                         │
- Codex       ─┼─ relay CLI / relay mcp ─┼─ Relay server (Hono + Postgres)
- ZCode       ─┘   read · redact · share └─ your team's agents via MCP
+ Gemini CLI  ─┼─ relay CLI / relay mcp ─┼─ Relay server (Hono + Postgres)
+ Copilot CLI ─┤   read · redact · share │
+ Cursor      ─┤                         └─ your team's agents via MCP
+ ZCode       ─┘
 ```
 
 | Package | |

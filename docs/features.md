@@ -6,7 +6,7 @@ Everything Session Relay does today. Each item links to where it's explained in 
 
 | Feature | What it does |
 |---|---|
-| **`/share` and `/pickup`** | Commands in **Claude Code**, **OpenCode**, **Codex** and **ZCode**. `/share` has the agent write a handoff (goal, decisions, done, next steps, open questions) and share it with the recent conversation and the files touched. `/pickup` finds a session, reads it, checks the code and continues. [Getting started](getting-started.md) |
+| **`/share` and `/pickup`** | Commands in **Claude Code**, **Codex**, **OpenCode**, **Gemini CLI**, **Copilot CLI**, **Cursor** and **ZCode**. `/share` has the agent write a handoff (goal, decisions, done, next steps, open questions) and share it with the recent conversation and the files touched. `/pickup` finds a session, reads it, checks the code and continues. [Getting started](getting-started.md) |
 | **Works across agents** | Share from one agent, pick up in another. Each agent's sessions are read in its own format and turned into one handoff. [Agents](agents.md) |
 | **What to include** | Summary only, summary plus the last 30 messages (default), or the full transcript. |
 | **Handoff chains** | A share made after `/pickup` links to the session it continues. Every session shows who started the work and who continued it. [Agents](agents.md#handoff-chains) |
@@ -14,7 +14,7 @@ Everything Session Relay does today. Each item links to where it's explained in 
 | **Edit after sharing** | Fix the title, goal, next steps, decisions or who it's for, in the web app (**Edit**), with `relay edit`, or by asking your agent (`update_session`). Only the author or an admin can edit. |
 | **Pull request links** | `relay share` attaches the current branch's open PR (found with the GitHub CLI), or pass `--pr <url>`. The session shows the PR, and `relay pr-comment <id>` posts a link to the session on the PR. |
 | **Comments** | Leave a note on any session you can see: in the web app, with `relay comment <id> "…"`, or from your agent (`comment_on_session`). The agent that picks the session up reads them first. Secrets are removed from comments too. |
-| **Auto-share drafts** (opt-in) | `relay setup --auto-share on` saves every Claude Code session as a **private draft** when it ends (in a git repo, 4+ messages). Only you see drafts (**My drafts**, `relay list --drafts`). Publish one when it's ready: **Publish to team** in the web app, `relay publish <id>`, or ask your agent. Sessions you already shared are skipped. |
+| **Auto-share drafts** (opt-in) | `relay setup --auto-share on` saves every Claude Code, Gemini CLI and Copilot CLI session as a **private draft** when it ends (in a git repo, 4+ messages). Only you see drafts (**My drafts**, `relay list --drafts`). Publish one when it's ready: **Publish to team** in the web app, `relay publish <id>`, or ask your agent. Sessions you already shared are skipped. |
 | **Without MCP** | `relay pull <id>` writes a handoff file any agent can read. |
 
 ## Finding sessions

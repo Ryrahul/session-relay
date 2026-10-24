@@ -32,6 +32,7 @@ The config is at `~/.config/session-relay/config.json` (mode `600`). Override it
 | `--tail <n>` | Messages to keep with `summary+tail` (default 30) |
 | `--title <title>` | Title teammates see |
 | `--people <names>` | Comma-separated names or emails. Default: the whole team |
+| `--diff` | Attach your uncommitted changes: `git diff HEAD` plus new untracked files (respecting `.gitignore`), redacted, up to 500 KB |
 | `--for <name>` | Teammate this handoff is for (name or email). It's first in their `/pickup` and visible to them even if private |
 | `--pr <url>` | Pull request it belongs to. Default: the current branch's open PR, found with the GitHub CLI (`gh`). `none` to leave it out |
 | `--continues <id>` | Shared session this work continues. Default: the one you last picked up in this repo (within 7 days). `none` to unlink |
@@ -57,7 +58,7 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 | `relay digest [--days 1]` | What the team did lately: new shares by repo, handoffs for you, pickups, comments |
 | `relay stats [--days 30] [--json]` | Shares, pickups, continued handoffs and comments, by day, person, agent and repo |
 | `relay show <id>` | Print a session as a handoff |
-| `relay pull <id>` | Write `.relay/handoff-<id>.md` for your agent. Counts as a pickup in Activity and Stats |
+| `relay pull <id>` | Write `.relay/handoff-<id>.md` for your agent, and `.relay/diff-<id>.patch` if changes were attached (`git apply` it). Counts as a pickup in Activity and Stats |
 
 `list` and `search` options: `--repo`, `--branch`, `--author <name|email|me>`, `--tool`, `--file <path>` (sessions that touched it; part of the path is fine), `--for-me`, `--limit` (default 20), `--json`.
 

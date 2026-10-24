@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { matchTemplate, type ChainLink, type Member, type MeResponse, type Message, type SessionDetail, type SummarySection } from "@session-relay/shared";
+import { matchTemplate, splitDiff, type DiffFile, type ChainLink, type Member, type MeResponse, type Message, type SessionDetail, type SummarySection } from "@session-relay/shared";
 import { api, download } from "../api";
 import { ago, dateTime, prLabel, shortRepo, TOOL_NAMES } from "../format";
 import { RichText } from "../text";
@@ -283,6 +283,72 @@ function Comments({ s, me, onChange }: { s: SessionDetail; me: MeResponse; onCha
   );
 }
 
+function DiffFileView({ f }: { f: DiffFile }) {
+  const [open, setOpen] = useState(false);
+  const lines = f.patch.split("\n");
+  // Skip the git headers; show from the first hunk.
+  const body = lines.slice(Math.max(0, lines.findIndex((l) => l.startsWith("@@"))));
+  return (
+    <li className="diff-file">
+      <button type="button" className="diff-file-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span className={`chev ${open ? "open" : ""}`}>
+          <Icon name="chevron" size={12} />
+        </span>
+        <span className="mono diff-path">{f.path}</span>
+        <span className="diff-count">
+          {f.binary ? "binary" : <><span className="add">+{f.additions}</span> <span className="del">−{f.deletions}</span></>}
+        </span>
+      </button>
+      {open && !f.binary && (
+        <pre className="diff-body">
+          {body.map((l, i) => (
+            <span key={i} className={l.startsWith("@@") ? "hunk" : l.startsWith("+") ? "add" : l.startsWith("-") ? "del" : ""}>
+              {l + "\n"}
+            </span>
+          ))}
+        </pre>
+      )}
+    </li>
+  );
+}
+
+/** Uncommitted changes attached at share time, loaded on demand. */
+function DiffCard({ s }: { s: SessionDetail }) {
+  const [files, setFiles] = useState<DiffFile[] | null>(null);
+  const [error, setError] = useState("");
+  if (!s.diff) return null;
+  const load = () => api.diff(s.id).then((d) => setFiles(splitDiff(d)), (e) => setError(e.message));
+  return (
+    <section className="diff-card">
+      <div className="conversation-head">
+        <h2>Uncommitted changes</h2>
+        <span className="muted">
+          {s.diff.files} file{s.diff.files === 1 ? "" : "s"} · <span className="add">+{s.diff.additions}</span> <span className="del">−{s.diff.deletions}</span>
+        </span>
+        {!files && (
+          <button type="button" className="btn-ghost btn-sm" onClick={load}>
+            Show changes
+          </button>
+        )}
+        <button type="button" className="btn-ghost btn-sm" onClick={() => download(`/v1/sessions/${s.id}/diff`, `${s.id}.patch`).catch((e) => setError(e.message))}>
+          <Icon name="download" size={14} /> .patch
+        </button>
+      </div>
+      <p className="muted small">
+        The author's working tree when they shared. Apply it with <code>relay pull {s.id}</code> then <code>git apply</code>.
+      </p>
+      {error && <p className="error">{error}</p>}
+      {files && (
+        <ul className="diff-files">
+          {files.map((f) => (
+            <DiffFileView key={f.path} f={f} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 type Block = { kind: "msg"; m: Message } | { kind: "tools"; items: Message[] };
 
 /** Consecutive tool lines are folded into one expandable block. */
@@ -491,6 +557,7 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
             </section>
           )}
 
+          <DiffCard s={s} />
           <section className="conversation">
             <div className="conversation-head">
               <h2>Conversation</h2>

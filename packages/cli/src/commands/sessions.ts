@@ -2,7 +2,7 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { describeTemplate, IncludeMode, matchTemplate, missingSections, SourceTool, Summary, type DetailMode, type SessionPatch, type SummarySection } from "@session-relay/shared";
+import { describeTemplate, diffStats, IncludeMode, matchTemplate, missingSections, SourceTool, Summary, type DetailMode, type SessionPatch, type SummarySection } from "@session-relay/shared";
 import { findSessions } from "../adapters/index.js";
 import { RelayClient, resolvePeople, resolvePerson } from "../client.js";
 import { repoInfo } from "../git.js";
@@ -27,6 +27,7 @@ interface ShareOpts {
   continues?: string;
   for?: string;
   pr?: string;
+  diff?: boolean;
 }
 
 function parseTool(t?: string): SourceTool | undefined {
@@ -90,6 +91,7 @@ export async function share(opts: ShareOpts): Promise<void> {
     continues: opts.continues,
     assign: opts.for,
     pr: opts.pr,
+    diff: opts.diff,
   });
   const { session } = prepared.built;
   const redactNote = describeRedactions(prepared.built.redactions);
@@ -104,6 +106,10 @@ export async function share(opts: ShareOpts): Promise<void> {
     console.log(redactNote);
     if (session.continues) console.log(`Continues ${session.continues}${prepared.continuesAuto ? " (the session you picked up here)" : ""}. Use --continues none to unlink.`);
     if (opts.for) console.log(`For ${opts.for}.`);
+    if (opts.diff) {
+      const d = prepared.built.diff;
+      console.log(d ? `Uncommitted changes: ${diffStats(d).files} files${prepared.built.diffTruncated ? " (cut to fit)" : ""}.` : "No uncommitted changes to attach.");
+    }
     if (client) {
       const t = matchTemplate((await client.me()).settings.share_templates ?? [], session.repo);
       const missing = missingSections(t, session.summary);
@@ -311,6 +317,12 @@ export async function pull(id: string, opts: { full?: boolean; summaryOnly?: boo
   await writeFile(file, renderHandoff(s));
   const rel = path.relative(process.cwd(), file) || file;
   console.log(`Wrote ${rel}\nTell your agent: "Read ${rel} and continue from where it stopped."`);
+  if (s.diff) {
+    const patch = path.join(path.dirname(file), `diff-${s.id}.patch`);
+    await writeFile(patch, await client.diff(s.id));
+    const prel = path.relative(process.cwd(), patch) || patch;
+    console.log(`Wrote ${prel} (${s.diff.files} files of uncommitted changes). Apply them with: git apply ${prel}`);
+  }
 }
 
 /** relay export: one session as Markdown/JSON, or (with no id) every session of a repo as NDJSON. */

@@ -44,6 +44,7 @@ program
   .option("--json", "print the result as JSON")
   .option("--continues <id>", 'shared session this continues (default: the one you last picked up here; "none" to unlink)')
   .option("--for <name>", "teammate this handoff is for; it shows first in their /pickup")
+  .option("--diff", "attach your uncommitted changes (git diff plus new files), redacted")
   .option("--pr <url>", 'pull request it belongs to (default: this branch\'s open PR via gh; "none" to leave out)')
   .action(share);
 

@@ -70,3 +70,33 @@ export async function currentPr(cwd: string): Promise<string | undefined> {
     return undefined;
   }
 }
+
+/** Biggest diff we attach; beyond this it's cut with a note (the server's hard limit is higher). */
+export const DIFF_LIMIT = 500_000;
+const UNTRACKED_FILE_LIMIT = 100_000;
+
+/**
+ * Uncommitted work, as one patch: changes to tracked files against HEAD, plus new untracked
+ * text files (respecting .gitignore). Empty string when the tree is clean.
+ */
+export async function workingDiff(root: string, limit = DIFF_LIMIT): Promise<{ diff: string; truncated: boolean }> {
+  const parts: string[] = [];
+  const tracked = await run("git", ["diff", "HEAD", "--no-color", "--no-ext-diff"], { cwd: root, maxBuffer: 64 * 1024 * 1024 })
+    .then((r) => r.stdout)
+    .catch(() => run("git", ["diff", "--no-color", "--no-ext-diff"], { cwd: root, maxBuffer: 64 * 1024 * 1024 }).then((r) => r.stdout, () => ""));
+  if (tracked) parts.push(tracked);
+  const untracked = (await git(root, "ls-files", "--others", "--exclude-standard", "-z")) ?? "";
+  for (const file of untracked.split("\0").filter(Boolean)) {
+    // `git diff --no-index` exits 1 when files differ, which is always here.
+    const out = await run("git", ["diff", "--no-color", "--no-index", "--", "/dev/null", file], { cwd: root, maxBuffer: 8 * 1024 * 1024 }).then(
+      (r) => r.stdout,
+      (e: { stdout?: string }) => e.stdout ?? "",
+    );
+    if (out && out.length <= UNTRACKED_FILE_LIMIT) parts.push(out);
+    else if (out) parts.push(`diff --git a/${file} b/${file}\nnew file (${Math.round(out.length / 1024)} KB, not included)\n`);
+  }
+  let diff = parts.join("");
+  const truncated = diff.length > limit;
+  if (truncated) diff = diff.slice(0, diff.lastIndexOf("\ndiff --git ", limit) > 0 ? diff.lastIndexOf("\ndiff --git ", limit) + 1 : limit) + "\n# [diff truncated by relay]\n";
+  return { diff, truncated };
+}

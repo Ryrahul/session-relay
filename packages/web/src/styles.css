@@ -425,3 +425,21 @@ a.badge-link:hover { color: var(--accent); }
 @media (max-width: 640px) { .template-section-row { grid-template-columns: 1fr auto; } .template-section-row input:nth-child(2) { grid-column: 1 / -1; grid-row: 2; } }
 .template-section p { margin: 4px 0 0; }
 .missing-banner { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; border-style: dashed; }
+
+/* Diffs */
+.diff-card { display: grid; gap: 8px; margin: 8px 0 16px; }
+.diff-files { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.diff-file + .diff-file { border-top: 1px solid var(--line); }
+.diff-file-head { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--surface); border: 0; color: var(--ink); text-align: left; cursor: pointer; }
+.diff-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.diff-count { font-size: 12px; font-variant-numeric: tabular-nums; }
+.add { color: var(--ok-ink, #1a7f37); }
+.del { color: var(--danger-ink, #b42318); }
+.diff-body { margin: 0; padding: 8px 0; background: var(--surface-2); font-size: 12px; line-height: 1.5; overflow-x: auto; max-height: 520px; }
+.diff-body span { display: block; padding: 0 12px; white-space: pre; }
+.diff-body .add { background: color-mix(in srgb, #2da44e 14%, transparent); color: var(--ink); }
+.diff-body .del { background: color-mix(in srgb, #cf222e 14%, transparent); color: var(--ink); }
+.diff-body .hunk { color: var(--muted); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .diff-count .add, :root:not([data-theme="light"]) .diff-card .muted .add { color: #5fd08b; } :root:not([data-theme="light"]) .diff-count .del, :root:not([data-theme="light"]) .diff-card .muted .del { color: #ff8b7e; } }
+:root[data-theme="dark"] .diff-count .add, :root[data-theme="dark"] .diff-card .muted .add { color: #5fd08b; }
+:root[data-theme="dark"] .diff-count .del, :root[data-theme="dark"] .diff-card .muted .del { color: #ff8b7e; }

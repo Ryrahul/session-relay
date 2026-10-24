@@ -126,6 +126,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         let out = renderHandoff(s);
         const end = s.message_offset + s.messages.length;
         if (mode === "full" && end < s.message_total) out += `\n(More messages: call get_session with mode "full" and offset ${end}.)`;
+        if (s.diff) out += `\n(Uncommitted changes are attached: call get_session_diff with id "${s.id}".)`;
         return text(out);
       } catch (err) {
         return fail(err);
@@ -152,6 +153,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
           .optional()
           .describe('Id of the shared session this work continues. Defaults to the one loaded with get_session in this repo; "none" to unlink.'),
         sections: z.array(z.object({ title: z.string(), items: z.array(z.string()) })).optional().describe("Extra sections, e.g. the ones share_template asks for"),
+        include_diff: z.boolean().optional().describe("Attach the uncommitted changes in this repo (redacted), so the next person gets the exact code state"),
         ignore_template: z.boolean().optional().describe("Share even if the repo's template has required sections you left empty"),
         for: z.string().optional().describe("Name or email of the teammate this handoff is for"),
         pr_url: z.string().optional().describe('Pull request URL. Defaults to the current branch\'s open PR (via gh); "none" to leave out'),
@@ -169,6 +171,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
           continues: args.continues,
           assign: args.for,
           pr: args.pr_url,
+          diff: args.include_diff,
           summary: {
             goal: args.goal,
             decisions: args.decisions ?? [],
@@ -194,6 +197,25 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         return text(
           `Shared as ${id}: "${session.title}" (${session.include}, ${session.messages.length} messages, ${session.visibility.team ? "whole team" : "selected people"}). ${describeRedactions(prepared.built.redactions)}${continues ? `\nContinues ${continues}.` : ""}${args.for ? `\nFor ${args.for}.` : ""}${session.pr_url ? `\nPR ${session.pr_url}.` : ""}\nTeammates can load it with get_session("${id}") or \`relay pull ${id}\`.`,
         );
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_session_diff",
+    {
+      description:
+        "The uncommitted changes a teammate attached to a shared session, as a unified diff. Use it to see exact code state; to apply it, write it to a file and run `git apply`.",
+      inputSchema: { id: z.string(), max_chars: z.number().int().min(1000).max(500000).optional() },
+    },
+    async ({ id, max_chars }) => {
+      try {
+        const client = await getClient();
+        const diff = await client.diff(id);
+        const max = max_chars ?? 100_000;
+        return text(diff.length > max ? `${diff.slice(0, max)}\n[cut at ${max} characters of ${diff.length}; ask for more with max_chars]` : diff);
       } catch (err) {
         return fail(err);
       }

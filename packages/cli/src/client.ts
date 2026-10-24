@@ -83,6 +83,9 @@ export class RelayClient {
   stats(days = 30) {
     return api<Stats>(this.config, "GET", `v1/stats?days=${days}`);
   }
+  diff(id: string) {
+    return apiText(this.config, `v1/sessions/${encodeURIComponent(id)}/diff`);
+  }
   export(id: string, format: "md" | "json") {
     return apiText(this.config, `v1/sessions/${encodeURIComponent(id)}/export?format=${format}`);
   }

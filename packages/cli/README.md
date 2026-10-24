@@ -25,6 +25,7 @@ You need a Session Relay server for your team; see [self-hosting](https://relay.
 |---|---|
 | `relay sessions` | Your local agent sessions for this repo |
 | `relay share [--dry-run]` | Pick a session, choose what to include and who sees it |
+| `relay share --diff` | Attach your uncommitted changes; teammates `git apply` them after `relay pull` |
 | `relay share --for <name>` | A handoff for a teammate (also `--pr <url>`; the branch's PR is found automatically) |
 | `relay list`, `relay search "<q>"` | Shared sessions. `--for-me`, `--file <path>`, or `file:` / `branch:` in the query |
 | `relay show <id>`, `relay pull <id>` | Read a session, or write `.relay/handoff-<id>.md` for your agent |

@@ -2,18 +2,19 @@
 
 Session Relay works with **Claude Code**, **OpenCode**, **Codex** and **ZCode**. Each one gets the same two things:
 
-1. **The relay MCP server** (`relay mcp`), which gives the agent four tools:
+1. **The relay MCP server** (`relay mcp`), which gives the agent five tools:
 
    | Tool | What it does |
    |---|---|
-   | `list_sessions` | Shared sessions for the current repo (or all repos), newest first |
-   | `search_sessions` | Full-text search over titles, summaries and conversations |
+   | `list_sessions` | Shared sessions for the current repo (or all repos), newest first. `for_me` lists handoffs assigned to you; `file` filters by touched file |
+   | `search_sessions` | Full-text search over titles, summaries and conversations. The query can include `file:` and `branch:` |
    | `get_session` | A session as a handoff: goal, decisions, done, next steps, open questions, files, conversation. `mode`: `tail` (default), `summary`, or `full` (paged) |
-   | `share_current_session` | Shares the session the agent is in, with a summary the agent writes |
+   | `share_current_session` | Shares the session the agent is in, with a summary the agent writes. `for` assigns it to a teammate; the branch's PR is attached |
+   | `update_session` | Changes a share: title, summary, extra next steps, who it's for, PR, visibility |
 
 2. **Two commands**:
-   - `/share [instructions]`: write a handoff and share this session.
-   - `/pickup <what or whose>`: find a shared session, read it, check the code and continue.
+   - `/share [instructions]`: write a handoff and share this session. "for Akshat" makes it a handoff for them.
+   - `/pickup [what or whose]`: find a shared session, read it, check the code and continue. With nothing after it, handoffs for you come first.
 
 `relay setup` installs both for every agent it finds. Restart your agents afterwards.
 

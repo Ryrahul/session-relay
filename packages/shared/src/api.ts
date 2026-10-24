@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { IncludeMode, Message, SessionRecord, SessionUpload, SourceTool, Visibility } from "./session.js";
+import { IncludeMode, Message, PrUrl, SessionRecord, SessionUpload, SourceTool, Summary, Visibility } from "./session.js";
 
 export const Role = z.enum(["owner", "admin", "member"]);
 export type Role = z.infer<typeof Role>;
@@ -26,7 +26,10 @@ export const SessionListItem = z.object({
   visibility_team: z.boolean(),
   /** Set when this share continues another session. */
   continues_id: z.string().nullable(),
+  assignee: z.object({ id: z.string(), name: z.string() }).nullable(),
+  pr_url: z.string().nullable(),
   created_at: z.string(),
+  updated_at: z.string().nullable(),
 });
 export type SessionListItem = z.infer<typeof SessionListItem>;
 
@@ -52,12 +55,18 @@ export const SessionDetail = SessionRecord.extend({
   chain: z.array(ChainLink),
   /** Sessions that continued this one. */
   continued_by: z.array(ChainLink),
+  /** The member `assignee` points to. */
+  assigned_to: z.object({ id: z.string(), name: z.string() }).nullable(),
 });
 export type SessionDetail = z.infer<typeof SessionDetail>;
 
+/** PATCH /v1/sessions/:id (author or admin). `null` clears assignee or pr_url. */
 export const SessionPatch = z.object({
   title: z.string().min(1).max(200).optional(),
   visibility: Visibility.optional(),
+  summary: Summary.optional(),
+  assignee: z.string().max(40).nullable().optional(),
+  pr_url: PrUrl.nullable().optional(),
 });
 export type SessionPatch = z.infer<typeof SessionPatch>;
 

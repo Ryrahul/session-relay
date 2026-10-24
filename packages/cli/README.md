@@ -4,7 +4,7 @@ Share coding-agent sessions with your team across **Claude Code**, **OpenCode**,
 
 ```sh
 npm install -g session-relay
-relay login --server https://relay.your-team.com --token srk_...
+relay login --server https://relay.your-team.com   # approve in the browser
 relay setup     # adds the relay MCP server and /share, /pickup to your agents
 ```
 
@@ -12,6 +12,8 @@ Then, in your agent:
 
 ```
 /share
+/share for bob
+/pickup
 /pickup alice's webhook retry work
 ```
 
@@ -23,8 +25,13 @@ You need a Session Relay server for your team; see [self-hosting](https://relay.
 |---|---|
 | `relay sessions` | Your local agent sessions for this repo |
 | `relay share [--dry-run]` | Pick a session, choose what to include and who sees it |
-| `relay list`, `relay search "<q>"` | Shared sessions |
+| `relay share --for <name>` | A handoff for a teammate (also `--pr <url>`; the branch's PR is found automatically) |
+| `relay list`, `relay search "<q>"` | Shared sessions. `--for-me`, `--file <path>`, or `file:` / `branch:` in the query |
 | `relay show <id>`, `relay pull <id>` | Read a session, or write `.relay/handoff-<id>.md` for your agent |
+| `relay edit <id>` | Change your share: title, summary, next steps, who it's for, PR |
+| `relay pr-comment <id>` | Post the session on its pull request |
+| `relay delete <id>` | Delete your share |
+| `relay members`, `relay invite --link` | Your team; invite links (admins) |
 | `relay setup` | Connect Claude Code, OpenCode, Codex and ZCode |
 | `relay mcp` | The MCP server your agents start |
 

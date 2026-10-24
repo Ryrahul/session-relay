@@ -32,11 +32,13 @@ The config is at `~/.config/session-relay/config.json` (mode `600`). Override it
 | `--tail <n>` | Messages to keep with `summary+tail` (default 30) |
 | `--title <title>` | Title teammates see |
 | `--people <names>` | Comma-separated names or emails. Default: the whole team |
+| `--for <name>` | Teammate this handoff is for (name or email). It's first in their `/pickup` and visible to them even if private |
+| `--pr <url>` | Pull request it belongs to. Default: the current branch's open PR, found with the GitHub CLI (`gh`). `none` to leave it out |
 | `--continues <id>` | Shared session this work continues. Default: the one you last picked up in this repo (within 7 days). `none` to unlink |
 | `--summary-file <file>` | JSON `{goal, decisions, done, next, open_questions}`. Without it, the summary is the first request and the last answer |
 | `--dry-run` | Write what would be uploaded to `.relay/dry-run-*.json` and stop |
 | `-y, --yes` | Don't ask questions |
-| `--json` | Print `{id, title, redactions}` |
+| `--json` | Print `{id, title, redactions, continues, pr_url}` |
 
 Example for scripts: `relay share --tool claude --latest --yes --json`.
 
@@ -46,11 +48,12 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 |---|---|
 | `relay list` | Shared sessions for this repo |
 | `relay list --all` | All repos |
-| `relay search "<query>"` | Full-text search over titles, summaries and messages |
+| `relay list --for-me` | Handoffs assigned to you, from any repo |
+| `relay search "<query>"` | Full-text search over titles, summaries and messages. Add `file:<path>` or `branch:<name>` to filter |
 | `relay show <id>` | Print a session as a handoff |
 | `relay pull <id>` | Write `.relay/handoff-<id>.md` for your agent |
 
-`list` and `search` options: `--repo`, `--author <name|email|me>`, `--tool`, `--limit` (default 20), `--json`. `list` also takes `--branch`.
+`list` and `search` options: `--repo`, `--branch`, `--author <name|email|me>`, `--tool`, `--file <path>` (sessions that touched it; part of the path is fine), `--for-me`, `--limit` (default 20), `--json`.
 
 `show` and `pull` options:
 - `--summary-only`: no messages.
@@ -62,10 +65,25 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 
 | Command | |
 |---|---|
+| `relay edit <id> …` | Change your share (admins: any share). See below |
+| `relay pr-comment <id> [--pr <url>]` | Comment on the share's pull request with a link and the next steps (uses `gh`) |
 | `relay delete <id> [-y]` | Delete your share. Admins can delete any share |
 | `relay members` | People in your org |
 | `relay invite --link [--role member\|admin\|owner] [--days 7]` | Admins: create a single-use invite link |
 | `relay invite <email> --name <name> [--role member\|admin\|owner]` | Admins: add someone and print their one-time login command |
+
+`relay edit` options:
+
+| Flag | |
+|---|---|
+| `--title <title>` | New title |
+| `--goal <text>` | Replace the goal |
+| `--add-next <text>` | Add a next step; repeat for more. `--clear-next` removes the old ones first |
+| `--add-done`, `--add-decision`, `--add-question <text>` | Add to those lists (repeatable) |
+| `--summary-file <file>` | Replace the whole summary with JSON `{goal, decisions, done, next, open_questions}` |
+| `--for <name>` | Who it's for; `none` to clear |
+| `--pr <url>` | Pull request; `none` to clear |
+| `--team` / `--people <names>` | Visible to the whole team, or only these people |
 
 ## Agents
 

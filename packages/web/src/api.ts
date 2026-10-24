@@ -1,4 +1,4 @@
-import type { InviteInfo, JoinInfo, Member, MeResponse, OrgInfo, OrgPatch, SessionDetail, SessionListItem } from "@session-relay/shared";
+import type { InviteInfo, JoinInfo, Member, MeResponse, OrgInfo, OrgPatch, SessionDetail, SessionListItem, SessionPatch } from "@session-relay/shared";
 
 const KEY = "relay.token";
 
@@ -59,6 +59,7 @@ export const api = {
   get: (id: string, mode: "tail" | "full", offset = 0) =>
     call<SessionDetail>("GET", `/v1/sessions/${encodeURIComponent(id)}?mode=${mode}&offset=${offset}&limit=1000`),
   remove: (id: string) => call<{ ok: true }>("DELETE", `/v1/sessions/${encodeURIComponent(id)}`),
+  update: (id: string, patch: SessionPatch) => call<{ ok: true }>("PATCH", `/v1/sessions/${encodeURIComponent(id)}`, patch),
   members: () => call<{ members: Member[] }>("GET", "/v1/members"),
   invite: (email: string, name: string, role: string) =>
     call<{ user: Member; token: string }>("POST", "/v1/members", { email, name, role }),

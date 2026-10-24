@@ -14,9 +14,15 @@ Teammate (OpenCode):    /pickup your webhook retry work
 Handing off agent work means copy-pasting chat logs, or the next person starting from zero. With Session Relay:
 
 - **`/share`**: the agent writes a handoff (goal, decisions, done, next steps, open questions) and shares it with the recent conversation and the files touched.
-- **`/pickup`**: the next person's agent finds it, reads it, checks the code and continues, in any of the three tools.
+- **`/pickup`**: the next person's agent finds it, reads it, checks the code and continues, in any of the four agents.
+- **Handoff chains**: work picked up and shared again is linked, so every session shows who started it and who continued it.
+- **Handoffs for someone**: share "for Akshat" and it's first in their `/pickup`. Edit a share any time (next steps, title, who it's for).
+- **Linked to PRs and files**: shares carry the branch's pull request; find every session that touched a file with `file:src/billing.ts`.
 - **Web app**: browse, search and read everything your team has shared.
+- **Easy onboarding**: invite links, and `relay login` signs in through the browser.
 - **Private by default**: nothing is uploaded unless you share it, secrets are removed on your laptop first, and shares can be limited to specific people.
+
+All of it: [Features](docs/features.md).
 
 ## Hosting
 
@@ -44,7 +50,7 @@ Open your server's URL, enter the setup code, and create your organization. You'
 
 ```sh
 npm install -g session-relay
-relay login --server https://relay.your-team.com --token srk_...
+relay login --server https://relay.your-team.com    # approve in the browser
 relay setup        # adds /share and /pickup to Claude Code, OpenCode, Codex and ZCode
 ```
 
@@ -56,6 +62,7 @@ Online at **https://relay.rahulweb.online**. Sources are in [`docs/`](docs/).
 
 
 - [Getting started](docs/getting-started.md): laptop setup, sharing, picking up
+- [Features](docs/features.md): everything it does, in one list
 - [Self-hosting](docs/self-hosting.md): Docker, HTTPS, backups, upgrades
 - [Deploy to Cloudflare](docs/cloudflare.md): Workers, Hyperdrive, R2, no server
 - [Agents](docs/agents.md): how each agent connects, manual setup, MCP tools
@@ -67,16 +74,17 @@ Online at **https://relay.rahulweb.online**. Sources are in [`docs/`](docs/).
 ## How it works
 
 ```
- Claude Code ─┐                         ┌─ web app (browse, search, read)
- OpenCode    ─┼─ relay CLI / relay mcp ─┼─ Relay server (Hono + Postgres)
- Codex       ─┘   read · redact · share └─ your team's agents via MCP
+ Claude Code ─┐                         ┌─ web app (browse, search, read, edit)
+ OpenCode    ─┤                         │
+ Codex       ─┼─ relay CLI / relay mcp ─┼─ Relay server (Hono + Postgres)
+ ZCode       ─┘   read · redact · share └─ your team's agents via MCP
 ```
 
 | Package | |
 |---|---|
 | `packages/cli` | `relay` CLI and MCP server: adapters for each agent, redaction, share building |
-| `packages/server` | API: orgs, members, tokens, sessions, search, retention, audit |
-| `packages/web` | Web app (React), served by the server |
+| `packages/server` | API: orgs, members, invites, tokens, sessions, search, retention, audit. Runs on Node (Docker) or Cloudflare Workers |
+| `packages/web` | Web app (React), served by the server or Workers Static Assets |
 | `packages/shared` | Session format and API types |
 
 ## Development

@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { login } from "./commands/login.js";
-import { invite, list, localSessions, members, pull, remove, search, share, show } from "./commands/sessions.js";
+import { edit, invite, list, localSessions, members, prComment, pull, remove, search, share, show } from "./commands/sessions.js";
 import { setup } from "./commands/setup.js";
 import { whoami } from "./commands/whoami.js";
 import { runMcp } from "./mcp.js";
@@ -42,6 +42,8 @@ program
   .option("-y, --yes", "don't ask questions")
   .option("--json", "print the result as JSON")
   .option("--continues <id>", 'shared session this continues (default: the one you last picked up here; "none" to unlink)')
+  .option("--for <name>", "teammate this handoff is for; it shows first in their /pickup")
+  .option("--pr <url>", 'pull request it belongs to (default: this branch\'s open PR via gh; "none" to leave out)')
   .action(share);
 
 const listOpts = (cmd: Command) =>
@@ -49,12 +51,14 @@ const listOpts = (cmd: Command) =>
     .option("--repo <repo>", "e.g. github.com/acme/api")
     .option("--author <name>", 'name, email or "me"')
     .option("--tool <tool>", "claude, opencode, codex or zcode")
+    .option("--branch <branch>")
+    .option("--file <path>", "only sessions that touched this file (part of the path is fine)")
+    .option("--for-me", "only handoffs assigned to you")
     .option("--limit <n>", "max results", "20")
     .option("--json", "print JSON");
 
 listOpts(program.command("list").description("List shared sessions (this repo by default)"))
   .option("--all", "all repos")
-  .option("--branch <branch>")
   .action(list);
 
 listOpts(program.command("search <query>").description("Search shared sessions")).action(search);
@@ -75,6 +79,30 @@ program
   .option("--summary-only", "no messages")
   .option("--out <file>", "output file")
   .action(pull);
+
+const collect = (v: string, prev: string[] = []) => [...prev, v];
+program
+  .command("edit <id>")
+  .description("Change one of your shares: title, summary, who it's for, PR, visibility")
+  .option("--title <title>")
+  .option("--goal <text>", "replace the goal")
+  .option("--add-next <text>", "add a next step (repeatable)", collect)
+  .option("--clear-next", "remove the existing next steps first")
+  .option("--add-done <text>", "add to done (repeatable)", collect)
+  .option("--add-decision <text>", "add a decision (repeatable)", collect)
+  .option("--add-question <text>", "add an open question (repeatable)", collect)
+  .option("--summary-file <file>", "replace the whole summary with this JSON")
+  .option("--for <name>", 'teammate it\'s for, or "none"')
+  .option("--pr <url>", 'pull request URL, or "none"')
+  .option("--team", "make it visible to the whole team")
+  .option("--people <names>", "make it visible only to these people")
+  .action(edit);
+
+program
+  .command("pr-comment <id>")
+  .description("Comment on the session's pull request with a link and next steps (uses the GitHub CLI)")
+  .option("--pr <url>", "pull request URL, if the share doesn't have one yet")
+  .action(prComment);
 
 program.command("delete <id>").description("Delete one of your shares").option("-y, --yes").action(remove);
 program.command("members").description("List people in your org").action(members);

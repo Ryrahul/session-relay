@@ -1,8 +1,10 @@
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { IncludeMode, SourceTool, Summary, type DetailMode } from "@session-relay/shared";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { IncludeMode, SourceTool, Summary, type DetailMode, type SessionPatch } from "@session-relay/shared";
 import { findSessions } from "../adapters/index.js";
-import { RelayClient } from "../client.js";
+import { RelayClient, resolvePeople, resolvePerson } from "../client.js";
 import { repoInfo } from "../git.js";
 import { renderHandoff } from "../handoff.js";
 import { recordPickup } from "../pickups.js";
@@ -22,6 +24,8 @@ interface ShareOpts {
   yes?: boolean;
   json?: boolean;
   continues?: string;
+  for?: string;
+  pr?: string;
 }
 
 function parseTool(t?: string): SourceTool | undefined {
@@ -83,6 +87,8 @@ export async function share(opts: ShareOpts): Promise<void> {
     title: opts.title,
     people,
     continues: opts.continues,
+    assign: opts.for,
+    pr: opts.pr,
   });
   const { session } = prepared.built;
   const redactNote = describeRedactions(prepared.built.redactions);
@@ -96,11 +102,15 @@ export async function share(opts: ShareOpts): Promise<void> {
     console.log(`\n"${session.title}" · ${toolLabel(prepared.ref.tool).trim()} · ${session.include} · ${session.messages.length} messages · ${session.visibility.team ? "whole team" : `${session.visibility.people.length} people`}`);
     console.log(redactNote);
     if (session.continues) console.log(`Continues ${session.continues}${prepared.continuesAuto ? " (the session you picked up here)" : ""}. Use --continues none to unlink.`);
+    if (opts.for) console.log(`For ${opts.for}.`);
+    if (session.pr_url) console.log(`PR ${session.pr_url}${opts.pr ? "" : " (this branch's open PR; --pr none to leave it out)"}`);
   }
   if (ask_ && !(await confirm("Share it?"))) return console.log("Cancelled.");
 
   const { id, continues } = await uploadShare(client!, prepared);
-  if (opts.json) return console.log(JSON.stringify({ id, title: session.title, redactions: session.redactions, continues: continues ?? null }));
+  if (opts.json) {
+    return console.log(JSON.stringify({ id, title: session.title, redactions: session.redactions, continues: continues ?? null, pr_url: session.pr_url ?? null }));
+  }
   console.log(`Shared as ${id}. Teammates can run: relay pull ${id}`);
 }
 
@@ -110,6 +120,8 @@ interface ListOpts {
   branch?: string;
   tool?: string;
   author?: string;
+  forMe?: boolean;
+  file?: string;
   limit?: string;
   json?: boolean;
 }
@@ -120,20 +132,90 @@ async function printList(query: Record<string, string | number | undefined>, jso
   if (json) return console.log(JSON.stringify(sessions, null, 2));
   if (!sessions.length) return console.log("No shared sessions found.");
   for (const s of sessions) {
+    const tags = [s.assignee ? `for ${s.assignee.name}` : "", s.pr_url ? `PR #${s.pr_url.split("/").pop()}` : ""].filter(Boolean).join(", ");
     console.log(
-      `${s.id}  ${s.author.name.slice(0, 12).padEnd(12)} ${toolLabel(s.tool)} ${ago(s.created_at).padEnd(9)} ${(s.branch ?? "").slice(0, 18).padEnd(18)} ${s.title}`,
+      `${s.id}  ${s.author.name.slice(0, 12).padEnd(12)} ${toolLabel(s.tool)} ${ago(s.created_at).padEnd(9)} ${(s.branch ?? "").slice(0, 18).padEnd(18)} ${s.title}${tags ? `  (${tags})` : ""}`,
     );
   }
 }
 
 export async function list(opts: ListOpts): Promise<void> {
   let repo = opts.repo;
-  if (!repo && !opts.all) repo = await repoInfo().then((r) => r.repo).catch(() => undefined);
-  await printList({ repo, branch: opts.branch, tool: parseTool(opts.tool), author: opts.author, limit: opts.limit }, opts.json);
+  // Handoffs for you are worth seeing from any repo.
+  if (!repo && !opts.all && !opts.forMe) repo = await repoInfo().then((r) => r.repo).catch(() => undefined);
+  await printList(
+    { repo, branch: opts.branch, tool: parseTool(opts.tool), author: opts.author, assignee: opts.forMe ? "me" : undefined, file: opts.file, limit: opts.limit },
+    opts.json,
+  );
 }
 
 export async function search(query: string, opts: ListOpts): Promise<void> {
-  await printList({ q: query, repo: opts.repo, author: opts.author, tool: parseTool(opts.tool), limit: opts.limit }, opts.json);
+  await printList(
+    { q: query, repo: opts.repo, branch: opts.branch, author: opts.author, tool: parseTool(opts.tool), assignee: opts.forMe ? "me" : undefined, file: opts.file, limit: opts.limit },
+    opts.json,
+  );
+}
+
+interface EditOpts {
+  title?: string;
+  goal?: string;
+  addDecision?: string[];
+  addDone?: string[];
+  addNext?: string[];
+  addQuestion?: string[];
+  clearNext?: boolean;
+  summaryFile?: string;
+  for?: string;
+  pr?: string;
+  team?: boolean;
+  people?: string;
+}
+
+/** relay edit: change a share after it was made (author or admin). */
+export async function edit(id: string, opts: EditOpts): Promise<void> {
+  const client = await RelayClient.fromConfig();
+  const patch: SessionPatch = {};
+  if (opts.title) patch.title = opts.title;
+  const touchesSummary = opts.goal || opts.summaryFile || opts.clearNext || opts.addDecision || opts.addDone || opts.addNext || opts.addQuestion;
+  if (touchesSummary) {
+    const current = opts.summaryFile
+      ? Summary.parse(JSON.parse(await readFile(opts.summaryFile, "utf8")))
+      : (await client.get(id, "summary")).summary;
+    patch.summary = {
+      goal: opts.goal ?? current.goal,
+      decisions: [...current.decisions, ...(opts.addDecision ?? [])],
+      done: [...current.done, ...(opts.addDone ?? [])],
+      next: [...(opts.clearNext ? [] : current.next), ...(opts.addNext ?? [])],
+      open_questions: [...current.open_questions, ...(opts.addQuestion ?? [])],
+    };
+  }
+  if (opts.for) patch.assignee = opts.for === "none" ? null : await resolvePerson(client, opts.for);
+  if (opts.pr) patch.pr_url = opts.pr === "none" ? null : opts.pr;
+  if (opts.team) patch.visibility = { team: true, people: [] };
+  else if (opts.people) {
+    patch.visibility = { team: false, people: await resolvePeople(client, opts.people.split(",").map((p) => p.trim()).filter(Boolean)) };
+  }
+  if (!Object.keys(patch).length) throw new Error("Nothing to change. See: relay edit --help");
+  await client.update(id, patch);
+  console.log(`Updated ${id}.`);
+}
+
+/** relay pr-comment: post a link to the session on its pull request (needs the GitHub CLI). */
+export async function prComment(id: string, opts: { pr?: string }): Promise<void> {
+  const client = await RelayClient.fromConfig();
+  const s = await client.get(id, "summary");
+  const pr = opts.pr ?? s.pr_url;
+  if (!pr) throw new Error(`${id} has no PR. Pass --pr <url>, or set one with: relay edit ${id} --pr <url>`);
+  if (!s.pr_url) await client.update(id, { pr_url: pr });
+  const link = `${client.config.server.replace(/\/$/, "")}/#/s/${s.id}`;
+  const next = s.summary.next.length ? `\n\n**Next steps**\n${s.summary.next.map((n) => `- ${n}`).join("\n")}` : "";
+  const body = `**Agent session:** [${s.title}](${link}) · shared by ${s.author.name} from Session Relay\n\n${s.summary.goal}${next}\n\nContinue it in your agent with \`/pickup ${s.id}\` or \`relay pull ${s.id}\`.`;
+  try {
+    await promisify(execFile)("gh", ["pr", "comment", pr, "--body", body], { timeout: 30000 });
+  } catch (err) {
+    throw new Error(`gh pr comment failed: ${((err as { stderr?: string }).stderr || (err as Error).message).trim()}`);
+  }
+  console.log(`Commented on ${pr}.`);
 }
 
 function mode(opts: { full?: boolean; summaryOnly?: boolean }): DetailMode {

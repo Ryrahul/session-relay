@@ -26,9 +26,9 @@ interface ShareOpts {
 
 function parseTool(t?: string): SourceTool | undefined {
   if (!t) return undefined;
-  const alias: Record<string, SourceTool> = { claude: "claude-code", "claude-code": "claude-code", opencode: "opencode", codex: "codex" };
+  const alias: Record<string, SourceTool> = { claude: "claude-code", "claude-code": "claude-code", opencode: "opencode", codex: "codex", zcode: "zcode" };
   const tool = alias[t.toLowerCase()];
-  if (!tool) throw new Error(`Unknown tool "${t}". Use claude, opencode or codex.`);
+  if (!tool) throw new Error(`Unknown tool "${t}". Use claude, opencode, codex or zcode.`);
   return tool;
 }
 
@@ -54,7 +54,7 @@ export async function share(opts: ShareOpts): Promise<void> {
   let ref;
   if (!opts.id && !opts.latest && ask_) {
     const refs = await findSessions(repo.root, tool);
-    if (!refs.length) throw new Error(`No Claude Code, OpenCode or Codex sessions found for ${repo.root}.`);
+    if (!refs.length) throw new Error(`No Claude Code, OpenCode, Codex or ZCode sessions found for ${repo.root}.`);
     console.log(`Recent sessions in ${repo.repo}:`);
     ref = await choose(
       "Share which session?",

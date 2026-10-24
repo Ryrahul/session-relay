@@ -1,6 +1,6 @@
 # Session Relay
 
-**Pick up where your teammate left off.** Share coding-agent sessions across **Claude Code**, **OpenCode** and **Codex**. Your teammate continues in whichever tool they use, with the goal, decisions, next steps and recent conversation.
+**Pick up where your teammate left off.** Share coding-agent sessions across **Claude Code**, **OpenCode**, **Codex** and **ZCode**. Your teammate continues in whichever tool they use, with the goal, decisions, next steps and recent conversation.
 
 ```
 You (Claude Code):      /share
@@ -45,7 +45,7 @@ Open your server's URL, enter the setup code, and create your organization. You'
 ```sh
 npm install -g session-relay
 relay login --server https://relay.your-team.com --token srk_...
-relay setup        # adds /share and /pickup to Claude Code, OpenCode and Codex
+relay setup        # adds /share and /pickup to Claude Code, OpenCode, Codex and ZCode
 ```
 
 Full walkthrough: [Getting started](docs/getting-started.md).

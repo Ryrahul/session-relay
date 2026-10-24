@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { login } from "./commands/login.js";
-import { edit, invite, list, localSessions, members, prComment, pull, remove, search, share, show } from "./commands/sessions.js";
+import { comment, edit, invite, list, localSessions, members, prComment, pull, remove, search, share, show } from "./commands/sessions.js";
 import { setup } from "./commands/setup.js";
 import { whoami } from "./commands/whoami.js";
 import { runMcp } from "./mcp.js";
@@ -103,6 +103,11 @@ program
   .description("Comment on the session's pull request with a link and next steps (uses the GitHub CLI)")
   .option("--pr <url>", "pull request URL, if the share doesn't have one yet")
   .action(prComment);
+
+program
+  .command("comment <id> [text...]")
+  .description("Leave a note on a shared session; without text, list its comments")
+  .action(comment);
 
 program.command("delete <id>").description("Delete one of your shares").option("-y, --yes").action(remove);
 program.command("members").description("List people in your org").action(members);

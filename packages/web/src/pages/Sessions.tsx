@@ -163,6 +163,11 @@ export function Sessions({ me }: { me: MeResponse }) {
                       {s.branch && <span className="faint"> · {s.branch}</span>}
                     </span>
                     <span className="faint">{s.message_count ? `${s.message_count} message${s.message_count === 1 ? "" : "s"}` : "summary only"}</span>
+                    {s.comment_count > 0 && (
+                      <span className="faint" title={`${s.comment_count} comment${s.comment_count === 1 ? "" : "s"}`}>
+                        <Icon name="comment" size={12} /> {s.comment_count}
+                      </span>
+                    )}
                     <span className="faint push">{ago(s.created_at)}</span>
                   </div>
                 </a>

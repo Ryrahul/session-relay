@@ -28,6 +28,7 @@ export const SessionListItem = z.object({
   continues_id: z.string().nullable(),
   assignee: z.object({ id: z.string(), name: z.string() }).nullable(),
   pr_url: z.string().nullable(),
+  comment_count: z.number().int(),
   created_at: z.string(),
   updated_at: z.string().nullable(),
 });
@@ -46,6 +47,19 @@ export const ChainLink = z.object({
 });
 export type ChainLink = z.infer<typeof ChainLink>;
 
+/** A note on a shared session. */
+export const Comment = z.object({
+  id: z.string(),
+  author: z.object({ id: z.string(), name: z.string() }),
+  body: z.string(),
+  created_at: z.string(),
+});
+export type Comment = z.infer<typeof Comment>;
+
+/** POST /v1/sessions/:id/comments */
+export const NewComment = z.object({ body: z.string().trim().min(1).max(4000) });
+export type NewComment = z.infer<typeof NewComment>;
+
 /** GET /v1/sessions/:id. `messages` is the requested window. */
 export const SessionDetail = SessionRecord.extend({
   people: z.array(z.object({ id: z.string(), name: z.string() })),
@@ -57,6 +71,8 @@ export const SessionDetail = SessionRecord.extend({
   continued_by: z.array(ChainLink),
   /** The member `assignee` points to. */
   assigned_to: z.object({ id: z.string(), name: z.string() }).nullable(),
+  /** Oldest first; the most recent 100. */
+  comments: z.array(Comment),
 });
 export type SessionDetail = z.infer<typeof SessionDetail>;
 

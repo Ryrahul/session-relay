@@ -66,6 +66,7 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 | Command | |
 |---|---|
 | `relay edit <id> …` | Change your share (admins: any share). See below |
+| `relay comment <id> "<text>"` | Leave a note on a session. Without text, list its comments. Secrets are removed first |
 | `relay pr-comment <id> [--pr <url>]` | Comment on the share's pull request with a link and the next steps (uses `gh`) |
 | `relay delete <id> [-y]` | Delete your share. Admins can delete any share |
 | `relay members` | People in your org |

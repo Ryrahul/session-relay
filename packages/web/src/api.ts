@@ -59,6 +59,9 @@ export const api = {
   get: (id: string, mode: "tail" | "full", offset = 0) =>
     call<SessionDetail>("GET", `/v1/sessions/${encodeURIComponent(id)}?mode=${mode}&offset=${offset}&limit=1000`),
   remove: (id: string) => call<{ ok: true }>("DELETE", `/v1/sessions/${encodeURIComponent(id)}`),
+  comment: (id: string, body: string) => call<{ id: string }>("POST", `/v1/sessions/${encodeURIComponent(id)}/comments`, { body }),
+  deleteComment: (id: string, commentId: string) =>
+    call<{ ok: true }>("DELETE", `/v1/sessions/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}`),
   update: (id: string, patch: SessionPatch) => call<{ ok: true }>("PATCH", `/v1/sessions/${encodeURIComponent(id)}`, patch),
   members: () => call<{ members: Member[] }>("GET", "/v1/members"),
   invite: (email: string, name: string, role: string) =>

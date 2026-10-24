@@ -179,7 +179,7 @@ retry path. Starting with that now.</pre>
     </div>
     <div>
       <h3>Handoffs for someone</h3>
-      <p>Share "for Akshat" and it shows up as <b>For you</b> in their list; <code>/pickup</code> checks their handoffs first. Edit a share any time: next steps, title, who it's for.</p>
+      <p>Share "for Akshat" and it shows up as <b>For you</b> in their list; <code>/pickup</code> checks their handoffs first. Edit a share any time, and leave comments the next agent reads.</p>
     </div>
     <div>
       <h3>Linked to your PRs</h3>

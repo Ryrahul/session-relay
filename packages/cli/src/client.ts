@@ -1,4 +1,5 @@
 import type {
+  Comment,
   DetailMode,
   Member,
   MeResponse,
@@ -9,6 +10,7 @@ import type {
 } from "@session-relay/shared";
 import { api } from "./api.js";
 import { resolveConfig, type CliConfig } from "./config.js";
+import { createRedactor } from "@session-relay/shared";
 
 export interface ListQuery {
   repo?: string;
@@ -51,6 +53,13 @@ export class RelayClient {
   }
   update(id: string, patch: SessionPatch) {
     return api<{ ok: true }>(this.config, "PATCH", `v1/sessions/${encodeURIComponent(id)}`, patch);
+  }
+  comments(id: string) {
+    return api<{ comments: Comment[] }>(this.config, "GET", `v1/sessions/${encodeURIComponent(id)}/comments`);
+  }
+  /** Secrets are removed from the note before it leaves the machine, like shares. */
+  comment(id: string, body: string) {
+    return api<{ id: string }>(this.config, "POST", `v1/sessions/${encodeURIComponent(id)}/comments`, { body: createRedactor()(body) });
   }
   remove(id: string) {
     return api<{ ok: true }>(this.config, "DELETE", `v1/sessions/${encodeURIComponent(id)}`);

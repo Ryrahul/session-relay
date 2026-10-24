@@ -35,6 +35,13 @@ export function renderHandoff(s: SessionDetail): string {
     list("Open questions", s.summary.open_questions) +
     list("Files touched", s.files_touched.map((f) => `\`${f}\``));
 
+  // Teammates' notes come before the conversation: they are often the latest word on the work.
+  const notes = s.comments?.length
+    ? `\n## Comments from the team\n${s.comments
+        .map((c) => `- **${c.author.name}** (${new Date(c.created_at).toISOString().slice(0, 16).replace("T", " ")} UTC): ${c.body.replace(/\n/g, "\n  ")}`)
+        .join("\n")}\n`
+    : "";
+
   let convo = "";
   if (s.messages.length) {
     const from = s.message_offset + 1;
@@ -44,5 +51,5 @@ export function renderHandoff(s: SessionDetail): string {
       s.messages.map((m) => (m.role === "tool" ? `> _tool:_ ${m.text}` : `**${m.role}:** ${m.text}`)).join("\n\n") +
       "\n";
   }
-  return `${head}\n${body}${convo}`;
+  return `${head}\n${body}${notes}${convo}`;
 }

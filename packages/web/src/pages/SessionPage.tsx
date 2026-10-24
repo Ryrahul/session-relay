@@ -169,6 +169,88 @@ function EditPanel({ s, onSaved, onCancel }: { s: SessionDetail; onSaved: () => 
   );
 }
 
+function Comments({ s, me, onChange }: { s: SessionDetail; me: MeResponse; onChange: () => void }) {
+  const [body, setBody] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function post(e: React.FormEvent) {
+    e.preventDefault();
+    if (!body.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api.comment(s.id, body.trim());
+      setBody("");
+      onChange();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(commentId: string) {
+    try {
+      await api.deleteComment(s.id, commentId);
+      onChange();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  return (
+    <section className="comments" aria-labelledby="comments-title">
+      <h2 id="comments-title">
+        Comments <span className="muted">{s.comments.length || ""}</span>
+      </h2>
+      {s.comments.length === 0 && <p className="muted small">No comments yet. Agents that pick this session up read them too.</p>}
+      <ol className="comment-list">
+        {s.comments.map((c) => (
+          <li key={c.id} className="comment">
+            <Avatar name={c.author.name} size={26} />
+            <div className="comment-body">
+              <div className="comment-head">
+                <strong>{c.author.name}</strong>
+                <span className="faint">{ago(c.created_at)}</span>
+                {(c.author.id === me.user.id || me.role !== "member") && (
+                  <button type="button" className="icon-btn push" aria-label={`Delete comment by ${c.author.name}`} onClick={() => remove(c.id)}>
+                    <Icon name="trash" size={13} />
+                  </button>
+                )}
+              </div>
+              <RichText text={c.body} />
+            </div>
+          </li>
+        ))}
+      </ol>
+      <form className="comment-form" onSubmit={post}>
+        <label htmlFor="comment-body" className="sr-only">
+          Add a comment
+        </label>
+        <textarea
+          id="comment-body"
+          rows={2}
+          maxLength={4000}
+          placeholder="Leave a note for the team: a question, a finding, &quot;picked this up&quot;"
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) post(e);
+          }}
+        />
+        {error && <p className="error">{error}</p>}
+        <div className="row">
+          <button type="submit" className="btn-primary btn-sm" disabled={busy || !body.trim()}>
+            {busy ? "Posting…" : "Comment"}
+          </button>
+          <span className="faint small">Don't paste secrets here.</span>
+        </div>
+      </form>
+    </section>
+  );
+}
+
 type Block = { kind: "msg"; m: Message } | { kind: "tools"; items: Message[] };
 
 /** Consecutive tool lines are folded into one expandable block. */
@@ -364,6 +446,7 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
               )}
             </ol>
           </section>
+          <Comments s={s} me={me} onChange={() => setVersion((v) => v + 1)} />
         </div>
 
         <aside className="session-side">

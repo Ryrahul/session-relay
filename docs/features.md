@@ -14,6 +14,7 @@ Everything Session Relay does today. Each item links to where it's explained in 
 | **Edit after sharing** | Fix the title, goal, next steps, decisions or who it's for, in the web app (**Edit**), with `relay edit`, or by asking your agent (`update_session`). Only the author or an admin can edit. |
 | **Pull request links** | `relay share` attaches the current branch's open PR (found with the GitHub CLI), or pass `--pr <url>`. The session shows the PR, and `relay pr-comment <id>` posts a link to the session on the PR. |
 | **Comments** | Leave a note on any session you can see: in the web app, with `relay comment <id> "…"`, or from your agent (`comment_on_session`). The agent that picks the session up reads them first. Secrets are removed from comments too. |
+| **Auto-share drafts** (opt-in) | `relay setup --auto-share on` saves every Claude Code session as a **private draft** when it ends (in a git repo, 4+ messages). Only you see drafts (**My drafts**, `relay list --drafts`). Publish one when it's ready: **Publish to team** in the web app, `relay publish <id>`, or ask your agent. Sessions you already shared are skipped. |
 | **Without MCP** | `relay pull <id>` writes a handoff file any agent can read. |
 
 ## Finding sessions

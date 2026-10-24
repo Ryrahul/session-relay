@@ -488,6 +488,27 @@ describe.skipIf(!DB)("API (integration)", () => {
     expect((await call(outsider.token, "GET", "/v1/stats")).body.totals.shares).toBe(0);
   });
 
+  it("drafts: only the author sees them, they skip stats, and publishing shares them now", async () => {
+    const team = await makeOrg("Drafts Team");
+    const dee = await makeUser(team, "Dee", "member");
+    const eli = await makeUser(team, "Eli", "admin");
+    const id = (await call(dee.token, "POST", "/v1/sessions", { session: upload({ native_id: "n", source: { tool: "claude-code", native_id: "native-d" }, draft: true, visibility: { team: true, people: [] } }) })).body.id;
+    // Hidden from everyone else, admins included, even with team visibility.
+    expect((await call(eli.token, "GET", `/v1/sessions/${id}`)).status).toBe(404);
+    expect((await call(eli.token, "GET", "/v1/sessions")).body.sessions).toEqual([]);
+    // The author's normal list leaves drafts out; drafts=only / native_id find them.
+    expect((await call(dee.token, "GET", "/v1/sessions")).body.sessions).toEqual([]);
+    const mine = (await call(dee.token, "GET", "/v1/sessions?drafts=only")).body.sessions;
+    expect(mine.map((s: any) => [s.id, s.draft])).toEqual([[id, true]]);
+    expect((await call(dee.token, "GET", "/v1/sessions?native_id=native-d&drafts=include")).body.sessions).toHaveLength(1);
+    expect((await call(eli.token, "GET", "/v1/stats?days=1")).body.totals.shares).toBe(0);
+    // Publish.
+    expect((await call(dee.token, "PATCH", `/v1/sessions/${id}`, { draft: false, visibility: { team: true, people: [] } })).status).toBe(200);
+    expect((await call(eli.token, "GET", `/v1/sessions/${id}`)).body.draft).toBe(false);
+    expect((await call(eli.token, "GET", "/v1/stats?days=1")).body.totals.shares).toBe(1);
+    expect((await call(dee.token, "PATCH", `/v1/sessions/${id}`, { draft: true })).status).toBe(400);
+  });
+
   it("records usage and audit events", async () => {
     const [u] = await sql`SELECT count(*)::int AS n FROM usage_events WHERE org_id = ${orgA} AND kind = 'session.share'`;
     const [a] = await sql`SELECT count(*)::int AS n FROM audit_log WHERE org_id = ${orgA} AND action = 'session.pull'`;

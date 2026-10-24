@@ -25,6 +25,9 @@ export interface ListQuery {
   file?: string;
   /** ISO time: only sessions shared since then. */
   since?: string;
+  native_id?: string;
+  /** Drafts are left out unless "include" or "only". */
+  drafts?: "include" | "only";
   q?: string;
   limit?: number;
 }

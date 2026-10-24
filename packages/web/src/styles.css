@@ -395,3 +395,8 @@ a.badge-link:hover { color: var(--accent); }
 .bar-area { display: block; min-width: 0; }
 .bar-fill { display: block; height: 12px; background: var(--chart); border-radius: 0 4px 4px 0; min-width: 2px; }
 .bar-value { font-variant-numeric: tabular-nums; color: var(--ink); }
+
+/* Drafts */
+.badge-draft { background: var(--warn-soft, var(--surface-2)); color: var(--ink); font-weight: 600; border: 1px dashed var(--line-strong); }
+.draft-banner { display: flex; gap: 12px; align-items: center; justify-content: space-between; border-style: dashed; flex-wrap: wrap; }
+.draft-banner p { margin: 2px 0 0; }

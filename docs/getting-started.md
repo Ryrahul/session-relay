@@ -47,6 +47,8 @@ The CLI's token is saved in `~/.config/session-relay/config.json`, readable only
 relay setup
 ```
 
+Optional: `relay setup --auto-share on` saves every Claude Code session as a private draft when it ends, so you can publish it later without remembering to `/share` ([details](agents.md#auto-share-drafts-claude-code)).
+
 This adds the relay MCP server and two commands, `/share` and `/pickup`, to each agent that is installed: Claude Code, OpenCode, Codex and ZCode. Restart your agents afterwards. Details and manual setup are in [Agents](agents.md).
 
 ## 4. Share a session

@@ -64,8 +64,8 @@ export function activityRoutes(sql: Sql) {
 
     const [totals] = await sql`
       SELECT
-        (SELECT count(*)::int FROM sessions WHERE org_id = ${org} AND created_at >= ${since}) AS shares,
-        (SELECT count(*)::int FROM sessions WHERE org_id = ${org} AND created_at >= ${since} AND continues_session_id IS NOT NULL) AS continued,
+        (SELECT count(*)::int FROM sessions WHERE org_id = ${org} AND NOT draft AND created_at >= ${since}) AS shares,
+        (SELECT count(*)::int FROM sessions WHERE org_id = ${org} AND NOT draft AND created_at >= ${since} AND continues_session_id IS NOT NULL) AS continued,
         (SELECT count(*)::int FROM (SELECT DISTINCT user_id, target_id FROM audit_log
            WHERE org_id = ${org} AND action = 'session.pickup' AND created_at >= ${since}) p) AS pickups,
         (SELECT count(*)::int FROM session_comments WHERE org_id = ${org} AND deleted_at IS NULL AND created_at >= ${since}) AS comments,
@@ -75,7 +75,7 @@ export function activityRoutes(sql: Sql) {
     // Calendar days in UTC, including days with nothing.
     const byDay = await sql`
       SELECT to_char(d, 'YYYY-MM-DD') AS day,
-        (SELECT count(*)::int FROM sessions WHERE org_id = ${org} AND created_at >= d AND created_at < d + interval '1 day') AS shares,
+        (SELECT count(*)::int FROM sessions WHERE org_id = ${org} AND NOT draft AND created_at >= d AND created_at < d + interval '1 day') AS shares,
         (SELECT count(DISTINCT (user_id, target_id))::int FROM audit_log
            WHERE org_id = ${org} AND action = 'session.pickup' AND created_at >= d AND created_at < d + interval '1 day') AS pickups
       FROM generate_series(date_trunc('day', ${since}::timestamptz AT TIME ZONE 'UTC') AT TIME ZONE 'UTC',
@@ -84,15 +84,15 @@ export function activityRoutes(sql: Sql) {
     `;
     const byTool = await sql`
       SELECT source_tool AS tool, count(*)::int AS shares FROM sessions
-      WHERE org_id = ${org} AND created_at >= ${since} GROUP BY 1 ORDER BY 2 DESC
+      WHERE org_id = ${org} AND NOT draft AND created_at >= ${since} GROUP BY 1 ORDER BY 2 DESC
     `;
     const byRepo = await sql`
       SELECT s.repo, count(*)::int AS shares FROM sessions s
-      WHERE s.created_at >= ${since} AND ${visible(sql, auth)} GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10
+      WHERE s.created_at >= ${since} AND NOT s.draft AND ${visible(sql, auth)} GROUP BY 1 ORDER BY 2 DESC, 1 LIMIT 10
     `;
     const byPerson = await sql`
       SELECT u.id, u.name,
-        (SELECT count(*)::int FROM sessions s WHERE s.org_id = ${org} AND s.author_id = u.id AND s.created_at >= ${since}) AS shares,
+        (SELECT count(*)::int FROM sessions s WHERE s.org_id = ${org} AND s.author_id = u.id AND NOT s.draft AND s.created_at >= ${since}) AS shares,
         (SELECT count(DISTINCT target_id)::int FROM audit_log l
            WHERE l.org_id = ${org} AND l.user_id = u.id AND l.action = 'session.pickup' AND l.created_at >= ${since}) AS pickups,
         (SELECT count(*)::int FROM session_comments c

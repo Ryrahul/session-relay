@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { login } from "./commands/login.js";
-import { comment, digest, edit, invite, list, localSessions, members, prComment, pull, remove, search, share, show, stats } from "./commands/sessions.js";
+import { comment, digest, edit, invite, list, localSessions, members, prComment, publish, pull, remove, search, share, show, stats } from "./commands/sessions.js";
+import { hook } from "./commands/hook.js";
 import { setup } from "./commands/setup.js";
 import { whoami } from "./commands/whoami.js";
 import { runMcp } from "./mcp.js";
@@ -59,6 +60,7 @@ const listOpts = (cmd: Command) =>
 
 listOpts(program.command("list").description("List shared sessions (this repo by default)"))
   .option("--all", "all repos")
+  .option("--drafts", "your drafts (saved automatically at session end), from any repo")
   .action(list);
 
 listOpts(program.command("search <query>").description("Search shared sessions")).action(search);
@@ -97,6 +99,13 @@ program
   .option("--team", "make it visible to the whole team")
   .option("--people <names>", "make it visible only to these people")
   .action(edit);
+
+program
+  .command("publish <id>")
+  .description("Share a draft with the whole team (or --people)")
+  .option("--people <names>", "only these people")
+  .option("--for <name>", "teammate it's for")
+  .action(publish);
 
 program
   .command("pr-comment <id>")
@@ -139,7 +148,14 @@ program
   .option("--tools <list>", "comma-separated: claude,opencode,codex,zcode")
   .option("--scope <scope>", "user (default) or project", "user")
   .option("--relay-config <file>", "relay config file the MCP server should use")
+  .option("--auto-share <on|off>", "save each session as a private draft when it ends (Claude Code)")
   .action(setup);
+
+program
+  .command("hook <event>")
+  .description("Run by agent hooks (session-end); not for direct use")
+  .requiredOption("--tool <tool>", "agent that ran the hook")
+  .action(hook);
 
 program.command("mcp").description("Run the MCP server on stdio (started by your agent)").action(runMcp);
 

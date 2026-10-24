@@ -73,6 +73,8 @@ export const SessionUpload = z.object({
   assignee: z.string().max(40).optional(),
   /** Pull request the work belongs to. */
   pr_url: PrUrl.optional(),
+  /** Saved automatically at session end: only the author sees it until it's published. */
+  draft: z.boolean().default(false),
 });
 export type SessionUpload = z.infer<typeof SessionUpload>;
 

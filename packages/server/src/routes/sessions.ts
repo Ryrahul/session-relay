@@ -32,6 +32,7 @@ export function visible(sql: Sql, auth: AuthContext) {
     s.org_id = ${auth.orgId}
     AND s.deleted_at IS NULL
     AND (s.expires_at IS NULL OR s.expires_at > now())
+    AND (s.draft = false OR s.author_id = ${auth.userId})
     AND (
       s.visibility_team
       OR s.author_id = ${auth.userId}
@@ -112,14 +113,14 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
           INSERT INTO sessions (
             id, org_id, author_id, source_tool, source_version, native_id, repo, branch, commit_sha,
             title, summary, files_touched, messages, include_mode, visibility_team, redactions,
-            transcript_key, transcript_bytes, started_at, expires_at, continues_session_id, assignee_id, pr_url
+            transcript_key, transcript_bytes, started_at, expires_at, continues_session_id, assignee_id, pr_url, draft
           ) VALUES (
             ${id}, ${auth.orgId}, ${auth.userId}, ${s.source.tool}, ${s.source.version ?? null}, ${s.source.native_id},
             ${s.repo}, ${s.branch ?? null}, ${s.commit ?? null}, ${s.title}, ${tx.json(s.summary)},
             ${s.files_touched}, ${tx.json(messages)}, ${s.include}, ${s.visibility.team}, ${s.redactions},
             ${key}, ${blob?.byteLength ?? null}, ${s.started_at ?? null},
             now() + make_interval(days => ${settings!.retention_days}),
-            ${s.continues ?? null}, ${s.assignee ?? null}, ${s.pr_url ?? null}
+            ${s.continues ?? null}, ${s.assignee ?? null}, ${s.pr_url ?? null}, ${s.draft}
           )
         `;
         if (!s.visibility.team) await setPeople(tx as unknown as Sql, auth.orgId, id, s.visibility.people);
@@ -131,7 +132,8 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
 
     const bytes = Buffer.byteLength(JSON.stringify(messages)) + (blob?.byteLength ?? 0);
     await recordUsage(sql, auth, "session.share", bytes);
-    await audit(sql, auth, "session.share", id, { repo: s.repo, include: s.include, team: s.visibility.team, assignee: s.assignee ?? null });
+    if (s.draft) await audit(sql, auth, "session.draft", id, { repo: s.repo });
+    else await audit(sql, auth, "session.share", id, { repo: s.repo, include: s.include, team: s.visibility.team, assignee: s.assignee ?? null });
     return c.json({ id }, 201);
   });
 
@@ -149,7 +151,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
     const rows = await sql`
       SELECT s.id, s.title, s.repo, s.branch, s.source_tool, s.summary->>'goal' AS goal, s.include_mode,
              jsonb_array_length(s.messages) AS message_count, s.transcript_key IS NOT NULL AS has_full,
-             s.visibility_team, s.continues_session_id, s.pr_url, s.created_at, s.updated_at,
+             s.visibility_team, s.continues_session_id, s.pr_url, s.draft, s.created_at, s.updated_at,
              u.id AS author_id, u.name AS author_name, a.id AS assignee_id, a.name AS assignee_name,
              (SELECT count(*)::int FROM session_comments c WHERE c.session_id = s.id AND c.deleted_at IS NULL) AS comment_count
              ${text ? sql`, ts_rank(s.search, websearch_to_tsquery('english', ${text})) AS rank` : sql``}
@@ -165,6 +167,8 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
         ${text ? sql`AND (s.search @@ websearch_to_tsquery('english', ${text}) OR s.title ILIKE ${"%" + text + "%"})` : sql``}
         ${q.before ? sql`AND s.created_at < ${q.before}` : sql``}
         ${q.since ? sql`AND s.created_at >= ${q.since}` : sql``}
+        ${q.native_id ? sql`AND s.native_id = ${q.native_id}` : sql``}
+        ${q.drafts === "only" ? sql`AND s.draft` : q.drafts === "include" ? sql`` : sql`AND NOT s.draft`}
       ORDER BY ${text ? sql`rank DESC,` : sql``} s.created_at DESC
       LIMIT ${limit}
     `;
@@ -184,6 +188,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       assignee: r.assignee_id ? { id: r.assignee_id, name: r.assignee_name } : null,
       pr_url: r.pr_url,
       comment_count: r.comment_count,
+      draft: r.draft,
       created_at: r.created_at.toISOString(),
       updated_at: iso(r.updated_at),
     }));
@@ -279,6 +284,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       continues: r.continues_session_id ?? undefined,
       assignee: r.assignee_id ?? undefined,
       pr_url: r.pr_url ?? undefined,
+      draft: r.draft,
       updated_at: iso(r.updated_at),
       chain: chain.map(link),
       continued_by: children.map(link),
@@ -299,6 +305,14 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       if (patch.summary) await tx`UPDATE sessions SET summary = ${tx.json(patch.summary)} WHERE id = ${id}`;
       if (patch.assignee !== undefined) await tx`UPDATE sessions SET assignee_id = ${patch.assignee} WHERE id = ${id}`;
       if (patch.pr_url !== undefined) await tx`UPDATE sessions SET pr_url = ${patch.pr_url} WHERE id = ${id}`;
+      // Publishing restarts the clock: it counts as shared now, and expires from now.
+      if (patch.draft === false) {
+        await tx`
+          UPDATE sessions SET draft = false, created_at = now(),
+            expires_at = now() + make_interval(days => (SELECT retention_days FROM org_settings WHERE org_id = ${auth.orgId}))
+          WHERE id = ${id} AND draft
+        `;
+      }
       if (patch.visibility) {
         await tx`UPDATE sessions SET visibility_team = ${patch.visibility.team} WHERE id = ${id}`;
         await setPeople(tx as unknown as Sql, auth.orgId, id, patch.visibility.team ? [] : patch.visibility.people);
@@ -308,6 +322,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
     // The summary can be long; the audit log only needs to know it changed.
     const { summary, ...rest } = patch;
     await audit(sql, auth, "session.update", id, { ...rest, ...(summary ? { summary: "edited" } : {}) });
+    if (patch.draft === false) await audit(sql, auth, "session.share", id, { published: true });
     return c.json({ ok: true });
   });
 

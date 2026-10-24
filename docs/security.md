@@ -54,6 +54,7 @@ The number of redactions is shown when you share and on the session page. Redact
 - Sessions belong to your **org**. Nobody outside it can list, read or even confirm that a session exists. That's enforced on every query and covered by tests.
 - Inside the org, a share is visible to **everyone** (default) or only to **selected people** (`/share only Bob`, `--people`). A handoff **for** someone (`--for`) is always visible to that person too.
 - Comments are visible to everyone who can see the session. Secrets are removed from them (by the CLI, and again on the server for comments typed in the web app). Only a comment's author or an admin can delete it.
+- **Drafts** (from `--auto-share`) are visible only to their author, admins included, until published. Turning auto-share on uploads drafts automatically, so only enable it if that's fine for your repos; redaction applies as usual.
 - Only the author or an admin can edit a share. Pull request links must be `http(s)` URLs.
 - The author or an org admin can change or delete a share.
 

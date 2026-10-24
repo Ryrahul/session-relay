@@ -234,6 +234,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         for: z.string().optional().describe('Teammate name or email, or "none"'),
         pr_url: z.string().optional().describe('Pull request URL, or "none"'),
         people: z.array(z.string()).optional().describe("Make it visible only to these people; an empty list makes it visible to the whole team"),
+        publish: z.boolean().optional().describe("Publish a draft (saved automatically at session end) to the team, or to `people`"),
       },
     },
     async (args) => {
@@ -256,6 +257,10 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         if (args.pr_url) patch.pr_url = args.pr_url === "none" ? null : args.pr_url;
         if (args.people) {
           patch.visibility = args.people.length ? { team: false, people: await resolvePeople(client, args.people) } : { team: true, people: [] };
+        }
+        if (args.publish) {
+          patch.draft = false;
+          patch.visibility ??= { team: true, people: [] };
         }
         if (!Object.keys(patch).length) return text("Nothing to change.");
         await client.update(args.id, patch);

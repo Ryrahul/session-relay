@@ -2,6 +2,8 @@
 
 Run Session Relay for your team on any machine with Docker. It's one container for the API and web app, plus Postgres. Caddy can provide HTTPS with automatic certificates.
 
+> **Don't want to run a server?** The same app runs on Cloudflare Workers: see [Deploy to Cloudflare](cloudflare.md).
+>
 > **Cloud hosting is coming soon.** We'll run it for you, so you don't need a server. Until then, self-hosting is the way to use Session Relay.
 
 ## Requirements

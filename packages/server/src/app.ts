@@ -1,13 +1,10 @@
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { HTTPException } from "hono/http-exception";
-import { serveStatic } from "@hono/node-server/serve-static";
 import type { AppEnv } from "./auth.js";
 import { requireAuth } from "./auth.js";
 import type { Sql } from "./db/client.js";
-import type { BlobStorage } from "./storage/index.js";
+import type { BlobStorage } from "./storage/types.js";
 import { meRoutes } from "./routes/me.js";
 import { orgRoutes } from "./routes/org.js";
 import { memberRoutes, tokenRoutes } from "./routes/members.js";
@@ -23,13 +20,13 @@ export interface AppDeps {
   setup?: SetupGate | null;
   /** Public URL, used in invite links and browser-login URLs. */
   publicUrl?: string;
-  /** Built web app to serve at `/`, if present. */
-  webDist?: string;
+  /** Extra routes added before the 404 handler (the Node entry serves the web app here). */
+  extend?: (app: Hono<AppEnv>) => void;
 }
 
 const MAX_BODY_BYTES = 25 * 1024 * 1024;
 
-export function createApp({ sql, storage, webDist, setup = null, publicUrl = "http://localhost:8787" }: AppDeps) {
+export function createApp({ sql, storage, setup = null, publicUrl = "http://localhost:8787", extend }: AppDeps) {
   const app = new Hono<AppEnv>();
 
   app.get("/health", (c) => c.json({ ok: true }));
@@ -51,12 +48,7 @@ export function createApp({ sql, storage, webDist, setup = null, publicUrl = "ht
   v1.route("/sessions", sessionRoutes(sql, storage));
   app.route("/v1", v1);
 
-  if (webDist && existsSync(path.join(webDist, "index.html"))) {
-    const root = path.relative(process.cwd(), webDist) || ".";
-    app.use("/*", serveStatic({ root }));
-    // Client-side routes fall back to the app shell.
-    app.get("*", serveStatic({ root, path: "index.html" }));
-  }
+  extend?.(app);
 
   app.onError((err, c) => {
     if (err instanceof HTTPException) return c.json({ error: err.message }, err.status);

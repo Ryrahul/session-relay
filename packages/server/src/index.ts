@@ -5,6 +5,7 @@ import { createDb } from "./db/client.js";
 import { migrate } from "./db/migrate.js";
 import { purgeExpired } from "./routes/sessions.js";
 import { createStorage } from "./storage/index.js";
+import { serveWebApp } from "./static-node.js";
 import { generateSetupCode, setupBanner, SetupGate, setupNeeded } from "./setup.js";
 
 const PURGE_EVERY_MS = 60 * 60 * 1000;
@@ -21,7 +22,7 @@ if (await setupNeeded(sql)) {
   setup = new SetupGate(code);
   console.log(setupBanner(code, config.PUBLIC_URL));
 }
-const app = createApp({ sql, storage, webDist: config.WEB_DIST, setup, publicUrl: config.PUBLIC_URL });
+const app = createApp({ sql, storage, setup, publicUrl: config.PUBLIC_URL, extend: serveWebApp(config.WEB_DIST) });
 
 const purge = () =>
   purgeExpired(sql, storage)

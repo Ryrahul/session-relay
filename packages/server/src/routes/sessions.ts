@@ -15,7 +15,8 @@ import type { AppEnv, AuthContext } from "../auth.js";
 import { audit, recordUsage } from "../audit.js";
 import type { Sql } from "../db/client.js";
 import { iso, parseBody } from "../http.js";
-import { transcriptKey, type BlobStorage } from "../storage/index.js";
+import { transcriptKey, type BlobStorage } from "../storage/types.js";
+import { purgeRateLimits } from "../ratelimit.js";
 
 const MAX_LIST = 100;
 const MAX_CHAIN = 20;
@@ -284,5 +285,6 @@ export async function purgeExpired(sql: Sql, storage: BlobStorage): Promise<numb
     RETURNING e.transcript_key AS old_key
   `;
   for (const r of rows) if (r.old_key) await storage.delete(r.old_key);
+  await purgeRateLimits(sql);
   return rows.length;
 }

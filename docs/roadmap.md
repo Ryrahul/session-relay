@@ -11,6 +11,7 @@
 - Per-person visibility, roles, personal tokens, retention, repo allowlist, audit log.
 - Web app: browse, search, read, members, settings.
 - One-command Docker deployment with automatic HTTPS (Caddy), or behind your own nginx.
+- **Cloudflare Workers deployment**: the same app on Workers + Hyperdrive + R2, no server to maintain ([guide](cloudflare.md)).
 - First-run setup in the browser: a one-time code from the server logs creates your organization and owner account.
 - **Handoff chains**: a share made after `/pickup` links to the session it continues; the web app shows the whole trail.
 - **Invite links**: single-use, expiring, revocable links instead of pasting tokens.
@@ -58,6 +59,7 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 | Handoff chains | Done; integration and end-to-end tested (CLI + MCP) |
 | Invite links, browser login | Done; integration and browser tested |
 | Self-hosting (Docker, Caddy or nginx) | Done; running in production |
+| Cloudflare Workers | Done; smoke-tested in CI with wrangler dev + Postgres on every PR |
 | CI/CD (deploy branch, rehearsal, backup, rollback) | Done; see [deploy-pipeline.md](deploy-pipeline.md) |
 | Docs site | Done; https://relay.rahulweb.online |
 | Signup, OAuth, billing | Not started (cloud) |

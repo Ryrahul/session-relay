@@ -36,7 +36,7 @@ Read the goal, decisions, next steps and recent conversation. Check the current 
 Then say in a few lines where things stand and continue with the first next step.
 `;
 
-type ToolName = "claude" | "opencode" | "codex";
+type ToolName = "claude" | "opencode" | "codex" | "zcode";
 
 interface SetupOpts {
   tools?: string;
@@ -138,16 +138,31 @@ async function setupCodex(cmd: string[], env: Record<string, string>): Promise<s
   return done;
 }
 
+async function setupZCode(scope: "user" | "project", root: string, cmd: string[], env: Record<string, string>): Promise<string[]> {
+  const base = scope === "project" ? path.join(root, ".zcode") : path.join(homedir(), ".zcode");
+  const file = scope === "project" ? path.join(base, "config.json") : path.join(base, "cli", "config.json");
+  const cfg = await readJson(file);
+  const relay = { type: "stdio", command: cmd[0], args: cmd.slice(1), ...(Object.keys(env).length ? { env } : {}) };
+  cfg.mcp = { ...cfg.mcp, servers: { ...cfg.mcp?.servers, relay } };
+  await writeText(file, JSON.stringify(cfg, null, 2) + "\n");
+  const dir = path.join(base, "commands");
+  await writeText(path.join(dir, "share.md"), SHARE_PROMPT);
+  await writeText(path.join(dir, "pickup.md"), PICKUP_PROMPT);
+  return [`MCP server in ${file}`, `/share and /pickup in ${dir}`];
+}
+
 export async function setup(opts: SetupOpts): Promise<void> {
   const scope = opts.scope ?? "user";
-  const wanted = (opts.tools ?? "claude,opencode,codex").split(",").map((t) => t.trim()) as ToolName[];
+  const wanted = (opts.tools ?? "claude,opencode,codex,zcode").split(",").map((t) => t.trim()) as ToolName[];
   const root = scope === "project" ? (await repoInfo()).root : process.cwd();
   const cmd = await mcpCommand();
   const env: Record<string, string> = opts.relayConfig ? { RELAY_CONFIG: path.resolve(opts.relayConfig) } : {};
 
   for (const tool of wanted) {
     const bin = tool === "claude" ? "claude" : tool;
-    if (!(await has(bin))) {
+    // The ZCode desktop app doesn't put `zcode` on PATH; its data folder is enough.
+    const installed = (await has(bin)) || (tool === "zcode" && existsSync(path.join(homedir(), ".zcode")));
+    if (!installed) {
       console.log(`- ${tool}: not installed, skipped`);
       continue;
     }
@@ -157,7 +172,9 @@ export async function setup(opts: SetupOpts): Promise<void> {
           ? await setupClaude(scope, root, cmd, env)
           : tool === "opencode"
             ? await setupOpenCode(scope, root, cmd, env)
-            : await setupCodex(cmd, env);
+            : tool === "zcode"
+              ? await setupZCode(scope, root, cmd, env)
+              : await setupCodex(cmd, env);
       console.log(`- ${tool}: ${done.join("; ")}`);
     } catch (err) {
       console.log(`- ${tool}: ${(err as Error).message}`);

@@ -6,6 +6,7 @@ import { encodeProjectDir, parseClaudeFile } from "./claude.js";
 import { parseCodexFile } from "./codex.js";
 import { describeToolCall, patchFiles } from "./describe.js";
 import { parseOpenCodeExport } from "./opencode.js";
+import { zcodeAdapter } from "./zcode.js";
 
 const FIX = fileURLToPath(new URL("../../../../fixtures", import.meta.url));
 const ROOT = "/home/dev/relay-sandbox";
@@ -59,6 +60,34 @@ describe("OpenCode adapter (real 1.19 export)", async () => {
     expect(tools.some((t) => /^ran `node -e .*` → 5/.test(t))).toBe(true);
     expect(s.messages.at(-1)!.text).toContain("5");
     expect(s.filesTouched).toContain(`${ROOT}/math.js`);
+  });
+});
+
+describe("ZCode adapter (ZCode's session tables)", () => {
+  process.env.ZCODE_DB = path.join(FIX, "zcode/db.sqlite");
+
+  it("lists top-level, unarchived sessions in this repo", async () => {
+    const refs = await zcodeAdapter.list(ROOT);
+    expect(refs.map((r) => r.nativeId)).toEqual(["ses_zc01fixadd"]);
+    expect(refs[0]).toMatchObject({ tool: "zcode", cwd: ROOT, title: "Fix math.js add() and verify output" });
+  });
+
+  it("reads messages and parts like OpenCode", async () => {
+    const [ref] = await zcodeAdapter.list(ROOT);
+    const s = await zcodeAdapter.load(ref!);
+    expect(s).toMatchObject({ tool: "zcode", nativeId: "ses_zc01fixadd", cwd: ROOT, version: "0.32.1" });
+    const tools = s.messages.filter((m) => m.role === "tool").map((m) => m.text);
+    expect(tools).toContain("read math.js");
+    expect(tools.some((t) => /^ran `node -e .*` → 5/.test(t))).toBe(true);
+    expect(s.messages[0]).toMatchObject({ role: "user" });
+    expect(s.messages.at(-1)!.text).toContain("5");
+    expect(s.filesTouched).toContain(`${ROOT}/math.js`);
+  });
+
+  it("returns nothing when ZCode isn't installed", async () => {
+    process.env.ZCODE_DB = "/nonexistent/db.sqlite";
+    expect(await zcodeAdapter.list(ROOT)).toEqual([]);
+    process.env.ZCODE_DB = path.join(FIX, "zcode/db.sqlite");
   });
 });
 

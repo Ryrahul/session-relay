@@ -18,14 +18,14 @@ The config is at `~/.config/session-relay/config.json` (mode `600`). Override it
 
 | Command | |
 |---|---|
-| `relay sessions [--tool claude\|opencode\|codex]` | Your local agent sessions for this repo, across tools |
+| `relay sessions [--tool claude\|opencode\|codex\|zcode]` | Your local agent sessions for this repo, across tools |
 | `relay share` | Pick a session, choose what to include and who sees it, confirm |
 
 `relay share` options:
 
 | Flag | |
 |---|---|
-| `--tool <tool>` | Only sessions from `claude`, `opencode` or `codex` |
+| `--tool <tool>` | Only sessions from `claude`, `opencode`, `codex` or `zcode` |
 | `--id <id>` | A specific session (prefix is fine; see `relay sessions`) |
 | `--latest` | The newest session, without asking |
 | `--include <mode>` | `summary`, `summary+tail` (default) or `full` |
@@ -71,5 +71,5 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 
 | Command | |
 |---|---|
-| `relay setup [--tools claude,opencode,codex] [--scope user\|project] [--relay-config <file>]` | Install the MCP server and `/share` `/pickup` into your agents |
+| `relay setup [--tools claude,opencode,codex,zcode] [--scope user\|project] [--relay-config <file>]` | Install the MCP server and `/share` `/pickup` into your agents |
 | `relay mcp` | The MCP server on stdio. Your agent starts it; you don't run it yourself |

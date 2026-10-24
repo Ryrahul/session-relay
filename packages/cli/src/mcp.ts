@@ -11,7 +11,7 @@ import { ago } from "./ui.js";
 import { VERSION } from "./version.js";
 
 
-const INSTRUCTIONS = `Session Relay shares coding-agent sessions between teammates (Claude Code, Codex, OpenCode).
+const INSTRUCTIONS = `Session Relay shares coding-agent sessions between teammates (Claude Code, Codex, OpenCode, ZCode).
 - To continue someone's work: search_sessions or list_sessions, then get_session (mode "tail") and read the summary, next steps and recent conversation before acting.
 - To share this session: write an honest handoff summary (goal, decisions, done, next, open questions; never secrets) and call share_current_session.`;
 
@@ -21,6 +21,7 @@ function callerTool(name?: string): SourceTool | undefined {
   if (n.includes("claude")) return "claude-code";
   if (n.includes("opencode")) return "opencode";
   if (n.includes("codex")) return "codex";
+  if (n.includes("zcode")) return "zcode";
   return undefined;
 }
 
@@ -44,7 +45,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
       description: "List sessions teammates have shared. Defaults to the current repo; pass all_repos to see everything.",
       inputSchema: {
         author: z.string().optional().describe('Name, email or "me"'),
-        tool: z.enum(["claude-code", "codex", "opencode"]).optional(),
+        tool: z.enum(["claude-code", "codex", "opencode", "zcode"]).optional(),
         branch: z.string().optional(),
         all_repos: z.boolean().optional(),
         limit: z.number().int().min(1).max(50).optional(),

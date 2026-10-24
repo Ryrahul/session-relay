@@ -1,5 +1,6 @@
 import type {
   Activity,
+  AuditEntry,
   Comment,
   Stats,
   DetailMode,
@@ -10,7 +11,7 @@ import type {
   SessionPatch,
   ShareRequest,
 } from "@session-relay/shared";
-import { api } from "./api.js";
+import { api, apiText } from "./api.js";
 import { resolveConfig, type CliConfig } from "./config.js";
 import { createRedactor } from "@session-relay/shared";
 
@@ -77,6 +78,19 @@ export class RelayClient {
   }
   stats(days = 30) {
     return api<Stats>(this.config, "GET", `v1/stats?days=${days}`);
+  }
+  export(id: string, format: "md" | "json") {
+    return apiText(this.config, `v1/sessions/${encodeURIComponent(id)}/export?format=${format}`);
+  }
+  exportAll(query: { repo?: string; since?: string; author?: string; full?: boolean }) {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(query)) if (v) params.set(k, v === true ? "1" : String(v));
+    return apiText(this.config, `v1/sessions/export?${params}`);
+  }
+  audit(query: { action?: string; user?: string; target?: string; before?: number; limit?: number }) {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== "") params.set(k, String(v));
+    return api<{ entries: AuditEntry[]; next: number | null }>(this.config, "GET", `v1/audit?${params}`);
   }
   members() {
     return api<{ members: Member[] }>(this.config, "GET", "v1/members");

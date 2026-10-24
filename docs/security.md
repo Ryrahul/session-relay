@@ -84,7 +84,7 @@ The number of redactions is shown when you share and on the session page. Redact
 
 ## Audit and usage
 
-Every share, pull, pickup, edit, comment, delete, invite, token change and settings change is recorded in an audit log, with who did it and when. Admin access to it in the web app is planned; it is in the `audit_log` table today.
+Every share, pull, pickup, edit, comment, delete, invite, token change and settings change is recorded in an audit log, with who did it and when. Admins see it in the web app (**Audit log**) and with `relay audit`. Exports are recorded too.
 
 ## Self-hosted data
 

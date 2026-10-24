@@ -509,6 +509,48 @@ describe.skipIf(!DB)("API (integration)", () => {
     expect((await call(dee.token, "PATCH", `/v1/sessions/${id}`, { draft: true })).status).toBe(400);
   });
 
+  it("exports a session as Markdown or JSON (full transcript), and a repo as NDJSON", async () => {
+    const repo = "github.com/acme/export";
+    const transcript = Array.from({ length: 300 }, (_, i) => ({ role: i % 2 ? "assistant" : "user", text: `full message ${i}` }) as const);
+    const id = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo, title: "Export me!", include: "full" }), transcript })).body.id;
+    await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo, title: "second" }) });
+    await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo, title: "hidden", visibility: { team: false, people: [] } }) });
+
+    const md = await app.request(`/v1/sessions/${id}/export`, { headers: { authorization: `Bearer ${bob.token}` } });
+    expect(md.headers.get("content-type")).toContain("text/markdown");
+    expect(md.headers.get("content-disposition")).toContain(`${id}-export-me.md`);
+    const text = await md.text();
+    expect(text).toContain("# Export me!");
+    expect(text).toContain("messages 1–300 of 300");
+    const json = (await call(bob.token, "GET", `/v1/sessions/${id}/export?format=json`)).body;
+    expect(json.messages).toHaveLength(300);
+    expect((await call(outsider.token, "GET", `/v1/sessions/${id}/export`)).status).toBe(404);
+
+    const nd = await app.request(`/v1/sessions/export?repo=${repo}`, { headers: { authorization: `Bearer ${bob.token}` } });
+    const lines = (await nd.text()).trim().split("\n").map((l) => JSON.parse(l));
+    expect(lines.map((l) => l.title).sort()).toEqual(["Export me!", "second"]); // not the private one
+    expect(lines.find((l) => l.id === id).messages).toHaveLength(40); // stored tail without full=1
+    const ndFull = await app.request(`/v1/sessions/export?repo=${repo}&full=1`, { headers: { authorization: `Bearer ${bob.token}` } });
+    expect((await ndFull.text()).trim().split("\n").map((l) => JSON.parse(l)).find((l) => l.id === id).messages).toHaveLength(300);
+  });
+
+  it("audit log: admins only, newest first, filters and paging", async () => {
+    expect((await call(alice.token, "GET", "/v1/audit")).status).toBe(403);
+    const first = (await call(owner.token, "GET", "/v1/audit?limit=5")).body;
+    expect(first.entries).toHaveLength(5);
+    expect(first.entries[0].id).toBeGreaterThan(first.entries[4].id);
+    const next = (await call(owner.token, "GET", `/v1/audit?limit=5&before=${first.next}`)).body;
+    expect(next.entries[0].id).toBeLessThan(first.entries[4].id);
+    const exports = (await call(owner.token, "GET", "/v1/audit?action=session.export")).body.entries;
+    expect(exports.length).toBeGreaterThanOrEqual(3);
+    expect(exports.every((e: any) => e.action === "session.export")).toBe(true);
+    const shares = (await call(owner.token, "GET", `/v1/audit?action=session.share&user=${alice.userId}`)).body.entries;
+    expect(shares.length).toBeGreaterThan(0);
+    expect(shares[0].user.name).toBe("Alice");
+    expect(shares.some((e: any) => e.session_title)).toBe(true);
+    expect((await call(outsider.token, "GET", "/v1/audit?action=session.share")).body.entries.every((e: any) => e.user?.name !== "Alice")).toBe(true);
+  });
+
   it("records usage and audit events", async () => {
     const [u] = await sql`SELECT count(*)::int AS n FROM usage_events WHERE org_id = ${orgA} AND kind = 'session.share'`;
     const [a] = await sql`SELECT count(*)::int AS n FROM audit_log WHERE org_id = ${orgA} AND action = 'session.pull'`;

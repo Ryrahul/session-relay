@@ -21,6 +21,7 @@ Handing off agent work means copy-pasting chat logs, or the next person starting
 - **Comments**: teammates leave notes on a session; the agent that picks it up reads them.
 - **Linked to PRs and files**: shares carry the branch's pull request; find every session that touched a file with `file:src/billing.ts`.
 - **Web app**: browse, search and read everything your team has shared, plus an **Activity** digest and team **Stats**.
+- **Export and audit**: download any session as Markdown or JSON; admins see an audit log of everything.
 - **Easy onboarding**: invite links, and `relay login` signs in through the browser.
 - **Private by default**: nothing is uploaded unless you share it, secrets are removed on your laptop first, and shares can be limited to specific people.
 

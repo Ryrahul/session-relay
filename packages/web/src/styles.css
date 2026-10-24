@@ -406,3 +406,11 @@ a.badge-link:hover { color: var(--accent); }
 .badge-draft { background: var(--warn-soft, var(--surface-2)); color: var(--ink); font-weight: 600; border: 1px dashed var(--line-strong); }
 .draft-banner { display: flex; gap: 12px; align-items: center; justify-content: space-between; border-style: dashed; flex-wrap: wrap; }
 .draft-banner p { margin: 2px 0 0; }
+
+/* Audit log */
+.audit-list { list-style: none; margin: 0 0 12px; padding: 0; }
+.audit-row { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); align-items: baseline; }
+.audit-row:first-child { border-top: 0; }
+.audit-what { min-width: 0; overflow-wrap: anywhere; }
+.audit-what .who { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }
+@media (max-width: 640px) { .audit-row { grid-template-columns: 1fr; gap: 2px; } }

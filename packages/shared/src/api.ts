@@ -218,3 +218,16 @@ export const Stats = z.object({
   by_person: z.array(z.object({ id: z.string(), name: z.string(), shares: Count, pickups: Count, comments: Count })),
 });
 export type Stats = z.infer<typeof Stats>;
+
+/** GET /v1/audit (admins) */
+export const AuditEntry = z.object({
+  id: z.number().int(),
+  action: z.string(),
+  user: z.object({ id: z.string(), name: z.string() }).nullable(),
+  target_id: z.string().nullable(),
+  /** Title of the session the entry is about, if it still exists. */
+  session_title: z.string().nullable(),
+  meta: z.record(z.unknown()),
+  created_at: z.string(),
+});
+export type AuditEntry = z.infer<typeof AuditEntry>;

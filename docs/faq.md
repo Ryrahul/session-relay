@@ -1,5 +1,11 @@
 # FAQ
 
+**I installed a new agent. How do I connect it?**
+`relay setup --tools <agent>`, e.g. `relay setup --tools gemini`, then restart that agent. See [Agents](agents.md#added-an-agent-later).
+
+**Can I get my sessions out?**
+Yes. Download one from its page (Markdown or JSON, full transcript included) or `relay export <id>`. Export many with **Settings → Export** or `relay export` in a repo (`--all` for every repo, `--full` for full transcripts): one JSON object per line.
+
 **Does my email have to match my coding-agent accounts?**
 No. In Session Relay the email is just how teammates are told apart (and stops someone being added twice). It isn't linked to any agent account. You log in with your token, never your email.
 

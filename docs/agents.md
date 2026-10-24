@@ -26,6 +26,17 @@ relay setup --tools claude,opencode # only some
 relay setup --scope project         # write config into the current repo instead
 ```
 
+## Added an agent later?
+
+`relay setup` only connects agents that are installed when you run it. After installing a new one, connect just that agent:
+
+```sh
+relay setup --tools gemini          # one agent
+relay setup --tools cursor,copilot  # a few
+```
+
+Agent names: `claude`, `codex`, `opencode`, `gemini`, `copilot`, `cursor`, `zcode`. Running `relay setup` again with no `--tools` is also fine: it only adds or replaces the relay entries and leaves your other settings alone. Add `--auto-share on` if you use auto-share drafts. Restart the agent afterwards.
+
 ## How sessions are read
 
 | Agent | Where sessions come from | Notes |

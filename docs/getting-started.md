@@ -47,6 +47,8 @@ The CLI's token is saved in `~/.config/session-relay/config.json`, readable only
 relay setup
 ```
 
+Installed another agent later? Connect just that one with `relay setup --tools gemini` (or `cursor`, `copilot`, `codex`, `opencode`, `zcode`, `claude`).
+
 Optional: `relay setup --auto-share on` saves every Claude Code, Gemini CLI and Copilot CLI session as a private draft when it ends, so you can publish it later without remembering to `/share` ([details](agents.md#auto-share-drafts)).
 
 This adds the relay MCP server and two commands, `/share` and `/pickup`, to each agent that is installed: Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor and ZCode. Restart your agents afterwards. Details and manual setup are in [Agents](agents.md).
@@ -132,6 +134,8 @@ Open your server's address in a browser and sign in with your token. You can:
 - **Edit** your shares: title, summary, next steps, who it's for, the pull request
 - **Comment** on any session you can see
 - see **Activity** (what the team shared, picked up and discussed) and **Stats** (who shares and picks up, by agent and repo)
+- **download** a session as Markdown or JSON, or export many from **Settings → Export**
+- admins: the **Audit log** of everything that happened
 - invite teammates with a link (admins), and create or revoke your own tokens
 - if you're an admin, change org settings: retention, allowed repositories, extra secret patterns
 

@@ -5,7 +5,7 @@ export async function audit(
   sql: Sql,
   auth: AuthContext,
   action: string,
-  targetId?: string,
+  targetId?: string | null,
   meta: Record<string, unknown> = {},
 ): Promise<void> {
   await sql`

@@ -13,6 +13,7 @@ import {
   type SessionDetail,
   type SessionListItem,
   type ChainLink,
+  renderHandoff,
 } from "@session-relay/shared";
 import type { AppEnv, AuthContext } from "../auth.js";
 import { audit, recordUsage } from "../audit.js";
@@ -195,16 +196,46 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
     return c.json({ sessions });
   });
 
-  app.get("/:id", async (c) => {
+  /**
+   * Every visible session matching the filters, one JSON object per line (newest first, at most 1000).
+   * Registered before "/:id" so "export" isn't read as an id. `full=1` includes full transcripts.
+   */
+  app.get("/export", async (c) => {
     const auth = c.get("auth");
-    const id = c.req.param("id");
-    const mode = DetailMode.catch("tail").parse(c.req.query("mode") ?? "tail");
+    const q = c.req.query();
+    const rows = await sql`
+      SELECT s.id FROM sessions s JOIN users u ON u.id = s.author_id
+      WHERE ${visible(sql, auth)} AND NOT s.draft
+        ${q.repo ? sql`AND s.repo = ${q.repo}` : sql``}
+        ${q.since ? sql`AND s.created_at >= ${q.since}` : sql``}
+        ${q.author === "me" ? sql`AND s.author_id = ${auth.userId}` : sql``}
+      ORDER BY s.created_at DESC LIMIT 1000
+    `;
+    const full = q.full === "1";
+    await audit(sql, auth, "session.export", null, { bulk: true, count: rows.length, repo: q.repo ?? null, full });
+    c.header("content-type", "application/x-ndjson; charset=utf-8");
+    c.header("content-disposition", `attachment; filename="sessions${q.repo ? "-" + q.repo.split("/").slice(-1)[0] : ""}.ndjson"`);
+    const lines: string[] = [];
+    for (const r of rows) {
+      const d = await loadDetail(auth, r.id, full ? "full" : "tail", { all: full });
+      if (d) lines.push(JSON.stringify(d));
+    }
+    return c.body(lines.join("\n") + (lines.length ? "\n" : ""));
+  });
+
+  /** A session as the caller may see it; `page` picks the window of messages. Null when not visible. */
+  async function loadDetail(
+    auth: AuthContext,
+    id: string,
+    mode: DetailMode,
+    page: { tail?: unknown; offset?: unknown; limit?: unknown; all?: boolean } = {},
+  ): Promise<SessionDetail | null> {
     const [r] = await sql`
       SELECT s.*, u.name AS author_name, a.name AS assignee_name
       FROM sessions s JOIN users u ON u.id = s.author_id LEFT JOIN users a ON a.id = s.assignee_id
       WHERE s.id = ${id} AND ${visible(sql, auth)}
     `;
-    if (!r) throw new HTTPException(404, { message: "Session not found" });
+    if (!r) return null;
 
     let all: Message[] = r.messages;
     if (mode === "full" && r.transcript_key) {
@@ -214,12 +245,12 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
     let window: Message[] = [];
     let offset = 0;
     if (mode === "tail") {
-      const tail = Math.max(1, Number(c.req.query("tail")) || all.length);
+      const tail = Math.max(1, Number(page.tail) || all.length);
       offset = Math.max(0, all.length - tail);
       window = all.slice(offset);
     } else if (mode === "full") {
-      offset = Math.max(0, Number(c.req.query("offset")) || 0);
-      const limit = Math.min(Number(c.req.query("limit")) || FULL_PAGE, 1000);
+      offset = Math.max(0, Number(page.offset) || 0);
+      const limit = page.all ? all.length : Math.min(Number(page.limit) || FULL_PAGE, 1000);
       window = all.slice(offset, offset + limit);
     }
 
@@ -254,11 +285,6 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       author: { id: x.author_id, name: x.author_name },
       created_at: x.created_at.toISOString(),
     });
-    await recordUsage(sql, auth, `session.get.${mode}`);
-    if (mode !== "summary") await audit(sql, auth, "session.pull", id, { mode });
-    // The CLI and agents say when they load a session to continue it (relay pull, /pickup).
-    if (c.req.query("pickup") === "1") await audit(sql, auth, "session.pickup", id);
-
     const body: SessionDetail = {
       id: r.id,
       org_id: r.org_id,
@@ -291,7 +317,38 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       assigned_to: r.assignee_id ? { id: r.assignee_id, name: r.assignee_name } : null,
       comments,
     };
+    return body;
+  }
+
+  app.get("/:id", async (c) => {
+    const auth = c.get("auth");
+    const id = c.req.param("id");
+    const mode = DetailMode.catch("tail").parse(c.req.query("mode") ?? "tail");
+    const body = await loadDetail(auth, id, mode, c.req.query());
+    if (!body) throw new HTTPException(404, { message: "Session not found" });
+    await recordUsage(sql, auth, `session.get.${mode}`);
+    if (mode !== "summary") await audit(sql, auth, "session.pull", id, { mode });
+    // The CLI and agents say when they load a session to continue it (relay pull, /pickup).
+    if (c.req.query("pickup") === "1") await audit(sql, auth, "session.pickup", id);
     return c.json(body);
+  });
+
+  /** The whole session, full transcript included, as Markdown or JSON. */
+  app.get("/:id/export", async (c) => {
+    const auth = c.get("auth");
+    const id = c.req.param("id");
+    const format = c.req.query("format") === "json" ? "json" : "md";
+    const body = await loadDetail(auth, id, "full", { all: true });
+    if (!body) throw new HTTPException(404, { message: "Session not found" });
+    await audit(sql, auth, "session.export", id, { format });
+    const name = `${body.id}-${body.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "session"}`;
+    if (format === "json") {
+      c.header("content-disposition", `attachment; filename="${name}.json"`);
+      return c.json(body);
+    }
+    c.header("content-type", "text/markdown; charset=utf-8");
+    c.header("content-disposition", `attachment; filename="${name}.md"`);
+    return c.body(renderHandoff(body));
   });
 
   app.patch("/:id", async (c) => {

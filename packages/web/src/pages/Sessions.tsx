@@ -6,13 +6,19 @@ import { Avatar, Empty, Icon, ToolBadge } from "../ui";
 
 const TOOLS = Object.keys(TOOL_NAMES);
 
+type View = "all" | "for-me" | "mine" | "drafts";
+const VIEWS: { id: View; label: string; title: string }[] = [
+  { id: "all", label: "All", title: "Everything you can see" },
+  { id: "for-me", label: "For me", title: "Handoffs someone shared for you" },
+  { id: "mine", label: "Shared by me", title: "Your shares" },
+  { id: "drafts", label: "My drafts", title: "Saved automatically at session end; only you can see them" },
+];
+
 export function Sessions({ me }: { me: MeResponse }) {
   const [q, setQ] = useState("");
   const [repo, setRepo] = useState("");
   const [tool, setTool] = useState("");
-  const [mine, setMine] = useState(false);
-  const [forMe, setForMe] = useState(false);
-  const [drafts, setDrafts] = useState(false);
+  const [view, setView] = useState<View>("all");
   const [rows, setRows] = useState<SessionListItem[] | null>(null);
   const [repos, setRepos] = useState<string[]>([]);
   const [error, setError] = useState("");
@@ -27,7 +33,7 @@ export function Sessions({ me }: { me: MeResponse }) {
   useEffect(() => {
     const t = setTimeout(() => {
       api
-        .list({ q, repo, tool, author: mine || drafts ? "me" : "", assignee: forMe ? "me" : "", drafts: drafts ? "only" : "", limit: "100" })
+        .list({ q, repo, tool, author: view === "mine" || view === "drafts" ? "me" : "", assignee: view === "for-me" ? "me" : "", drafts: view === "drafts" ? "only" : "", limit: "100" })
         .then((r) => {
           setRows(r.sessions);
           setError("");
@@ -35,7 +41,7 @@ export function Sessions({ me }: { me: MeResponse }) {
         .catch((e) => setError(e.message));
     }, q ? 220 : 0);
     return () => clearTimeout(t);
-  }, [q, repo, tool, mine, forMe, drafts]);
+  }, [q, repo, tool, view]);
 
   // Search results stay in rank order; otherwise group by day.
   const groups = useMemo(() => {
@@ -50,7 +56,7 @@ export function Sessions({ me }: { me: MeResponse }) {
     return out;
   }, [rows, q]);
 
-  const filtered = Boolean(q || repo || tool || mine || forMe || drafts);
+  const filtered = Boolean(q || repo || tool || view !== "all");
 
   return (
     <div className="page">
@@ -82,32 +88,55 @@ export function Sessions({ me }: { me: MeResponse }) {
           ))}
         </select>
       </div>
-      <div className="chips" role="group" aria-label="Filters">
-        <button type="button" className={`chip ${!tool ? "on" : ""}`} aria-pressed={!tool} onClick={() => setTool("")}>
-          All tools
-        </button>
-        {TOOLS.map((t) => (
-          <button key={t} type="button" className={`chip chip-${t} ${tool === t ? "on" : ""}`} aria-pressed={tool === t} onClick={() => setTool(tool === t ? "" : t)}>
-            {TOOL_NAMES[t]}
+      <div className="filter-bar">
+        <div className="segmented" role="radiogroup" aria-label="Show">
+          {VIEWS.map((v) => (
+            <button key={v.id} type="button" role="radio" aria-checked={view === v.id} className={view === v.id ? "on" : ""} title={v.title} onClick={() => setView(v.id)}>
+              {v.label}
+            </button>
+          ))}
+        </div>
+        <select value={tool} onChange={(e) => setTool(e.target.value)} aria-label="Agent" className="tool-select">
+          <option value="">All agents</option>
+          {TOOLS.map((t) => (
+            <option key={t} value={t}>
+              {TOOL_NAMES[t]}
+            </option>
+          ))}
+        </select>
+        {filtered && (
+          <button
+            type="button"
+            className="btn-link small"
+            onClick={() => {
+              setQ("");
+              setRepo("");
+              setTool("");
+              setView("all");
+            }}
+          >
+            Clear filters
           </button>
-        ))}
-        <span className="chip-sep" />
-        <button type="button" className={`chip ${forMe ? "on" : ""}`} aria-pressed={forMe} onClick={() => setForMe(!forMe)}>
-          For me
-        </button>
-        <button type="button" className={`chip ${mine ? "on" : ""}`} aria-pressed={mine} onClick={() => setMine(!mine)}>
-          Shared by me
-        </button>
-        <button type="button" className={`chip ${drafts ? "on" : ""}`} aria-pressed={drafts} onClick={() => setDrafts(!drafts)}>
-          My drafts
-        </button>
+        )}
       </div>
 
       {error && <p className="error">{error}</p>}
       {rows === null && !error && <div className="skeleton-list" aria-busy="true" />}
 
       {rows?.length === 0 &&
-        (filtered ? (
+        (view === "for-me" && !q && !repo && !tool ? (
+          <Empty title="No handoffs for you">
+            <p className="muted">
+              When a teammate runs <code>/share for {me.user.name.split(" ")[0]}</code>, it shows up here and <code>/pickup</code> checks it first.
+            </p>
+          </Empty>
+        ) : view === "drafts" && !q && !repo && !tool ? (
+          <Empty title="No drafts">
+            <p className="muted">
+              Turn on auto-share with <code>relay setup --auto-share on</code> and every session is saved here as a private draft when it ends.
+            </p>
+          </Empty>
+        ) : filtered ? (
           <Empty title="No sessions match">
             <p className="muted">Try a different search, or clear the filters.</p>
           </Empty>

@@ -19,28 +19,67 @@ const ACTIONS = [
   { value: "org", label: "Settings" },
 ];
 
+const SETTING_NAMES: Record<string, string> = {
+  name: "name",
+  retention_days: "retention",
+  repo_allowlist: "allowed repositories",
+  redaction_patterns: "secret patterns",
+  share_templates: "handoff templates",
+};
+const EDIT_NAMES: Record<string, string> = { title: "title", summary: "summary", assignee: "who it's for", pr_url: "pull request", draft: "draft", visibility: "visibility" };
+const list = (keys: string[], names: Record<string, string>) => keys.map((k) => names[k] ?? k.replace(/_/g, " ")).join(", ");
+
 /** Plain words for an audit action. */
-function describe(e: AuditEntry): string {
+function describe(e: AuditEntry, people: Map<string, string>): string {
   const m = e.meta as Record<string, unknown>;
+  const who = (id: string | null) => (id && people.get(id)) || "someone";
   switch (e.action) {
     case "session.share":
       return m.published ? "published a draft" : "shared";
     case "session.draft":
       return "saved a draft of";
     case "session.pull":
-      return `opened (${m.mode ?? "tail"})`;
+      return m.mode === "full" ? "opened the full transcript of" : "opened";
     case "session.pickup":
       return "picked up";
     case "session.update":
-      return `edited (${Object.keys(m).join(", ") || "details"})`;
+      return Object.keys(m).length ? `edited the ${list(Object.keys(m), EDIT_NAMES)} of` : "edited";
     case "session.comment":
       return "commented on";
     case "session.comment.delete":
       return "deleted a comment on";
     case "session.export":
-      return m.bulk ? `exported ${m.count} sessions${m.repo ? ` from ${m.repo}` : ""}${m.full ? " with full transcripts" : ""}` : `exported (${m.format})`;
+      return m.bulk
+        ? `exported ${m.count} sessions${m.repo ? ` from ${m.repo}` : ""}${m.full ? " with full transcripts" : ""}`
+        : `exported (${m.format === "json" ? "JSON" : "Markdown"})`;
     case "session.delete":
       return "deleted";
+    case "member.add":
+      return `added ${m.email ?? who(e.target_id)}${m.role ? ` as ${m.role}` : ""}`;
+    case "member.remove":
+      return `removed ${who(e.target_id)}`;
+    case "invite.create":
+      return `created an invite link${m.role ? ` (${m.role}, ${m.expires_days} day${m.expires_days === 1 ? "" : "s"})` : ""}`;
+    case "invite.revoke":
+      return "revoked an invite link";
+    case "invite.accept":
+      return "joined with an invite link";
+    case "token.create":
+      return "created a token";
+    case "token.revoke":
+      return "revoked a token";
+    case "token.issue_cli":
+      return "was issued a token from the server shell";
+    case "org.setup":
+      return "set up the organization";
+    case "device.approve":
+      return `signed in the CLI${m.client ? ` on ${m.client}` : ""}`;
+    case "device.deny":
+      return "denied a CLI sign-in";
+    case "org.update": {
+      const keys = Object.keys(m);
+      return keys.length ? `changed ${list(keys, SETTING_NAMES)}` : "changed settings";
+    }
     default:
       return e.action.replace(/[._]/g, " ");
   }
@@ -76,6 +115,8 @@ export function Audit({ me }: { me: MeResponse }) {
     api.members().then((r) => setMembers(r.members), () => undefined);
   }, []);
 
+  const people = new Map(members.map((m) => [m.id, m.name]));
+
   if (me.role === "member") return <div className="page"><p className="error">Only admins can see the audit log.</p></div>;
 
   return (
@@ -86,7 +127,7 @@ export function Audit({ me }: { me: MeResponse }) {
           <p className="muted">Every share, view, pickup, edit, comment, export and settings change in {me.org.name}.</p>
         </div>
       </header>
-      <div className="toolbar">
+      <div className="toolbar toolbar-filters">
         <select aria-label="Action" value={action} onChange={(e) => setAction(e.target.value)}>
           {ACTIONS.map((a) => (
             <option key={a.value} value={a.value}>
@@ -120,8 +161,12 @@ export function Audit({ me }: { me: MeResponse }) {
                   ) : (
                     <strong>System</strong>
                   )}{" "}
-                  {describe(e)}{" "}
-                  {e.session_title ? <a href={`#/s/${e.target_id}`}>{e.session_title}</a> : e.target_id && <span className="mono faint">{e.target_id}</span>}
+                  {describe(e, people)}{" "}
+                  {e.session_title ? (
+                    <a href={`#/s/${e.target_id}`}>{e.session_title}</a>
+                  ) : (
+                    e.action.startsWith("session.") && e.target_id && <span className="faint">a deleted session</span>
+                  )}
                 </span>
               </li>
             ))}

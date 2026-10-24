@@ -91,7 +91,7 @@ It prints the owner token once.
 Then:
 
 - **Members → Invite with a link** for each person: pick the role, send them the link. It works once and expires (1, 7 or 30 days). They choose their name and email and are signed in. (Adding someone directly, with a one-time login command, is still available.)
-- **Settings:** set retention, and optionally an allowlist of repositories (`github.com/your-org/*`) and extra secret patterns.
+- **Settings:** **General** (name, how long shares are kept), **Privacy** (an allowlist of repositories like `github.com/your-org/*`, extra secret patterns you can test on sample text), **Handoff templates** (sections every handoff in a repo should have), **Tokens** and **Export**.
 
 Everyone then follows [Getting started](getting-started.md).
 
@@ -137,7 +137,7 @@ Run the backup from cron, e.g. nightly, and copy the files somewhere off the ser
 | `SETUP_CODE` | (random) | Fixed first-run setup code, instead of the one printed at startup |
 | `STORAGE_DRIVER` | `local` | Where full transcripts go. `local` = Docker volume. S3/R2 is planned |
 
-Org settings (retention, allowed repositories, secret patterns) are changed in the web app under **Settings**, not in env vars.
+Org settings (retention, allowed repositories, secret patterns) are changed in the web app under **Settings** (**General** and **Privacy** tabs), not in env vars.
 
 ## Running without Docker
 
@@ -160,6 +160,6 @@ Create the first org with `node packages/server/dist/bootstrap.js ...` using the
 |---|---|
 | `relay login` says it can't reach the server | Check `PUBLIC_URL` and DNS. Try `curl https://relay.your-team.com/health` from the laptop |
 | Caddy can't get a certificate | DNS must point at the server and ports 80/443 must be open. Check `docker compose ... logs caddy` |
-| `Repo ... is not on this org's allowlist` | Add it under **Settings → Allowed repositories**, or clear the list |
+| `Repo ... is not on this org's allowlist` | Add it under **Settings → Privacy → Allowed repositories**, or clear the list |
 | `413 Request too large` when sharing a full transcript | Shares are capped at 25 MB. Share `summary+tail` instead, or raise `client_max_body_size` in your proxy |
 | Lost a token, or the only owner is locked out | On the server: `docker compose -f deploy/docker-compose.yml --env-file deploy/.env exec server node packages/server/dist/issue-token.js --email you@your-team.com`. It prints a new token |

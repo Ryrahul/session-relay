@@ -23,7 +23,7 @@
 - **Comments** on sessions, in the web app, the CLI and from agents; the next agent reads them.
 - **Activity digest** and **stats**: web pages, `relay digest`, `relay stats`, and the `team_activity` MCP tool.
 - **Search across full transcripts**, with existing shares indexed by the hourly job.
-- **Redaction preview**: test secret patterns on sample text in Settings; `--dry-run` lists every redaction.
+- **Redaction preview**: test secret patterns on sample text in **Settings → Privacy**; `--dry-run` lists every redaction.
 - **Diff snapshots**: uncommitted changes attached to a share, viewable in the web app and `git apply`-able after `relay pull`.
 - **Handoff templates**: per-repo sections and instructions that `/share` follows; missing sections flagged.
 - **Audit log page** (admins) and `relay audit`; **export** of a session (Markdown/JSON) or many (NDJSON).
@@ -52,6 +52,7 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 
 | Version | Date | |
 |---|---|---|
+| Web app | 2026-10-24 | Easier to use: Settings in tabs; a guided handoff-template editor (examples, one-click sections, required switches, reorder, preview, unsaved-changes bar, which repos it applies to); All / For me / Shared by me / My drafts views; plain-words audit log; session list fixed on phones |
 | CLI `0.5.0` on npm | 2026-10-24 | `relay share --diff`, `relay template`, `relay edit --section`, `relay export`, `relay audit`; dry-run lists redactions; MCP `share_template`, `get_session_diff` |
 | Server and web app | 2026-10-24 | Handoff templates, diff snapshots, audit log page, export, full-transcript search, redaction preview (migrations 0010–0012) |
 | CLI `0.4.0` on npm | 2026-10-24 | Gemini CLI, Copilot CLI and Cursor (experimental); `relay edit`, `publish`, `comment`, `pr-comment`, `digest`, `stats`; `setup --auto-share`; `--for`, `--pr`, `--for-me`, `--file`, `--drafts`; MCP `update_session`, `comment_on_session`, `team_activity` |
@@ -71,6 +72,7 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 | API, auth, roles, visibility, retention, audit | Done; integration-tested against Postgres, including org isolation |
 | CLI (npm `session-relay`) and MCP server | Done; published, end-to-end tested with three users |
 | Web app | Done; browser-tested flows, light/dark, mobile |
+| Handoff templates, diffs, audit log, export, transcript search | Done; integration, CLI, MCP and browser tested |
 | Handoff chains | Done; integration and end-to-end tested (CLI + MCP) |
 | Invite links, browser login | Done; integration and browser tested |
 | Edit, assign, PR links, file search | Done; integration, CLI, MCP and browser tested |

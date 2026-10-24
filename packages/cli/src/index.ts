@@ -15,7 +15,8 @@ program
   .command("login")
   .description("Connect this machine to a relay server")
   .requiredOption("--server <url>", "server URL, e.g. https://relay.example.com")
-  .requiredOption("--token <token>", "your personal token")
+  .option("--token <token>", "personal token; without it, sign in through the browser")
+  .option("--no-browser", "print the sign-in link instead of opening a browser")
   .action(login);
 
 program.command("whoami").description("Show the current user, org and server").action(whoami);
@@ -78,9 +79,11 @@ program
 program.command("delete <id>").description("Delete one of your shares").option("-y, --yes").action(remove);
 program.command("members").description("List people in your org").action(members);
 program
-  .command("invite <email>")
-  .description("Add someone to your org (admins) and print their login command")
-  .requiredOption("--name <name>")
+  .command("invite [email]")
+  .description("Admins: create an invite link (--link), or add someone directly and print their login command")
+  .option("--link", "create a single-use invite link instead")
+  .option("--days <n>", "invite link lifetime: 1-30 days", "7")
+  .option("--name <name>", "their name (when adding directly)")
   .option("--role <role>", "member | admin | owner", "member")
   .action(invite);
 

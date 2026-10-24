@@ -33,7 +33,7 @@ export function Login({ onSignedIn }: { onSignedIn: (me: MeResponse) => void }) 
           <Mark size={30} />
           <span>Session Relay</span>
         </div>
-        <h1>Pick up where your teammate left off.</h1>
+        <h1>{location.hash.startsWith("#/device/") ? "Sign in to approve your terminal." : "Pick up where your teammate left off."}</h1>
         <p className="muted">Shared sessions from Claude Code, OpenCode and Codex, in one place for your team.</p>
         <form onSubmit={submit} className="stack">
           <label htmlFor="token">Personal token</label>

@@ -61,6 +61,12 @@ The number of redactions is shown when you share and on the session page. Redact
 | Admin | Also: add and remove members, delete any share, change org settings |
 | Owner | Also: add owners and admins, remove admins |
 
+## Invite links and browser login
+
+- An invite link contains a random secret; the server stores only its hash. A link works **once**, can be revoked, and expires after 1, 7 or 30 days. Only admins can create links, and only owners can create owner links.
+- `relay login` (browser) creates a short code that expires in 10 minutes. A signed-in user approves it in the web app, which shows the computer's name and the code to compare. The CLI's token is created only then, for the approving user in their current org, and is handed to the CLI once. A denied code can't be approved later.
+- The unauthenticated endpoints (`/v1/join`, `/v1/auth/device`) are rate-limited per IP.
+
 ## Tokens
 
 - Tokens are personal, one person in one org, and start with `srk_`.

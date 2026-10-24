@@ -21,7 +21,7 @@ if (await setupNeeded(sql)) {
   setup = new SetupGate(code);
   console.log(setupBanner(code, config.PUBLIC_URL));
 }
-const app = createApp({ sql, storage, webDist: config.WEB_DIST, setup });
+const app = createApp({ sql, storage, webDist: config.WEB_DIST, setup, publicUrl: config.PUBLIC_URL });
 
 const purge = () =>
   purgeExpired(sql, storage)

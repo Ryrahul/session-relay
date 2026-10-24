@@ -12,9 +12,14 @@
 - Web app: browse, search, read, members, settings.
 - One-command Docker deployment with automatic HTTPS (Caddy), or behind your own nginx.
 - First-run setup in the browser: a one-time code from the server logs creates your organization and owner account.
+- **Handoff chains**: a share made after `/pickup` links to the session it continues; the web app shows the whole trail.
+- **Invite links**: single-use, expiring, revocable links instead of pasting tokens.
+- **Browser login**: `relay login --server …` signs in by approving a code in the web app.
 
 ## Next
 
+- **Edit after sharing**: fix a share's title, summary, next steps and visibility in the web app.
+- **GitHub PR link**: comment on a PR with the sessions behind it; link the PR from the session page.
 - Prebuilt public Docker image, so self-hosting needs no build.
 - Full live test of Codex with a real session fixture.
 - S3 / Cloudflare R2 storage for full transcripts.
@@ -36,6 +41,8 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 
 | Version | Date | |
 |---|---|---|
+| CLI `0.2.0` on npm | 2026-10-24 | Handoff chains (`--continues`), browser login, `relay invite --link` |
+| Server and web app | 2026-10-24 | Handoff chains, invite links, browser login (migrations 0002, 0003) |
 | CLI `0.1.0` on npm | 2026-10-23 | First public release: adapters for all three agents, sharing, MCP server, `relay setup` |
 | Server and web app | 2026-10-23 | First production deployment |
 
@@ -48,6 +55,8 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 | API, auth, roles, visibility, retention, audit | Done; integration-tested against Postgres, including org isolation |
 | CLI (npm `session-relay`) and MCP server | Done; published, end-to-end tested with three users |
 | Web app | Done; browser-tested flows, light/dark, mobile |
+| Handoff chains | Done; integration and end-to-end tested (CLI + MCP) |
+| Invite links, browser login | Done; integration and browser tested |
 | Self-hosting (Docker, Caddy or nginx) | Done; running in production |
 | CI/CD (deploy branch, rehearsal, backup, rollback) | Done; see [deploy-pipeline.md](deploy-pipeline.md) |
 | Docs site | Done; https://relay.rahulweb.online |

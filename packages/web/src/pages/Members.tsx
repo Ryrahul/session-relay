@@ -1,8 +1,94 @@
 import { useEffect, useState, type FormEvent } from "react";
-import type { Member, MeResponse } from "@session-relay/shared";
+import type { InviteInfo, Member, MeResponse } from "@session-relay/shared";
 import { api } from "../api";
 import { ago } from "../format";
 import { Avatar, Command, Icon } from "../ui";
+
+function InviteLinks({ me }: { me: MeResponse }) {
+  const [role, setRole] = useState("member");
+  const [days, setDays] = useState("7");
+  const [created, setCreated] = useState<string | null>(null);
+  const [invites, setInvites] = useState<InviteInfo[]>([]);
+  const [error, setError] = useState("");
+
+  const load = () => api.invites().then((r) => setInvites(r.invites), () => undefined);
+  useEffect(() => {
+    void load();
+  }, []);
+
+  async function create(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    try {
+      const r = await api.createInvite(role, Number(days));
+      setCreated(r.url);
+      void load();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function revoke(id: string) {
+    await api.revokeInvite(id).catch((e) => setError(e.message));
+    void load();
+  }
+
+  return (
+    <section className="card">
+      <h2>Invite with a link</h2>
+      <p className="muted small">Send the link to one person. It works once; they pick their name and email and are signed in straight away.</p>
+      <form className="inline-form" onSubmit={create}>
+        <label htmlFor="inv-link-role" className="sr-only">
+          Role
+        </label>
+        <select id="inv-link-role" value={role} onChange={(e) => setRole(e.target.value)}>
+          <option value="member">Member</option>
+          <option value="admin">Admin</option>
+          {me.role === "owner" && <option value="owner">Owner</option>}
+        </select>
+        <label htmlFor="inv-link-days" className="sr-only">
+          Expires
+        </label>
+        <select id="inv-link-days" value={days} onChange={(e) => setDays(e.target.value)}>
+          <option value="1">Expires in 1 day</option>
+          <option value="7">Expires in 7 days</option>
+          <option value="30">Expires in 30 days</option>
+        </select>
+        <button type="submit" className="btn-primary">
+          <Icon name="chain" size={14} /> Create link
+        </button>
+      </form>
+      {created && (
+        <div className="reveal">
+          <p>Copy it now; it isn't shown again. Send it privately to one person.</p>
+          <Command>{created}</Command>
+        </div>
+      )}
+      {error && <p className="error">{error}</p>}
+      {invites.length > 0 && (
+        <div className="invite-links">
+          {invites.slice(0, 8).map((i) => (
+            <div key={i.id} className="invite-row">
+              <div>
+                <span className={`status-pill status-${i.status}`}>{i.status}</span> <span className="role">{i.role}</span>{" "}
+                <span className="muted">
+                  {i.status === "used"
+                    ? `joined as ${i.used_by}`
+                    : `created by ${i.created_by ?? "someone"} ${ago(i.created_at)} · expires ${new Date(i.expires_at).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`}
+                </span>
+              </div>
+              {i.status === "pending" && (
+                <button type="button" className="btn-ghost btn-sm" onClick={() => revoke(i.id)}>
+                  Revoke
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
 export function Members({ me }: { me: MeResponse }) {
   const [members, setMembers] = useState<Member[] | null>(null);
@@ -56,9 +142,13 @@ export function Members({ me }: { me: MeResponse }) {
         </div>
       </header>
 
+      {isAdmin && <InviteLinks me={me} />}
+
       {isAdmin && (
-        <section className="card">
-          <h2>Add a teammate</h2>
+        <details className="card add-direct">
+          <summary>
+            <h2>Or add someone directly</h2>
+          </summary>
           <form className="invite-form" onSubmit={invite}>
             <div className="field">
               <label htmlFor="inv-name">Name</label>
@@ -91,7 +181,7 @@ export function Members({ me }: { me: MeResponse }) {
               <Command>{created.command}</Command>
             </div>
           )}
-        </section>
+        </details>
       )}
 
       {error && <p className="error">{error}</p>}

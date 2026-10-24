@@ -330,6 +330,8 @@ await rm(OUT, { recursive: true, force: true });
 await mkdir(path.join(OUT, "docs"), { recursive: true });
 await cp(path.join(ROOT, "docs/images"), path.join(OUT, "images"), { recursive: true });
 await cp(path.join(ROOT, "site/site.css"), path.join(OUT, "site.css"));
+// Search engine ownership files (Google Search Console, Bing), served from the site root.
+await cp(path.join(ROOT, "site/verify"), OUT, { recursive: true });
 await writeFile(path.join(OUT, "index.html"), landing());
 // GitHub Pages: serve files as-is.
 await writeFile(path.join(OUT, ".nojekyll"), "");

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { RelayClient, resolvePeople, resolvePerson } from "./client.js";
 import type { SessionPatch } from "@session-relay/shared";
 import { repoInfo } from "./git.js";
-import { renderHandoff } from "./handoff.js";
+import { renderHandoff } from "@session-relay/shared";
 import { recordPickup } from "./pickups.js";
 import { renderDigest } from "./digest.js";
 import { describeRedactions, prepareShare, uploadShare } from "./share.js";

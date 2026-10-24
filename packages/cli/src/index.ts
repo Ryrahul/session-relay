@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { login } from "./commands/login.js";
-import { comment, digest, edit, invite, list, localSessions, members, prComment, publish, pull, remove, search, share, show, stats } from "./commands/sessions.js";
+import { auditCmd, comment, digest, edit, exportCmd, invite, list, localSessions, members, prComment, publish, pull, remove, search, share, show, stats } from "./commands/sessions.js";
 import { hook } from "./commands/hook.js";
 import { setup } from "./commands/setup.js";
 import { whoami } from "./commands/whoami.js";
@@ -112,6 +112,27 @@ program
   .description("Comment on the session's pull request with a link and next steps (uses the GitHub CLI)")
   .option("--pr <url>", "pull request URL, if the share doesn't have one yet")
   .action(prComment);
+
+program
+  .command("export [id]")
+  .description("Download a session (Markdown or JSON, full transcript included); without an id, all of a repo's sessions as NDJSON")
+  .option("--format <format>", "md (default) or json, for one session")
+  .option("-o, --out <file>", "write to a file instead of the terminal")
+  .option("--repo <repo>", "repo to export (default: this repo)")
+  .option("--all", "every repo")
+  .option("--since <date>", "only sessions shared since this date (YYYY-MM-DD)")
+  .option("--full", "include full transcripts (bulk export)")
+  .action(exportCmd);
+
+program
+  .command("audit")
+  .description("Admins: the org's audit log (shares, pulls, edits, exports, members, tokens, settings)")
+  .option("--action <prefix>", 'e.g. "session.share", "session", "member"')
+  .option("--user <name>", "only this person")
+  .option("--session <id>", "only events about this session")
+  .option("--limit <n>", "entries (max 200)", "50")
+  .option("--json", "print JSON")
+  .action(auditCmd);
 
 program
   .command("digest")

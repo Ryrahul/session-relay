@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ChainLink, Member, MeResponse, Message, SessionDetail } from "@session-relay/shared";
-import { api } from "../api";
+import { api, download } from "../api";
 import { ago, dateTime, prLabel, shortRepo, TOOL_NAMES } from "../format";
 import { RichText } from "../text";
 import { Avatar, Command, Icon, ToolBadge } from "../ui";
@@ -546,6 +546,19 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
                 <Icon name="lock" size={12} /> {s.redactions} secret{s.redactions === 1 ? " was" : "s were"} removed before upload.
               </p>
             )}
+          </section>
+
+          <section className="card">
+            <h2>Download</h2>
+            <p className="muted small">The whole session{s.has_full_transcript ? ", full transcript included" : ""}.</p>
+            <div className="row">
+              <button type="button" className="btn-ghost btn-sm" onClick={() => download(`/v1/sessions/${s.id}/export?format=md`, `${s.id}.md`).catch((e) => setError(e.message))}>
+                <Icon name="download" size={14} /> Markdown
+              </button>
+              <button type="button" className="btn-ghost btn-sm" onClick={() => download(`/v1/sessions/${s.id}/export?format=json`, `${s.id}.json`).catch((e) => setError(e.message))}>
+                <Icon name="download" size={14} /> JSON
+              </button>
+            </div>
           </section>
 
           {s.files_touched.length > 0 && (

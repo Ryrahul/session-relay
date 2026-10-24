@@ -7,7 +7,7 @@ import { findSessions } from "../adapters/index.js";
 import { RelayClient, resolvePeople, resolvePerson } from "../client.js";
 import { repoInfo } from "../git.js";
 import { renderDigest } from "../digest.js";
-import { renderHandoff } from "../handoff.js";
+import { renderHandoff } from "@session-relay/shared";
 import { recordPickup } from "../pickups.js";
 import { describeRedactions, prepareShare, relayDir, uploadShare, writeDryRun } from "../share.js";
 import { ago, ask, choose, confirm, interactive, toolLabel } from "../ui.js";
@@ -279,6 +279,47 @@ export async function pull(id: string, opts: { full?: boolean; summaryOnly?: boo
   await writeFile(file, renderHandoff(s));
   const rel = path.relative(process.cwd(), file) || file;
   console.log(`Wrote ${rel}\nTell your agent: "Read ${rel} and continue from where it stopped."`);
+}
+
+/** relay export: one session as Markdown/JSON, or (with no id) every session of a repo as NDJSON. */
+export async function exportCmd(
+  id: string | undefined,
+  opts: { format?: string; out?: string; repo?: string; all?: boolean; full?: boolean; since?: string },
+): Promise<void> {
+  const client = await RelayClient.fromConfig();
+  if (id) {
+    const format = opts.format === "json" ? "json" : "md";
+    const body = await client.export(id, format);
+    if (!opts.out) return void process.stdout.write(body);
+    await writeFile(opts.out, body);
+    return console.log(`Wrote ${opts.out}`);
+  }
+  let repo = opts.repo;
+  if (!repo && !opts.all) repo = await repoInfo().then((r) => r.repo).catch(() => undefined);
+  if (!repo && !opts.all) throw new Error("Run inside a repo, or pass --repo <repo> or --all.");
+  const body = await client.exportAll({ repo, since: opts.since, full: opts.full });
+  const count = body.trim() ? body.trim().split("\n").length : 0;
+  const out = opts.out ?? `sessions-${(repo ?? "all").split("/").pop()}.ndjson`;
+  await writeFile(out, body);
+  console.log(`Wrote ${count} session${count === 1 ? "" : "s"} to ${out} (one JSON object per line${opts.full ? ", full transcripts" : ""}).`);
+}
+
+/** relay audit: the org's audit log (admins). */
+export async function auditCmd(opts: { action?: string; user?: string; session?: string; limit?: string; json?: boolean }): Promise<void> {
+  const client = await RelayClient.fromConfig();
+  const user = opts.user ? await resolvePerson(client, opts.user) : undefined;
+  const { entries } = await client.audit({ action: opts.action, user, target: opts.session, limit: Number(opts.limit) || 50 });
+  if (opts.json) return console.log(JSON.stringify(entries, null, 2));
+  if (!entries.length) return console.log("No audit entries.");
+  for (const e of entries) {
+    const when = new Date(e.created_at).toISOString().slice(0, 16).replace("T", " ");
+    const meta = Object.entries(e.meta)
+      .filter(([, v]) => v !== null && v !== undefined && typeof v !== "object")
+      .map(([k, v]) => `${k}=${v}`)
+      .join(" ");
+    const target = e.session_title ? `"${e.session_title}" (${e.target_id})` : (e.target_id ?? meta);
+    console.log(`${when}  ${(e.user?.name ?? "-").slice(0, 16).padEnd(16)} ${e.action.padEnd(22)} ${target}`);
+  }
 }
 
 /** relay digest: what the team did lately. */

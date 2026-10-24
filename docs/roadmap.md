@@ -22,6 +22,7 @@
 - **Search by file and branch**: `file:` and `branch:` in any search, `--file` in the CLI.
 - **Comments** on sessions, in the web app, the CLI and from agents; the next agent reads them.
 - **Activity digest** and **stats**: web pages, `relay digest`, `relay stats`, and the `team_activity` MCP tool.
+- **Audit log page** (admins) and `relay audit`; **export** of a session (Markdown/JSON) or many (NDJSON).
 - **Gemini CLI, Copilot CLI and Cursor** (experimental) adapters, with `relay setup` for each.
 - **Auto-share drafts** (opt-in; Claude Code, Gemini CLI, Copilot CLI): sessions saved as private drafts at session end; publish when ready.
 
@@ -31,7 +32,6 @@
 - Prebuilt public Docker image, so self-hosting needs no build.
 - Full live test of Codex with a real session fixture.
 - S3 / Cloudflare R2 storage for full transcripts.
-- Audit log in the web app.
 
 ## Cloud hosting (coming soon)
 

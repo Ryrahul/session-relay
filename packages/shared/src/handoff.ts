@@ -1,4 +1,4 @@
-import type { SessionDetail } from "@session-relay/shared";
+import type { SessionDetail } from "./api.js";
 
 const TOOL_NAMES = { "claude-code": "Claude Code", codex: "Codex", opencode: "OpenCode", zcode: "ZCode", gemini: "Gemini CLI", copilot: "Copilot CLI", cursor: "Cursor" } as const;
 

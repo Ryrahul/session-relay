@@ -51,6 +51,8 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 | `relay list --for-me` | Handoffs assigned to you, from any repo |
 | `relay list --drafts` | Your drafts (saved automatically at session end) |
 | `relay search "<query>"` | Full-text search over titles, summaries and messages. Add `file:<path>` or `branch:<name>` to filter |
+| `relay export <id> [--format md\|json] [-o file]` | Download a session, full transcript included |
+| `relay export [--repo <repo>\|--all] [--since YYYY-MM-DD] [--full] [-o file]` | Every session of this repo (or all repos) you can see, as NDJSON |
 | `relay digest [--days 1]` | What the team did lately: new shares by repo, handoffs for you, pickups, comments |
 | `relay stats [--days 30] [--json]` | Shares, pickups, continued handoffs and comments, by day, person, agent and repo |
 | `relay show <id>` | Print a session as a handoff |
@@ -73,6 +75,7 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 | `relay comment <id> "<text>"` | Leave a note on a session. Without text, list its comments. Secrets are removed first |
 | `relay pr-comment <id> [--pr <url>]` | Comment on the share's pull request with a link and the next steps (uses `gh`) |
 | `relay delete <id> [-y]` | Delete your share. Admins can delete any share |
+| `relay audit [--action <prefix>] [--user <name>] [--session <id>] [--limit 50]` | Admins: the audit log |
 | `relay members` | People in your org |
 | `relay invite --link [--role member\|admin\|owner] [--days 7]` | Admins: create a single-use invite link |
 | `relay invite <email> --name <name> [--role member\|admin\|owner]` | Admins: add someone and print their one-time login command |
@@ -97,4 +100,5 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 | `relay setup [--tools claude,codex,opencode,gemini,copilot,cursor,zcode] [--scope user\|project] [--relay-config <file>]` | Install the MCP server and `/share` `/pickup` into your agents |
 | `relay setup --auto-share on\|off` | Save each Claude Code, Gemini CLI and Copilot CLI session as a private draft when it ends (a session-end hook). `off` removes the hooks |
 | `relay hook session-end --tool <agent>` | What that hook runs. It never fails the agent; it logs to `hook.log` next to your relay config |
+| `relay setup --tools <agent>` | Connect one agent you installed later, e.g. `--tools gemini` |
 | `relay mcp` | The MCP server on stdio. Your agent starts it; you don't run it yourself |

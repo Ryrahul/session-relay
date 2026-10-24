@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { LocalSession } from "./adapters/types.js";
 import { buildShare } from "./build.js";
 import { normaliseRemote } from "./git.js";
-import { renderHandoff } from "./handoff.js";
+import { renderHandoff } from "@session-relay/shared";
 
 const local: LocalSession = {
   tool: "claude-code",

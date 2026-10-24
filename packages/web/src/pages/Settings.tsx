@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type { MeResponse, OrgInfo } from "@session-relay/shared";
-import { api, type TokenInfo } from "../api";
+import { api, download, type TokenInfo } from "../api";
 import { ago, bytes } from "../format";
 import { Command } from "../ui";
 
@@ -195,6 +195,52 @@ function Tokens() {
   );
 }
 
+/** Download the sessions you can see, as NDJSON (one session per line). */
+function ExportCard() {
+  const [repos, setRepos] = useState<string[]>([]);
+  const [repo, setRepo] = useState("");
+  const [full, setFull] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    api.list({ limit: "100" }).then((r) => setRepos([...new Set(r.sessions.map((s) => s.repo))].sort()), () => undefined);
+  }, []);
+  async function run() {
+    setBusy(true);
+    setError("");
+    try {
+      await download(`/v1/sessions/export?${new URLSearchParams({ ...(repo ? { repo } : {}), ...(full ? { full: "1" } : {}) })}`, "sessions.ndjson");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="card">
+      <h2>Export</h2>
+      <p className="muted small">Download the sessions you can see, one JSON object per line (the newest 1000). Single sessions download from their page.</p>
+      <div className="row">
+        <select aria-label="Repository to export" value={repo} onChange={(e) => setRepo(e.target.value)}>
+          <option value="">All repositories</option>
+          {repos.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+        <label className="check">
+          <input type="checkbox" checked={full} onChange={(e) => setFull(e.target.checked)} /> Full transcripts
+        </label>
+        <button type="button" className="btn-primary btn-sm" onClick={run} disabled={busy}>
+          {busy ? "Preparing…" : "Download"}
+        </button>
+      </div>
+      {error && <p className="error">{error}</p>}
+    </section>
+  );
+}
+
 export function Settings({ me, onOrgChanged }: { me: MeResponse; onOrgChanged: () => void }) {
   return (
     <div className="page">
@@ -208,6 +254,7 @@ export function Settings({ me, onOrgChanged }: { me: MeResponse; onOrgChanged: (
       </header>
       <OrgSettings me={me} onOrgChanged={onOrgChanged} />
       <Tokens />
+      <ExportCard />
     </div>
   );
 }

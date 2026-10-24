@@ -168,6 +168,14 @@ retry path. Starting with that now.</pre>
       <p>Organizations, roles, personal tokens, retention, a repo allowlist, your own secret patterns, and an audit log of every share and pull.</p>
     </div>
     <div>
+      <h3>Handoff chains</h3>
+      <p>Pick up a session and share your work later: it's linked automatically. Every session shows the trail, from who started it to who continued it.</p>
+    </div>
+    <div>
+      <h3>Easy onboarding</h3>
+      <p>Invite teammates with a single-use link. <code>relay login</code> signs in by approving a code in the browser, with no tokens to copy around.</p>
+    </div>
+    <div>
       <h3>Small to run</h3>
       <p>One container plus Postgres, with automatic HTTPS. Upgrades are a <code>git pull</code> and a restart.</p>
     </div>

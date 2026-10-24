@@ -30,6 +30,7 @@ You need a Session Relay server for your team; see [self-hosting](https://relay.
 | `relay show <id>`, `relay pull <id>` | Read a session, or write `.relay/handoff-<id>.md` for your agent |
 | `relay edit <id>` | Change your share: title, summary, next steps, who it's for, PR |
 | `relay pr-comment <id>` | Post the session on its pull request |
+| `relay comment <id> "<text>"` | Leave a note on a session (the next agent reads it) |
 | `relay delete <id>` | Delete your share |
 | `relay members`, `relay invite --link` | Your team; invite links (admins) |
 | `relay setup` | Connect Claude Code, OpenCode, Codex and ZCode |

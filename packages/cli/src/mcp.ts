@@ -16,7 +16,8 @@ const INSTRUCTIONS = `Session Relay shares coding-agent sessions between teammat
 - To continue someone's work: search_sessions or list_sessions, then get_session (mode "tail") and read the summary, next steps and recent conversation before acting.
 - Handoffs assigned to you: list_sessions with for_me.
 - To share this session: write an honest handoff summary (goal, decisions, done, next, open questions; never secrets) and call share_current_session.
-- To fix or extend a share you made (new next steps, PR link, who it's for): update_session.`;
+- To fix or extend a share you made (new next steps, PR link, who it's for): update_session.
+- To leave a note on someone's session (a question, "picked this up", a finding): comment_on_session. Comments show up in get_session.`;
 
 /** Which agent launched us, from the MCP client name. */
 function callerTool(name?: string): SourceTool | undefined {
@@ -37,7 +38,8 @@ function formatList(rows: Awaited<ReturnType<RelayClient["list"]>>["sessions"]):
     .map(
       (s) =>
         `- ${s.id} · "${s.title}" · ${s.author.name} · ${s.tool} · ${s.branch ?? "-"} · ${ago(s.created_at)}` +
-        `${s.assignee ? ` · for ${s.assignee.name}` : ""}${s.pr_url ? ` · ${s.pr_url}` : ""}\n  goal: ${s.goal.slice(0, 200)}`,
+        `${s.assignee ? ` · for ${s.assignee.name}` : ""}${s.pr_url ? ` · ${s.pr_url}` : ""}${s.comment_count ? ` · ${s.comment_count} comments` : ""}` +
+        `\n  goal: ${s.goal.slice(0, 200)}`,
     )
     .join("\n");
 }
@@ -173,6 +175,24 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         return text(
           `Shared as ${id}: "${session.title}" (${session.include}, ${session.messages.length} messages, ${session.visibility.team ? "whole team" : "selected people"}). ${describeRedactions(prepared.built.redactions)}${continues ? `\nContinues ${continues}.` : ""}${args.for ? `\nFor ${args.for}.` : ""}${session.pr_url ? `\nPR ${session.pr_url}.` : ""}\nTeammates can load it with get_session("${id}") or \`relay pull ${id}\`.`,
         );
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "comment_on_session",
+    {
+      description:
+        "Leave a short note on a shared session for the team: a question, a finding, or that you picked it up. Never include secrets.",
+      inputSchema: { id: z.string(), body: z.string().min(1).max(4000) },
+    },
+    async ({ id, body }) => {
+      try {
+        const client = await getClient();
+        await client.comment(id, body);
+        return text(`Commented on ${id}.`);
       } catch (err) {
         return fail(err);
       }

@@ -428,6 +428,33 @@ describe.skipIf(!DB)("API (integration)", () => {
     expect((await call(alice.token, "GET", `/v1/sessions/${id}?mode=summary`)).body.assigned_to).toBeNull();
   });
 
+  it("comments: visible members comment, author or admin deletes, shown on the session and counted in lists", async () => {
+    const repo = "github.com/acme/comments";
+    const id = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo, title: "commented" }) })).body.id;
+    expect((await call(bob.token, "POST", `/v1/sessions/${id}/comments`, { body: "  " })).status).toBe(400);
+    const c1 = (await call(bob.token, "POST", `/v1/sessions/${id}/comments`, { body: "picked this up; tests fail on node 20" })).body.id;
+    await call(alice.token, "POST", `/v1/sessions/${id}/comments`, { body: "thanks!" });
+    // Typed in the web app: secrets are removed on the server.
+    await call(owner.token, "POST", `/v1/sessions/${id}/comments`, { body: "use AKIAIOSFODNN7EXAMPLE for now" });
+    const all = (await call(owner.token, "GET", `/v1/sessions/${id}/comments`)).body.comments;
+    expect(all.at(-1).body).not.toContain("AKIAIOSFODNN7EXAMPLE");
+    await call(owner.token, "DELETE", `/v1/sessions/${id}/comments/${all.at(-1).id}`);
+    const detail = (await call(owner.token, "GET", `/v1/sessions/${id}?mode=summary`)).body;
+    expect(detail.comments.map((c: any) => [c.author.name, c.body])).toEqual([["Bob", "picked this up; tests fail on node 20"], ["Alice", "thanks!"]]);
+    expect((await call(bob.token, "GET", `/v1/sessions?repo=${repo}`)).body.sessions[0].comment_count).toBe(2);
+    expect((await call(alice.token, "DELETE", `/v1/sessions/${id}/comments/${c1}`)).status).toBe(403);
+    expect((await call(outsider.token, "POST", `/v1/sessions/${id}/comments`, { body: "hi" })).status).toBe(404);
+    expect((await call(bob.token, "DELETE", `/v1/sessions/${id}/comments/${c1}`)).status).toBe(200);
+    expect((await call(bob.token, "GET", `/v1/sessions/${id}/comments`)).body.comments).toHaveLength(1);
+    // Private shares: people who can't see the session can't comment on it.
+    const priv = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo, visibility: { team: false, people: [] } }) })).body.id;
+    expect((await call(bob.token, "POST", `/v1/sessions/${priv}/comments`, { body: "x" })).status).toBe(404);
+    // Deleting the share deletes its comments.
+    await call(alice.token, "DELETE", `/v1/sessions/${id}`);
+    const [{ n }] = await sql`SELECT count(*)::int AS n FROM session_comments WHERE session_id = ${id}`;
+    expect(n).toBe(0);
+  });
+
   it("records usage and audit events", async () => {
     const [u] = await sql`SELECT count(*)::int AS n FROM usage_events WHERE org_id = ${orgA} AND kind = 'session.share'`;
     const [a] = await sql`SELECT count(*)::int AS n FROM audit_log WHERE org_id = ${orgA} AND action = 'session.pull'`;

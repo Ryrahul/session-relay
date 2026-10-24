@@ -75,11 +75,16 @@ describe("renderHandoff", () => {
       people: [],
       message_total: 12,
       message_offset: 10,
+      chain: [
+        { id: "rs_a", title: "start retry work", tool: "claude-code", author: { id: "u1", name: "Alice" }, created_at: "2026-10-22T09:00:00.000Z" },
+      ],
+      continued_by: [],
     });
     expect(md).toContain("# fix retry");
     expect(md).toContain("Shared by **Alice** from OpenCode");
     expect(md).toContain("## Next steps\n- n1");
     expect(md).toContain("messages 11–12 of 12");
     expect(md).toContain("> _tool:_ ran `ls`");
+    expect(md).toContain('Continues "start retry work" (Alice, `rs_a`)');
   });
 });

@@ -14,6 +14,12 @@ export function renderHandoff(s: SessionDetail): string {
     "",
     `Shared by **${s.author.name}** from ${TOOL_NAMES[s.source.tool]} · ${when} UTC · \`${s.id}\``,
     `Repo \`${s.repo}\`${s.branch ? ` · branch \`${s.branch}\`` : ""}${s.commit ? ` · commit \`${s.commit}\`` : ""}`,
+    ...(s.chain?.length
+      ? [`Continues ${s.chain.map((c) => `"${c.title}" (${c.author.name}, \`${c.id}\`)`).join(" → ")}`]
+      : []),
+    ...(s.continued_by?.length
+      ? [`Continued by ${s.continued_by.map((c) => `"${c.title}" (${c.author.name}, \`${c.id}\`)`).join(", ")}`]
+      : []),
     "",
     "## Goal",
     s.summary.goal || "(not stated)",

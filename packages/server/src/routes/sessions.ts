@@ -9,6 +9,7 @@ import {
   type Message,
   type SessionDetail,
   type SessionListItem,
+  type ChainLink,
 } from "@session-relay/shared";
 import type { AppEnv, AuthContext } from "../auth.js";
 import { audit, recordUsage } from "../audit.js";
@@ -17,6 +18,7 @@ import { iso, parseBody } from "../http.js";
 import { transcriptKey, type BlobStorage } from "../storage/index.js";
 
 const MAX_LIST = 100;
+const MAX_CHAIN = 20;
 const FULL_PAGE = 200;
 
 /** Rows the caller may see: same org, live, and either team-visible, theirs, or shared with them. */
@@ -66,6 +68,10 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
     const { session: s, transcript } = parseBody(ShareRequest, await c.req.json());
 
     const [settings] = await sql`SELECT retention_days, repo_allowlist FROM org_settings WHERE org_id = ${auth.orgId}`;
+    if (s.continues) {
+      const [parent] = await sql`SELECT s.id FROM sessions s WHERE s.id = ${s.continues} AND ${visible(sql, auth)}`;
+      if (!parent) throw new HTTPException(400, { message: `continues: session ${s.continues} not found or not visible to you` });
+    }
     if (!repoAllowed(settings!.repo_allowlist, s.repo)) {
       throw new HTTPException(403, { message: `Repo ${s.repo} is not on this org's allowlist` });
     }
@@ -83,13 +89,14 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
           INSERT INTO sessions (
             id, org_id, author_id, source_tool, source_version, native_id, repo, branch, commit_sha,
             title, summary, files_touched, messages, include_mode, visibility_team, redactions,
-            transcript_key, transcript_bytes, started_at, expires_at
+            transcript_key, transcript_bytes, started_at, expires_at, continues_session_id
           ) VALUES (
             ${id}, ${auth.orgId}, ${auth.userId}, ${s.source.tool}, ${s.source.version ?? null}, ${s.source.native_id},
             ${s.repo}, ${s.branch ?? null}, ${s.commit ?? null}, ${s.title}, ${tx.json(s.summary)},
             ${s.files_touched}, ${tx.json(messages)}, ${s.include}, ${s.visibility.team}, ${s.redactions},
             ${key}, ${blob?.byteLength ?? null}, ${s.started_at ?? null},
-            now() + make_interval(days => ${settings!.retention_days})
+            now() + make_interval(days => ${settings!.retention_days}),
+            ${s.continues ?? null}
           )
         `;
         if (!s.visibility.team) await setPeople(tx as unknown as Sql, auth.orgId, id, s.visibility.people);
@@ -114,7 +121,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
     const rows = await sql`
       SELECT s.id, s.title, s.repo, s.branch, s.source_tool, s.summary->>'goal' AS goal, s.include_mode,
              jsonb_array_length(s.messages) AS message_count, s.transcript_key IS NOT NULL AS has_full,
-             s.visibility_team, s.created_at, u.id AS author_id, u.name AS author_name
+             s.visibility_team, s.continues_session_id, s.created_at, u.id AS author_id, u.name AS author_name
              ${q.q ? sql`, ts_rank(s.search, websearch_to_tsquery('english', ${q.q})) AS rank` : sql``}
       FROM sessions s JOIN users u ON u.id = s.author_id
       WHERE ${visible(sql, auth)}
@@ -139,6 +146,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       message_count: r.message_count,
       has_full_transcript: r.has_full,
       visibility_team: r.visibility_team,
+      continues_id: r.continues_session_id,
       created_at: r.created_at.toISOString(),
     }));
     return c.json({ sessions });
@@ -175,6 +183,33 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
     const people = await sql`
       SELECT u.id, u.name FROM session_people p JOIN users u ON u.id = p.user_id WHERE p.session_id = ${id}
     `;
+    // Walk up the handoff chain (bounded), keeping only sessions the caller can see.
+    const chain = await sql`
+      WITH RECURSIVE up(id, parent, depth) AS (
+        SELECT id, continues_session_id, 0 FROM sessions WHERE id = ${id} AND org_id = ${auth.orgId}
+        UNION ALL
+        SELECT x.id, x.continues_session_id, up.depth + 1
+        FROM sessions x JOIN up ON x.id = up.parent
+        WHERE up.depth < ${MAX_CHAIN} AND x.org_id = ${auth.orgId}
+      )
+      SELECT s.id, s.title, s.source_tool, s.created_at, u.id AS author_id, u.name AS author_name
+      FROM up JOIN sessions s ON s.id = up.id JOIN users u ON u.id = s.author_id
+      WHERE up.depth > 0 AND ${visible(sql, auth)}
+      ORDER BY up.depth DESC
+    `;
+    const children = await sql`
+      SELECT s.id, s.title, s.source_tool, s.created_at, u.id AS author_id, u.name AS author_name
+      FROM sessions s JOIN users u ON u.id = s.author_id
+      WHERE s.continues_session_id = ${id} AND ${visible(sql, auth)}
+      ORDER BY s.created_at
+    `;
+    const link = (x: (typeof chain)[number]): ChainLink => ({
+      id: x.id,
+      title: x.title,
+      tool: x.source_tool,
+      author: { id: x.author_id, name: x.author_name },
+      created_at: x.created_at.toISOString(),
+    });
     await recordUsage(sql, auth, `session.get.${mode}`);
     if (mode !== "summary") await audit(sql, auth, "session.pull", id, { mode });
 
@@ -200,6 +235,9 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       people: people.map((p) => ({ id: p.id, name: p.name })),
       message_total: all.length,
       message_offset: offset,
+      continues: r.continues_session_id ?? undefined,
+      chain: chain.map(link),
+      continued_by: children.map(link),
     };
     return c.json(body);
   });

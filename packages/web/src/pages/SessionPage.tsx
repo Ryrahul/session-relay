@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { MeResponse, Message, SessionDetail } from "@session-relay/shared";
+import type { ChainLink, MeResponse, Message, SessionDetail } from "@session-relay/shared";
 import { api } from "../api";
 import { ago, dateTime, shortRepo, TOOL_NAMES } from "../format";
 import { RichText } from "../text";
@@ -17,6 +17,41 @@ function Section({ title, items, tone }: { title: string; items: string[]; tone?
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+function ChainCard({ s }: { s: SessionDetail }) {
+  if (!s.chain.length && !s.continued_by.length) return null;
+  const Item = ({ l }: { l: ChainLink }) => (
+    <li className="chain-item">
+      <a href={`#/s/${l.id}`}>{l.title}</a>
+      <span className="chain-meta">
+        <ToolBadge tool={l.tool} /> {l.author.name} · {ago(l.created_at)}
+      </span>
+    </li>
+  );
+  return (
+    <section className="card">
+      <h2>
+        <Icon name="chain" size={14} /> Handoff chain
+      </h2>
+      <ol className="chain">
+        {s.chain.length > 0 && <li className="chain-label">Continues</li>}
+        {s.chain.map((l) => (
+          <Item key={l.id} l={l} />
+        ))}
+        <li className="chain-item chain-current">
+          <span>{s.title}</span>
+          <span className="chain-meta">
+            <ToolBadge tool={s.source.tool} /> {s.author.name} · this session
+          </span>
+        </li>
+        {s.continued_by.length > 0 && <li className="chain-label">Continued by</li>}
+        {s.continued_by.map((l) => (
+          <Item key={l.id} l={l} />
+        ))}
+      </ol>
     </section>
   );
 }
@@ -135,6 +170,12 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
           <Avatar name={s.author.name} size={22} />
           <span>
             <strong>{s.author.name}</strong> shared from {TOOL_NAMES[s.source.tool]} · {ago(s.created_at)}
+            {s.chain.length > 0 && (
+              <>
+                {" · continues "}
+                <a href={`#/s/${s.chain[s.chain.length - 1]!.id}`}>{s.chain[s.chain.length - 1]!.author.name}'s session</a>
+              </>
+            )}
           </span>
         </p>
       </header>
@@ -184,6 +225,7 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
         </div>
 
         <aside className="session-side">
+          <ChainCard s={s} />
           <section className="card">
             <h2>Continue this session</h2>
             <p className="muted small">In your agent:</p>

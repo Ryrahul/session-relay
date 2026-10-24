@@ -60,8 +60,11 @@ export function memberRoutes(sql: Sql) {
     const [target] = await sql`SELECT role FROM memberships WHERE org_id = ${auth.orgId} AND user_id = ${userId}`;
     if (!target) throw new HTTPException(404, { message: "Member not found" });
     if (target.role === "owner") requireRole(auth, "owner");
-    // Tokens and per-person visibility rows cascade from the membership.
-    await sql`DELETE FROM memberships WHERE org_id = ${auth.orgId} AND user_id = ${userId}`;
+    // Tokens and per-person visibility rows cascade from the membership; handoffs for them become unassigned.
+    await sql.begin(async (tx) => {
+      await tx`UPDATE sessions SET assignee_id = NULL WHERE org_id = ${auth.orgId} AND assignee_id = ${userId}`;
+      await tx`DELETE FROM memberships WHERE org_id = ${auth.orgId} AND user_id = ${userId}`;
+    });
     await audit(sql, auth, "member.remove", userId);
     return c.json({ ok: true });
   });

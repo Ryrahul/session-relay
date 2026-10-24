@@ -39,6 +39,13 @@ export const Visibility = z.object({
 });
 export type Visibility = z.infer<typeof Visibility>;
 
+/** A link to a pull/merge request: any http(s) URL. */
+export const PrUrl = z
+  .string()
+  .max(500)
+  .url()
+  .refine((u) => /^https?:\/\//i.test(u), "must be an http(s) URL");
+
 /** Payload the CLI uploads. Already redacted and normalised on the client. */
 export const SessionUpload = z.object({
   source: z.object({
@@ -62,6 +69,10 @@ export const SessionUpload = z.object({
   started_at: z.string().datetime().optional(),
   /** Id of the shared session this one continues (after a /pickup). */
   continues: z.string().max(40).optional(),
+  /** Member this handoff is for (user id). They see it first in /pickup, even when it's private. */
+  assignee: z.string().max(40).optional(),
+  /** Pull request the work belongs to. */
+  pr_url: PrUrl.optional(),
 });
 export type SessionUpload = z.infer<typeof SessionUpload>;
 
@@ -73,5 +84,7 @@ export const SessionRecord = SessionUpload.extend({
   has_full_transcript: z.boolean(),
   created_at: z.string().datetime(),
   expires_at: z.string().datetime().nullable(),
+  /** Set when the share was edited after it was created. */
+  updated_at: z.string().datetime().nullable(),
 });
 export type SessionRecord = z.infer<typeof SessionRecord>;

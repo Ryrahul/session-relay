@@ -371,6 +371,63 @@ describe.skipIf(!DB)("API (integration)", () => {
     expect((await pub("POST", "/v1/auth/device/token", { device_code: "dev_notarealcodenotarealcode" })).status).toBe(404);
   });
 
+  it("edits a share: summary, who it's for and the PR; only author or admin", async () => {
+    const { body } = await call(alice.token, "POST", "/v1/sessions", { session: upload({ title: "edit me", repo: "github.com/acme/edits" }) });
+    const id = body.id;
+    const summary = { goal: "new goal", decisions: ["d1"], done: ["x"], next: ["ship it"], open_questions: [] };
+    expect((await call(bob.token, "PATCH", `/v1/sessions/${id}`, { summary })).status).toBe(403);
+    expect((await call(alice.token, "PATCH", `/v1/sessions/${id}`, { pr_url: "javascript:alert(1)" })).status).toBe(400);
+    expect((await call(alice.token, "PATCH", `/v1/sessions/${id}`, { assignee: outsider.userId })).status).toBe(400);
+    const pr = "https://github.com/acme/edits/pull/42";
+    expect((await call(alice.token, "PATCH", `/v1/sessions/${id}`, { summary, assignee: bob.userId, pr_url: pr })).status).toBe(200);
+    const got = (await call(bob.token, "GET", `/v1/sessions/${id}?mode=summary`)).body;
+    expect(got.summary.goal).toBe("new goal");
+    expect(got.assigned_to).toEqual({ id: bob.userId, name: "Bob" });
+    expect(got.pr_url).toBe(pr);
+    expect(got.updated_at).toBeTruthy();
+    // Search sees the edited summary.
+    const found = (await call(bob.token, "GET", "/v1/sessions?q=ship+it&repo=github.com/acme/edits")).body.sessions;
+    expect(found.map((x: any) => x.id)).toContain(id);
+    // null clears.
+    await call(owner.token, "PATCH", `/v1/sessions/${id}`, { assignee: null, pr_url: null });
+    const cleared = (await call(alice.token, "GET", `/v1/sessions/${id}?mode=summary`)).body;
+    expect(cleared.assigned_to).toBeNull();
+    expect(cleared.pr_url).toBeUndefined();
+  });
+
+  it("handoffs for someone: listed with assignee=me and visible to them even when private", async () => {
+    const r = await call(alice.token, "POST", "/v1/sessions", {
+      session: upload({ title: "for bob only", repo: "github.com/acme/assign", assignee: bob.userId, visibility: { team: false, people: [] } }),
+    });
+    expect(r.status).toBe(201);
+    const mine = (await call(bob.token, "GET", "/v1/sessions?assignee=me")).body.sessions;
+    expect(mine.map((x: any) => x.id)).toEqual([r.body.id]);
+    expect(mine[0].assignee).toEqual({ id: bob.userId, name: "Bob" });
+    expect((await call(bob.token, "GET", `/v1/sessions/${r.body.id}`)).status).toBe(200);
+    expect((await call(owner.token, "GET", "/v1/sessions?assignee=me")).body.sessions).toEqual([]);
+    expect((await call(alice.token, "POST", "/v1/sessions", { session: upload({ assignee: outsider.userId }) })).status).toBe(400);
+  });
+
+  it("filters by touched file and branch, also as file:/branch: in the query", async () => {
+    const repo = "github.com/acme/files";
+    const a = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo, branch: "main", files_touched: ["src/billing/invoice.ts"], title: "invoice rounding" }) })).body.id;
+    const b = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo, branch: "dev", files_touched: ["src/auth/login.ts"], title: "login rounding" }) })).body.id;
+    const ids = async (qs: string) => (await call(bob.token, "GET", `/v1/sessions?repo=${repo}&${qs}`)).body.sessions.map((x: any) => x.id);
+    expect(await ids("file=invoice")).toEqual([a]);
+    expect(await ids("file=src%2Fauth")).toEqual([b]);
+    expect(await ids("file=50%25")).toEqual([]);
+    expect(await ids("q=file%3Ainvoice.ts")).toEqual([a]);
+    expect(await ids("q=rounding+branch%3Adev")).toEqual([b]);
+    expect((await ids("q=rounding")).sort()).toEqual([a, b].sort());
+  });
+
+  it("removing a member unassigns their handoffs", async () => {
+    const carol = await makeUser(orgA, "Carol", "member");
+    const id = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ assignee: carol.userId }) })).body.id;
+    expect((await call(owner.token, "DELETE", `/v1/members/${carol.userId}`)).status).toBe(200);
+    expect((await call(alice.token, "GET", `/v1/sessions/${id}?mode=summary`)).body.assigned_to).toBeNull();
+  });
+
   it("records usage and audit events", async () => {
     const [u] = await sql`SELECT count(*)::int AS n FROM usage_events WHERE org_id = ${orgA} AND kind = 'session.share'`;
     const [a] = await sql`SELECT count(*)::int AS n FROM audit_log WHERE org_id = ${orgA} AND action = 'session.pull'`;

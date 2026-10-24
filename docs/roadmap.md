@@ -16,16 +16,21 @@
 - **Handoff chains**: a share made after `/pickup` links to the session it continues; the web app shows the whole trail.
 - **Invite links**: single-use, expiring, revocable links instead of pasting tokens.
 - **Browser login**: `relay login --server …` signs in by approving a code in the web app.
+- **Edit after sharing**: title, summary, next steps, who it's for and the PR, in the web app, `relay edit` or the `update_session` MCP tool.
+- **Handoffs for someone**: `--for`, `/share for …`; shown as **For you** and checked first by `/pickup`.
+- **Pull request links**: the branch's open PR is attached automatically; `relay pr-comment` posts the session on the PR.
+- **Search by file and branch**: `file:` and `branch:` in any search, `--file` in the CLI.
 
 ## Next
 
-- **Edit after sharing**: fix a share's title, summary, next steps and visibility in the web app.
-- **GitHub PR link**: comment on a PR with the sessions behind it; link the PR from the session page.
+- **Auto-share at session end** (opt-in): a private draft you publish when ready.
+- **Comments** on shared sessions, visible to the agent that picks it up.
+- **Digest** of what the team shared, and **usage stats** per org.
+- **More agents**: Gemini CLI and GitHub Copilot CLI, then Cursor.
 - Prebuilt public Docker image, so self-hosting needs no build.
 - Full live test of Codex with a real session fixture.
 - S3 / Cloudflare R2 storage for full transcripts.
 - Audit log in the web app.
-- More agents: Cursor, Gemini CLI, Aider (adapters welcome).
 
 ## Cloud hosting (coming soon)
 
@@ -42,6 +47,9 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 
 | Version | Date | |
 |---|---|---|
+| CLI `0.4.0` on npm | 2026-10-24 | `relay edit`, `relay pr-comment`, `--for`, `--pr`, `--for-me`, `--file`; MCP `update_session` |
+| Server and web app | 2026-10-24 | Edit after sharing, handoffs for someone, PR links, file and branch search (migration 0006) |
+| CLI `0.3.0` on npm | 2026-10-24 | ZCode support |
 | CLI `0.2.0` on npm | 2026-10-24 | Handoff chains (`--continues`), browser login, `relay invite --link` |
 | Server and web app | 2026-10-24 | Handoff chains, invite links, browser login (migrations 0002, 0003) |
 | CLI `0.1.0` on npm | 2026-10-23 | First public release: adapters for all three agents, sharing, MCP server, `relay setup` |
@@ -58,6 +66,7 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 | Web app | Done; browser-tested flows, light/dark, mobile |
 | Handoff chains | Done; integration and end-to-end tested (CLI + MCP) |
 | Invite links, browser login | Done; integration and browser tested |
+| Edit, assign, PR links, file search | Done; integration, CLI, MCP and browser tested |
 | Self-hosting (Docker, Caddy or nginx) | Done; running in production |
 | Cloudflare Workers | Done; smoke-tested in CI with wrangler dev + Postgres on every PR |
 | CI/CD (deploy branch, rehearsal, backup, rollback) | Done; see [deploy-pipeline.md](deploy-pipeline.md) |

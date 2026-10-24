@@ -17,6 +17,9 @@ export function renderHandoff(s: SessionDetail): string {
     ...(s.chain?.length
       ? [`Continues ${s.chain.map((c) => `"${c.title}" (${c.author.name}, \`${c.id}\`)`).join(" → ")}`]
       : []),
+    ...(s.assigned_to ? [`For **${s.assigned_to.name}**`] : []),
+    ...(s.pr_url ? [`Pull request: ${s.pr_url}`] : []),
+    ...(s.updated_at ? [`Edited ${new Date(s.updated_at).toISOString().slice(0, 16).replace("T", " ")} UTC`] : []),
     ...(s.continued_by?.length
       ? [`Continued by ${s.continued_by.map((c) => `"${c.title}" (${c.author.name}, \`${c.id}\`)`).join(", ")}`]
       : []),

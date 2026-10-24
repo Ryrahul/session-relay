@@ -15,6 +15,10 @@ export interface ListQuery {
   branch?: string;
   tool?: string;
   author?: string;
+  /** "me" or a user id. */
+  assignee?: string;
+  /** Part of a touched file's path. */
+  file?: string;
   q?: string;
   limit?: number;
 }
@@ -60,6 +64,11 @@ export class RelayClient {
   invite(email: string, name: string, role: string) {
     return api<{ user: Member; token: string }>(this.config, "POST", "v1/members", { email, name, role });
   }
+}
+
+/** One member id from a name, email or id. */
+export async function resolvePerson(client: RelayClient, name: string): Promise<string> {
+  return (await resolvePeople(client, [name]))[0]!;
 }
 
 /** Resolves "alice", "alice@x.dev" or a user id to member ids. */

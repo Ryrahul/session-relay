@@ -18,6 +18,7 @@ const SITE_URL = (process.env.SITE_URL ?? "https://relay.rahulweb.online").repla
 // Order and titles for the docs nav. Files not listed are still built.
 const NAV = [
   ["getting-started", "Getting started"],
+  ["features", "Features"],
   ["self-hosting", "Self-hosting"],
   ["cloudflare", "Deploy to Cloudflare"],
   ["agents", "Agents"],
@@ -151,7 +152,7 @@ retry path. Starting with that now.</pre>
     <ol class="how-steps">
       <li><h3>Share</h3><p>Run <code>/share</code> in your agent. It writes a handoff (goal, decisions, done, next steps, open questions) and shares it with the last 30 messages and the files touched. Secrets are removed on your laptop first.</p></li>
       <li><h3>Find</h3><p>Everything your team shares is in one place. Search it from the web app, the <code>relay</code> CLI, or straight from your agent.</p></li>
-      <li><h3>Pick up</h3><p>Run <code>/pickup</code>. The agent reads the handoff, checks the current code, tells you where things stand and continues, in any of the three tools.</p></li>
+      <li><h3>Pick up</h3><p>Run <code>/pickup</code>. The agent reads the handoff, checks the current code, tells you where things stand and continues, in any of the four agents.</p></li>
     </ol>
   </section>
 
@@ -177,8 +178,16 @@ retry path. Starting with that now.</pre>
       <p>Invite teammates with a single-use link. <code>relay login</code> signs in by approving a code in the browser, with no tokens to copy around.</p>
     </div>
     <div>
+      <h3>Handoffs for someone</h3>
+      <p>Share "for Akshat" and it shows up as <b>For you</b> in their list; <code>/pickup</code> checks their handoffs first. Edit a share any time: next steps, title, who it's for.</p>
+    </div>
+    <div>
+      <h3>Linked to your PRs</h3>
+      <p>Shares pick up the branch's open pull request automatically. Find every session that touched a file with <code>file:src/billing.ts</code>.</p>
+    </div>
+    <div>
       <h3>Small to run</h3>
-      <p>One container plus Postgres, with automatic HTTPS. Upgrades are a <code>git pull</code> and a restart.</p>
+      <p>One container plus Postgres with automatic HTTPS, or Cloudflare Workers with no server at all. Upgrades are a <code>git pull</code> and a restart.</p>
     </div>
   </section>
 
@@ -218,7 +227,7 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 
 <span class="faint"># on each laptop</span>
 npm install -g session-relay
-relay login --server https://relay.your-team.com --token srk_…
+relay login --server https://relay.your-team.com   <span class="faint"># approve in the browser</span>
 relay setup                           <span class="faint"># adds /share and /pickup to your agents</span></code></pre>
     <p><a href="docs/getting-started.html">Full getting-started guide →</a></p>
   </section>

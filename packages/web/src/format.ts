@@ -58,3 +58,10 @@ export function parseRoute(hash: string): Route {
   if (hash.startsWith("#/settings")) return { page: "settings" };
   return { page: "sessions" };
 }
+
+/** "github.com/acme/api/pull/42" → "acme/api#42"; other URLs → their host and path. */
+export function prLabel(url: string): string {
+  const m = /^https?:\/\/[^/]+\/(.+?)\/(?:pull|merge_requests|pull-requests)\/(\d+)/.exec(url);
+  if (m) return `${m[1]!.split("/").slice(-2).join("/")}#${m[2]}`;
+  return url.replace(/^https?:\/\//, "");
+}

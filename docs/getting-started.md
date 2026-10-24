@@ -71,15 +71,26 @@ You can add instructions:
 
 ```
 /share only Bob
+/share for Akshat              # a handoff for them: first in their /pickup
 /share full transcript
 /share title: payment retry, half done
 ```
+
+If your branch has an open pull request (and the GitHub CLI `gh` is installed), the share links to it.
 
 Or share from a terminal, inside the repo:
 
 ```sh
 relay share               # pick a session, choose what to include and who sees it
 relay share --dry-run     # see exactly what would be uploaded, upload nothing
+relay share --for akshat  # a handoff for someone
+```
+
+Changed your mind? Edit a share later in the web app (**Edit** on the session), with `relay edit`, or ask your agent ("add a next step to my last share"):
+
+```sh
+relay edit rs_7KQ2M9XA --add-next "load-test the retry path" --for bob
+relay pr-comment rs_7KQ2M9XA    # post a link to the session on its pull request
 ```
 
 ## 5. Pick up a session
@@ -87,6 +98,7 @@ relay share --dry-run     # see exactly what would be uploaded, upload nothing
 In your agent:
 
 ```
+/pickup                        # handoffs for you first
 /pickup alice's webhook retry work
 /pickup rs_7KQ2M9XA
 ```
@@ -97,7 +109,9 @@ From a terminal:
 
 ```sh
 relay list                     # shared sessions for this repo
+relay list --for-me            # handoffs for you, any repo
 relay search "idempotency"
+relay search "file:src/webhooks.ts"   # every session that touched a file
 relay pull rs_7KQ2M9XA         # writes .relay/handoff-rs_7KQ2M9XA.md
 ```
 
@@ -108,7 +122,9 @@ Then tell any agent: *"Read .relay/handoff-rs_7KQ2M9XA.md and continue."*
 Open your server's address in a browser and sign in with your token. You can:
 
 - browse, search and read shared sessions, including the full conversation and tool calls
-- add teammates and create or revoke your own tokens
+- filter to **For me**, by agent, by repo, or search `file:` and `branch:`
+- **Edit** your shares: title, summary, next steps, who it's for, the pull request
+- invite teammates with a link (admins), and create or revoke your own tokens
 - if you're an admin, change org settings: retention, allowed repositories, extra secret patterns
 
 **Get started** in the web app shows the commands above with your server's address filled in.

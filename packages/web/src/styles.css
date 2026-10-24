@@ -238,7 +238,19 @@ button:disabled { cursor: default; opacity: 0.55; }
 .chain-current > span:first-child { font-weight: 600; overflow-wrap: anywhere; }
 .chain-meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--faint); font-size: 12.5px; }
 .chain-label { font-size: 11px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--faint); margin-bottom: -6px; }
-.row-badges { display: inline-flex; gap: 6px; flex: none; }
+.row-badges { display: inline-flex; gap: 6px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+.badge-accent { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+a.badge-link { color: var(--muted); text-decoration: none; }
+a.badge-link:hover { color: var(--accent); }
+.session-meta-top .push { margin-left: auto; }
+.edit-panel { display: grid; gap: 12px; border-color: var(--accent); }
+.items-field { border: 0; padding: 0; margin: 0; }
+.items-field legend { font-size: 13px; font-weight: 600; color: var(--muted); padding: 0; margin-bottom: 6px; }
+.item-row { display: flex; gap: 6px; align-items: flex-start; }
+.item-row textarea { flex: 1; min-height: 38px; }
+.add-item { justify-self: start; }
+.edit-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 12px; }
+@media (max-width: 640px) { .edit-row { grid-template-columns: 1fr; } }
 .files { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
 .files li { display: flex; gap: 6px; align-items: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 .files svg { flex: none; }

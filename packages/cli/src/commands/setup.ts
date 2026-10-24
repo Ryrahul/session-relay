@@ -21,7 +21,7 @@ First write a handoff for a teammate who will continue this work, based on this 
 - open_questions: anything unresolved
 Never include secrets, tokens or passwords.
 
-Then call \`share_current_session\` with those fields. If this session continued a teammate's shared session you loaded earlier, it is linked automatically; if the work is unrelated, pass \`continues: "none"\`. Extra instructions from the user (title, who should see it, "full transcript"): $ARGUMENTS
+Then call \`share_current_session\` with those fields. If the user says who it's for ("for Akshat"), pass \`for\`. If this session continued a teammate's shared session you loaded earlier, it is linked automatically; if the work is unrelated, pass \`continues: "none"\`. Extra instructions from the user (title, who should see it, "full transcript"): $ARGUMENTS
 
 Reply with the share id and title only.
 `;
@@ -31,7 +31,7 @@ description: Load a teammate's shared session and continue it (Session Relay)
 ---
 Load a teammate's shared session and continue it. Request: $ARGUMENTS
 
-Use the relay MCP tools: \`search_sessions\` or \`list_sessions\` to find the best match for this repo, then \`get_session\` with mode "tail".
+Use the relay MCP tools. If the request is empty, first check \`list_sessions\` with \`for_me: true\` (handoffs assigned to me). Otherwise use \`search_sessions\` or \`list_sessions\` to find the best match for this repo. Then \`get_session\` with mode "tail".
 Read the goal, decisions, next steps and recent conversation. Check the current state of the code (git status, the files touched) before changing anything.
 Then say in a few lines where things stand and continue with the first next step.
 `;

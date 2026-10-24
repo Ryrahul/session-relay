@@ -147,7 +147,11 @@ export function Members({ me }: { me: MeResponse }) {
       {isAdmin && (
         <details className="card add-direct">
           <summary>
-            <h2>Or add someone directly</h2>
+            <Icon name="chevron" size={14} />
+            <span>
+              <h2>Or add someone directly</h2>
+              <span className="faint small"> Get a login command for them instead of a link (for scripts, CI, or people without a browser).</span>
+            </span>
           </summary>
           <form className="invite-form" onSubmit={invite}>
             <div className="field">

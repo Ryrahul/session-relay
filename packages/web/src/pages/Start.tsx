@@ -28,7 +28,7 @@ export function Start({ me }: { me: MeResponse }) {
             <p className="muted">It opens this site in your browser; approve the code it shows and you're in.</p>
             <Command>{`relay login --server ${server}`}</Command>
             <p className="hint">
-              No browser on that machine? Create a token in <a href="#/settings">Settings</a> and add <code>--token srk_…</code>.
+              No browser on that machine? Create a token in <a href="#/settings/tokens">Settings → Tokens</a> and add <code>--token srk_…</code>.
             </p>
           </div>
         </li>
@@ -73,6 +73,15 @@ export function Start({ me }: { me: MeResponse }) {
           </li>
           <li>
             By default a share has the summary and the last 30 messages. Ask for <code>/share full transcript</code> to include everything.
+          </li>
+          <li>
+            Hand it to someone: <code>/share for Bob</code>. It shows as <strong>For you</strong> in their list and their <code>/pickup</code> finds it first.
+          </li>
+          <li>
+            Attach your uncommitted changes: <code>/share with the diff</code>. Your teammate gets a patch they can <code>git apply</code>.
+          </li>
+          <li>
+            Added an agent later? <code>relay setup --tools gemini</code> sets up just that one.
           </li>
           <li>
             From a terminal: <code>relay list</code>, <code>relay search "…"</code>, <code>relay pull &lt;id&gt;</code>. See the{" "}

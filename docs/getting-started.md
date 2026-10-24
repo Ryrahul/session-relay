@@ -37,9 +37,9 @@ npm link -w session-relay
 relay login --server https://relay.your-team.com
 ```
 
-It opens the site in your browser and shows a code like `KDQX-7MRA`. Check the browser shows the same code, click **Approve**, and the CLI is signed in. On a machine without a browser, it prints the link to open anywhere you're signed in; or create a token in **Settings** and use `relay login --server … --token srk_…`.
+It opens the site in your browser and shows a code like `KDQX-7MRA`. Check the browser shows the same code, click **Approve**, and the CLI is signed in. On a machine without a browser, it prints the link to open anywhere you're signed in; or create a token in **Settings → Tokens** and use `relay login --server … --token srk_…`.
 
-The CLI's token is saved in `~/.config/session-relay/config.json`, readable only by you. It appears in **Settings → Your tokens** as `CLI · you@your-machine`, so you can revoke a lost laptop.
+The CLI's token is saved in `~/.config/session-relay/config.json`, readable only by you. It appears in **Settings → Tokens** as `CLI · you@your-machine`, so you can revoke a lost laptop.
 
 ## 3. Connect your agents
 
@@ -134,14 +134,21 @@ To catch up on what the team did: `relay digest` (or `--days 7`), the **Activity
 Open your server's address in a browser and sign in with your token. You can:
 
 - browse, search and read shared sessions, including the full conversation and tool calls
-- filter to **For me**, by agent, by repo, or search `file:` and `branch:`
-- **Edit** your shares: title, summary, next steps, who it's for, the pull request
+- switch between **All**, **For me** (handoffs shared for you), **Shared by me** and **My drafts**; filter by agent and repo, or search `file:` and `branch:`
+- **Edit** your shares: title, summary, next steps, who it's for, the pull request, template sections
 - **Comment** on any session you can see
 - see **Activity** (what the team shared, picked up and discussed) and **Stats** (who shares and picks up, by agent and repo)
-- **download** a session as Markdown or JSON, or export many from **Settings → Export**
-- admins: the **Audit log** of everything that happened
-- invite teammates with a link (admins), and create or revoke your own tokens
-- if you're an admin, change org settings: retention, allowed repositories, extra secret patterns
+- **download** a session as Markdown or JSON
+- invite teammates with a link (admins, **Members**)
+- **Settings**, in tabs:
+  - **General**: the org's name and how long shares are kept
+  - **Privacy**: allowed repositories, extra secret patterns, and a box to test them on sample text
+  - **Handoff templates**: sections every handoff in a repo should have ([how](agents.md#handoff-templates))
+  - **Tokens**: create or revoke your own
+  - **Export**: download many sessions at once
+- admins: the **Audit log** of everything that happened, in plain words
+
+Members can see every Settings tab; only admins can change the org's settings.
 
 **Get started** in the web app shows the commands above with your server's address filled in.
 

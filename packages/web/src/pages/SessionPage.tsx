@@ -325,14 +325,14 @@ function DiffCard({ s }: { s: SessionDetail }) {
         <span className="muted">
           {s.diff.files} file{s.diff.files === 1 ? "" : "s"} · <span className="add">+{s.diff.additions}</span> <span className="del">−{s.diff.deletions}</span>
         </span>
-        {!files && (
-          <button type="button" className="btn-ghost btn-sm" onClick={load}>
-            Show changes
+        <span className="head-actions">
+          <button type="button" className="btn-ghost btn-sm" aria-expanded={Boolean(files)} onClick={() => (files ? setFiles(null) : load())}>
+            <Icon name={files ? "up" : "down"} size={14} /> {files ? "Hide" : "Show"} changes
           </button>
-        )}
-        <button type="button" className="btn-ghost btn-sm" onClick={() => download(`/v1/sessions/${s.id}/diff`, `${s.id}.patch`).catch((e) => setError(e.message))}>
-          <Icon name="download" size={14} /> .patch
-        </button>
+          <button type="button" className="btn-ghost btn-sm" onClick={() => download(`/v1/sessions/${s.id}/diff`, `${s.id}.patch`).catch((e) => setError(e.message))}>
+            <Icon name="download" size={14} /> .patch
+          </button>
+        </span>
       </div>
       <p className="muted small">
         The author's working tree when they shared. Apply it with <code>relay pull {s.id}</code> then <code>git apply</code>.

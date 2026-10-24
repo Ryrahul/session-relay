@@ -45,14 +45,14 @@ Every message and summary passes through a redactor **on your machine** before u
 - env-style assignments: `*_SECRET=`, `*_TOKEN=`, `*_PASSWORD=`, `*_API_KEY=`, …
 - quoted values of keys named like secrets: `"apiKey": "..."`
 - Session Relay tokens (`srk_…`)
-- **your org's own patterns**, set by admins in **Settings → Extra secret patterns**
+- **your org's own patterns**, set by admins in **Settings → Privacy → Secret redaction**
 
 The number of redactions is shown when you share and on the session page. Redaction is a safety net, not a guarantee. Don't paste secrets into agent sessions you plan to share.
 
 ## Who can see a share
 
 - Sessions belong to your **org**. Nobody outside it can list, read or even confirm that a session exists. That's enforced on every query and covered by tests.
-- Admins can test the built-in rules and the org's patterns on sample text in **Settings → Extra secret patterns → Test patterns** (runs in the browser; nothing is sent). `relay share --dry-run` lists each redaction with surrounding (already redacted) text.
+- Admins can test the built-in rules and the org's patterns on sample text in **Settings → Privacy → Test on sample text** (runs in the browser; nothing is sent). `relay share --dry-run` lists each redaction with surrounding (already redacted) text.
 - Full transcripts are searchable: when a full transcript is shared, an index of its words (not the text) is stored in Postgres next to the share and deleted with it.
 - Inside the org, a share is visible to **everyone** (default) or only to **selected people** (`/share only Bob`, `--people`). A handoff **for** someone (`--for`) is always visible to that person too.
 - Comments are visible to everyone who can see the session. Secrets are removed from them (by the CLI, and again on the server for comments typed in the web app). Only a comment's author or an admin can delete it.
@@ -77,12 +77,12 @@ The number of redactions is shown when you share and on the session page. Redact
 
 - Tokens are personal, one person in one org, and start with `srk_`.
 - The server stores only a SHA-256 hash. A token is shown once, when it's created.
-- Create one per laptop and revoke a lost one in **Settings → Your tokens**.
+- Create one per laptop and revoke a lost one in **Settings → Tokens**.
 - Removing a member revokes all their tokens immediately.
 
 ## Retention and deletion
 
-- Shares expire after the org's retention period (default **90 days**; set in **Settings**). Expired shares and their transcripts are deleted by the server automatically.
+- Shares expire after the org's retention period (default **90 days**; set in **Settings → General**). Expired shares and their transcripts are deleted by the server automatically.
 - Deleting a share removes its messages and transcript immediately. Handoff files already pulled to someone's laptop are not recalled.
 
 ## Audit and usage

@@ -116,7 +116,7 @@ export function App() {
         {route.page === "audit" && <Audit me={me} />}
         {route.page === "start" && <Start me={me} />}
         {route.page === "members" && <Members me={me} />}
-        {route.page === "settings" && <Settings me={me} onOrgChanged={refreshMe} />}
+        {route.page === "settings" && <Settings me={me} tab={route.tab} onOrgChanged={refreshMe} />}
       </main>
     </div>
   );

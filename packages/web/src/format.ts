@@ -38,6 +38,8 @@ export function shortRepo(repo: string): string {
 
 /** Hash routes. */
 export type Route =
+  | { page: "join"; secret: string }
+  | { page: "device"; code: string }
   | { page: "sessions" }
   | { page: "session"; id: string }
   | { page: "start" }
@@ -45,6 +47,10 @@ export type Route =
   | { page: "settings" };
 
 export function parseRoute(hash: string): Route {
+  const join = /^#\/join\/([\w-]+)/.exec(hash);
+  if (join) return { page: "join", secret: join[1]! };
+  const device = /^#\/device\/([\w-]+)/.exec(hash);
+  if (device) return { page: "device", code: device[1]! };
   const m = /^#\/s\/([\w-]+)/.exec(hash);
   if (m) return { page: "session", id: m[1]! };
   if (hash.startsWith("#/start")) return { page: "start" };

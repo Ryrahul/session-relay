@@ -8,6 +8,8 @@ import { SessionPage } from "./pages/SessionPage";
 import { Sessions } from "./pages/Sessions";
 import { Settings } from "./pages/Settings";
 import { Setup } from "./pages/Setup";
+import { Device } from "./pages/Device";
+import { Join } from "./pages/Join";
 import { Start } from "./pages/Start";
 import { Avatar, Icon, Mark, ThemeSwitch, useTheme } from "./ui";
 
@@ -49,10 +51,11 @@ export function App() {
   const signOut = useCallback(() => {
     setToken(null);
     setMe(null);
-    location.hash = "#/";
+    if (!location.hash.startsWith("#/device/")) location.hash = "#/";
   }, []);
 
   if (checking) return <div className="boot" aria-busy="true" />;
+  if (route.page === "join" && !me) return <Join key={route.secret} secret={route.secret} onDone={setMe} />;
   if (!me && needsSetup)
     return (
       <Setup
@@ -64,7 +67,7 @@ export function App() {
     );
   if (!me) return <Login onSignedIn={setMe} />;
 
-  const active = route.page === "session" ? "sessions" : route.page;
+  const active = route.page === "session" || route.page === "device" || route.page === "join" ? "sessions" : route.page;
 
   return (
     <div className="app">
@@ -99,7 +102,8 @@ export function App() {
         </div>
       </aside>
       <main className="content">
-        {route.page === "sessions" && <Sessions me={me} />}
+        {(route.page === "sessions" || route.page === "join") && <Sessions me={me} />}
+        {route.page === "device" && <Device key={route.code} code={route.code} me={me} />}
         {route.page === "session" && <SessionPage id={route.id} me={me} />}
         {route.page === "start" && <Start me={me} />}
         {route.page === "members" && <Members me={me} />}

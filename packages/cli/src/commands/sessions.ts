@@ -186,8 +186,15 @@ export async function members(): Promise<void> {
   for (const m of members) console.log(`${m.name.padEnd(20)} ${m.email.padEnd(30)} ${m.role}`);
 }
 
-export async function invite(email: string, opts: { name: string; role?: string }): Promise<void> {
+export async function invite(email: string | undefined, opts: { name?: string; role?: string; link?: boolean; days?: string }): Promise<void> {
   const client = await RelayClient.fromConfig();
+  if (opts.link || !email) {
+    const r = await client.inviteLink(opts.role ?? "member", Number(opts.days ?? 7));
+    const until = new Date(r.expires_at).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    console.log(`Invite link (${r.role}, works once, expires ${until}). Send it to one person:\n  ${r.url}`);
+    return;
+  }
+  if (!opts.name) throw new Error("Add --name, or use --link to create an invite link instead.");
   const { user, token } = await client.invite(email, opts.name, opts.role ?? "member");
   console.log(`Added ${user.name} <${user.email}> as ${user.role}.`);
   console.log(`\nSend them this privately (shown once):\n  relay login --server ${client.config.server} --token ${token}`);

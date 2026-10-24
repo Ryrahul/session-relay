@@ -54,6 +54,9 @@ export class RelayClient {
   members() {
     return api<{ members: Member[] }>(this.config, "GET", "v1/members");
   }
+  inviteLink(role: string, expiresDays: number) {
+    return api<{ id: string; url: string; role: string; expires_at: string }>(this.config, "POST", "v1/invites", { role, expires_days: expiresDays });
+  }
   invite(email: string, name: string, role: string) {
     return api<{ user: Member; token: string }>(this.config, "POST", "v1/members", { email, name, role });
   }

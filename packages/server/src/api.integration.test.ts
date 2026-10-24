@@ -282,6 +282,95 @@ describe.skipIf(!DB)("API (integration)", () => {
     expect(asOwner.body.chain).toEqual([]);
   });
 
+  const pub = (method: string, route: string, body?: unknown) =>
+    app.request(route, { method, headers: { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) })
+      .then(async (r) => ({ status: r.status, body: (await r.json()) as any }));
+
+  it("invite links: admins only, single use, joins with the right role", async () => {
+    expect((await call(alice.token, "POST", "/v1/invites", {})).status).toBe(403);
+    expect((await call(owner.token, "POST", "/v1/invites", { role: "owner" })).status).toBe(201);
+    const inv = await call(owner.token, "POST", "/v1/invites", { role: "admin", expires_days: 3, note: "for dana" });
+    expect(inv.status).toBe(201);
+    expect(inv.body.url).toMatch(/\/#\/join\/inv_[A-Za-z0-9_-]{20,}$/);
+    const secret = inv.body.url.split("/join/")[1];
+
+    const info = await pub("GET", `/v1/join/${secret}`);
+    expect(info.status).toBe(200);
+    expect(info.body.role).toBe("admin");
+    expect(typeof info.body.org).toBe("string");
+
+    const joined = await pub("POST", `/v1/join/${secret}`, { name: "Dana", email: "Dana@Example.dev" });
+    expect(joined.status).toBe(201);
+    const me = await call(joined.body.token, "GET", "/v1/me");
+    expect(me.body).toMatchObject({ role: "admin", user: { name: "Dana", email: "dana@example.dev" }, org: { id: orgA } });
+
+    // Single use, and the link can't be read again.
+    expect((await pub("POST", `/v1/join/${secret}`, { name: "Eve", email: "eve2@example.dev" })).status).toBe(404);
+    expect((await pub("GET", `/v1/join/${secret}`)).status).toBe(404);
+    expect((await pub("GET", "/v1/join/inv_madeupmadeupmadeupmadeup")).status).toBe(404);
+
+    const list = await call(owner.token, "GET", "/v1/invites");
+    expect(list.body.invites.find((i: any) => i.id === inv.body.id)).toMatchObject({ status: "used", used_by: "Dana", note: "for dana" });
+    expect((await call(outsider.token, "GET", "/v1/invites")).body.invites).toEqual([]);
+  });
+
+  it("invite links: revoked and expired links don't work; concurrent use only succeeds once", async () => {
+    const a = await call(owner.token, "POST", "/v1/invites", {});
+    expect((await call(outsider.token, "DELETE", `/v1/invites/${a.body.id}`)).status).toBe(404);
+    expect((await call(owner.token, "DELETE", `/v1/invites/${a.body.id}`)).status).toBe(200);
+    expect((await pub("POST", `/v1/join/${a.body.url.split("/join/")[1]}`, { name: "X", email: "x1@example.dev" })).status).toBe(404);
+
+    const b = await call(owner.token, "POST", "/v1/invites", {});
+    await sql`UPDATE invites SET expires_at = now() - interval '1 minute' WHERE id = ${b.body.id}`;
+    expect((await pub("POST", `/v1/join/${b.body.url.split("/join/")[1]}`, { name: "X", email: "x2@example.dev" })).status).toBe(404);
+
+    const c = await call(owner.token, "POST", "/v1/invites", {});
+    const s = c.body.url.split("/join/")[1];
+    const results = await Promise.all([
+      pub("POST", `/v1/join/${s}`, { name: "Race 1", email: "race1@example.dev" }),
+      pub("POST", `/v1/join/${s}`, { name: "Race 2", email: "race2@example.dev" }),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual([201, 404]);
+  });
+
+  it("browser login: approve once, token handed out once, in the approver's org", async () => {
+    const start = await pub("POST", "/v1/auth/device", { client_name: "Bob's MacBook" });
+    expect(start.status).toBe(201);
+    expect(start.body.user_code).toMatch(/^[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+    expect(start.body.verification_url).toContain(`/#/device/${start.body.user_code}`);
+    const poll = () => pub("POST", "/v1/auth/device/token", { device_code: start.body.device_code });
+
+    expect((await poll()).body.status).toBe("pending");
+    expect((await pub("GET", `/v1/auth/device/${start.body.user_code}`)).status).toBe(401);
+    const info = await call(bob.token, "GET", `/v1/auth/device/${start.body.user_code.toLowerCase().replace("-", "")}`);
+    expect(info.body.client_name).toBe("Bob's MacBook");
+
+    expect((await call(bob.token, "POST", "/v1/auth/device/approve", { user_code: start.body.user_code })).status).toBe(200);
+    const done = await poll();
+    expect(done.body.status).toBe("approved");
+    const me = await call(done.body.token, "GET", "/v1/me");
+    expect(me.body).toMatchObject({ user: { name: "Bob" }, org: { id: orgA } });
+    expect((await poll()).status).toBe(410); // handed out once
+    expect((await call(alice.token, "POST", "/v1/auth/device/approve", { user_code: start.body.user_code })).status).toBe(404);
+    const tokens = await call(bob.token, "GET", "/v1/tokens");
+    expect(tokens.body.tokens.some((t: any) => t.name === "CLI · Bob's MacBook")).toBe(true);
+  });
+
+  it("browser login: denied and expired codes never yield a token", async () => {
+    const d = await pub("POST", "/v1/auth/device", { client_name: "suspicious" });
+    await call(owner.token, "POST", "/v1/auth/device/deny", { user_code: d.body.user_code });
+    const denied = await pub("POST", "/v1/auth/device/token", { device_code: d.body.device_code });
+    expect(denied.status).toBe(403);
+    expect(denied.body.status).toBe("denied");
+    expect((await call(owner.token, "POST", "/v1/auth/device/approve", { user_code: d.body.user_code })).status).toBe(404);
+
+    const e = await pub("POST", "/v1/auth/device", {});
+    await sql`UPDATE device_logins SET expires_at = now() - interval '1 second' WHERE user_code = ${e.body.user_code}`;
+    expect((await call(owner.token, "POST", "/v1/auth/device/approve", { user_code: e.body.user_code })).status).toBe(404);
+    expect((await pub("POST", "/v1/auth/device/token", { device_code: e.body.device_code })).body.status).toBe("expired");
+    expect((await pub("POST", "/v1/auth/device/token", { device_code: "dev_notarealcodenotarealcode" })).status).toBe(404);
+  });
+
   it("records usage and audit events", async () => {
     const [u] = await sql`SELECT count(*)::int AS n FROM usage_events WHERE org_id = ${orgA} AND kind = 'session.share'`;
     const [a] = await sql`SELECT count(*)::int AS n FROM audit_log WHERE org_id = ${orgA} AND action = 'session.pull'`;

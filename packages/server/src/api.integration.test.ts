@@ -243,6 +243,45 @@ describe.skipIf(!DB)("API (integration)", () => {
     await call(owner.token, "PATCH", "/v1/org", { retention_days: 90, repo_allowlist: [], redaction_patterns: [] });
   });
 
+  it("links handoff chains and shows them on both ends", async () => {
+    const a = await call(alice.token, "POST", "/v1/sessions", { session: upload({ title: "chain A" }) });
+    const b = await call(bob.token, "POST", "/v1/sessions", { session: upload({ title: "chain B", continues: a.body.id }) });
+    expect(b.status).toBe(201);
+    const c = await call(owner.token, "POST", "/v1/sessions", { session: upload({ title: "chain C", continues: b.body.id }) });
+
+    const detailC = await call(alice.token, "GET", `/v1/sessions/${c.body.id}?mode=summary`);
+    expect(detailC.body.continues).toBe(b.body.id);
+    expect(detailC.body.chain.map((x: any) => x.title)).toEqual(["chain A", "chain B"]);
+    expect(detailC.body.chain[1]).toMatchObject({ author: { name: "Bob" }, tool: "claude-code" });
+    expect(detailC.body.continued_by).toEqual([]);
+
+    const detailA = await call(bob.token, "GET", `/v1/sessions/${a.body.id}?mode=summary`);
+    expect(detailA.body.chain).toEqual([]);
+    expect(detailA.body.continued_by.map((x: any) => x.title)).toEqual(["chain B"]);
+
+    const list = await call(alice.token, "GET", "/v1/sessions?q=chain");
+    expect(list.body.sessions.find((x: any) => x.id === c.body.id).continues_id).toBe(b.body.id);
+
+    // Deleting the middle link keeps the rest of the trail readable.
+    await call(bob.token, "DELETE", `/v1/sessions/${b.body.id}`);
+    const after = await call(alice.token, "GET", `/v1/sessions/${c.body.id}?mode=summary`);
+    expect(after.body.chain.map((x: any) => x.title)).toEqual(["chain A"]);
+  });
+
+  it("only continues sessions you can see, in your org", async () => {
+    const priv = await call(alice.token, "POST", "/v1/sessions", { session: upload({ title: "only bob", visibility: { team: false, people: [bob.userId] } }) });
+    const denied = await call(owner.token, "POST", "/v1/sessions", { session: upload({ continues: priv.body.id }) });
+    expect(denied.status).toBe(400);
+    expect(denied.body.error).toMatch(/not visible/);
+    expect((await call(bob.token, "POST", "/v1/sessions", { session: upload({ continues: priv.body.id }) })).status).toBe(201);
+    const other = await call(outsider.token, "POST", "/v1/sessions", { session: upload({ continues: priv.body.id }) });
+    expect(other.status).toBe(400);
+    // A private parent stays hidden from people who can't see it, even in someone else's chain.
+    const child = await call(bob.token, "POST", "/v1/sessions", { session: upload({ title: "public child", continues: priv.body.id }) });
+    const asOwner = await call(owner.token, "GET", `/v1/sessions/${child.body.id}?mode=summary`);
+    expect(asOwner.body.chain).toEqual([]);
+  });
+
   it("records usage and audit events", async () => {
     const [u] = await sql`SELECT count(*)::int AS n FROM usage_events WHERE org_id = ${orgA} AND kind = 'session.share'`;
     const [a] = await sql`SELECT count(*)::int AS n FROM audit_log WHERE org_id = ${orgA} AND action = 'session.pull'`;

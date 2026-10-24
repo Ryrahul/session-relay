@@ -124,11 +124,18 @@ export function Sessions({ me }: { me: MeResponse }) {
                 <a href={`#/s/${s.id}`} className="session-row">
                   <div className="row-top">
                     <span className="row-title">{s.title}</span>
-                    {!s.visibility_team && (
-                      <span className="badge" title="Only visible to selected people">
-                        <Icon name="lock" size={12} /> Private
-                      </span>
-                    )}
+                    <span className="row-badges">
+                      {s.continues_id && (
+                        <span className="badge" title="Continues an earlier shared session">
+                          <Icon name="chain" size={12} /> Continues
+                        </span>
+                      )}
+                      {!s.visibility_team && (
+                        <span className="badge" title="Only visible to selected people">
+                          <Icon name="lock" size={12} /> Private
+                        </span>
+                      )}
+                    </span>
                   </div>
                   {s.goal && s.goal !== s.title && <p className="row-goal">{s.goal}</p>}
                   <div className="row-meta">

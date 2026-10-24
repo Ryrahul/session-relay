@@ -31,6 +31,7 @@ The config is at `~/.config/session-relay/config.json` (mode `600`). Override it
 | `--tail <n>` | Messages to keep with `summary+tail` (default 30) |
 | `--title <title>` | Title teammates see |
 | `--people <names>` | Comma-separated names or emails. Default: the whole team |
+| `--continues <id>` | Shared session this work continues. Default: the one you last picked up in this repo (within 7 days). `none` to unlink |
 | `--summary-file <file>` | JSON `{goal, decisions, done, next, open_questions}`. Without it, the summary is the first request and the last answer |
 | `--dry-run` | Write what would be uploaded to `.relay/dry-run-*.json` and stop |
 | `-y, --yes` | Don't ask questions |

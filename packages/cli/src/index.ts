@@ -40,6 +40,7 @@ program
   .option("--dry-run", "write what would be uploaded to .relay/ and stop")
   .option("-y, --yes", "don't ask questions")
   .option("--json", "print the result as JSON")
+  .option("--continues <id>", 'shared session this continues (default: the one you last picked up here; "none" to unlink)')
   .action(share);
 
 const listOpts = (cmd: Command) =>

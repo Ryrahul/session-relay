@@ -4,7 +4,9 @@ import type { IncludeMode, SourceTool, Summary } from "@session-relay/shared";
 import { ADAPTERS, findSessions, type SessionRef } from "./adapters/index.js";
 import { buildShare, type BuiltShare } from "./build.js";
 import { resolvePeople, type RelayClient } from "./client.js";
+import { ApiError } from "./api.js";
 import { repoInfo, type RepoInfo } from "./git.js";
+import { forgetPickup, resolveContinues } from "./pickups.js";
 
 export interface ShareInput {
   cwd?: string;
@@ -18,12 +20,16 @@ export interface ShareInput {
   title?: string;
   /** Empty means the whole team. */
   people?: string[];
+  /** Session id this continues, "none", or undefined to use the last pickup in this repo. */
+  continues?: string;
 }
 
 export interface PreparedShare {
   repo: RepoInfo;
   ref: SessionRef;
   built: BuiltShare;
+  /** True when `continues` came from a remembered pickup rather than the caller. */
+  continuesAuto: boolean;
 }
 
 export async function pickSession(repo: RepoInfo, tool?: SourceTool, id?: string): Promise<SessionRef> {
@@ -54,7 +60,27 @@ export async function prepareShare(client: RelayClient | null, input: ShareInput
     visibility: { team: people.length === 0, people },
     redactionPatterns: me?.settings.redaction_patterns,
   });
-  return { repo, ref, built };
+  const continues = await resolveContinues(repo.root, input.continues);
+  if (continues.id) built.session.continues = continues.id;
+  return { repo, ref, built, continuesAuto: continues.auto };
+}
+
+/**
+ * Uploads a prepared share. If the remembered pickup can no longer be continued
+ * (deleted, or not visible any more), shares without the link instead of failing.
+ */
+export async function uploadShare(client: RelayClient, prepared: PreparedShare): Promise<{ id: string; continues?: string }> {
+  const { session, transcript } = prepared.built;
+  try {
+    const { id } = await client.share({ session, transcript });
+    return { id, continues: session.continues };
+  } catch (err) {
+    if (!(prepared.continuesAuto && err instanceof ApiError && err.status === 400 && /continues/.test(err.message))) throw err;
+    await forgetPickup(prepared.repo.root);
+    const { continues: _dropped, ...rest } = session;
+    const { id } = await client.share({ session: rest, transcript });
+    return { id };
+  }
 }
 
 /** `.relay/` holds handoffs and dry runs; it ignores itself so nothing in it gets committed. */

@@ -4,6 +4,7 @@ import { api, getToken, setToken } from "./api";
 import { parseRoute, type Route } from "./format";
 import { Login } from "./pages/Login";
 import { Activity } from "./pages/Activity";
+import { Audit } from "./pages/Audit";
 import { Members } from "./pages/Members";
 import { Stats } from "./pages/Stats";
 import { SessionPage } from "./pages/SessionPage";
@@ -22,6 +23,7 @@ const NAV: { page: Route["page"]; href: string; label: string; icon: string }[] 
   { page: "start", href: "#/start", label: "Get started", icon: "start" },
   { page: "members", href: "#/members", label: "Members", icon: "members" },
   { page: "settings", href: "#/settings", label: "Settings", icon: "settings" },
+  { page: "audit", href: "#/audit", label: "Audit log", icon: "audit" },
 ];
 
 export function App() {
@@ -84,7 +86,7 @@ export function App() {
           {me.org.name}
         </div>
         <nav aria-label="Main">
-          {NAV.map((n) => (
+          {NAV.filter((n) => n.page !== "audit" || me.role !== "member").map((n) => (
             <a key={n.page} href={n.href} className={active === n.page ? "on" : ""} aria-current={active === n.page ? "page" : undefined}>
               <Icon name={n.icon} />
               <span>{n.label}</span>
@@ -111,6 +113,7 @@ export function App() {
         {route.page === "session" && <SessionPage id={route.id} me={me} />}
         {route.page === "activity" && <Activity me={me} />}
         {route.page === "stats" && <Stats />}
+        {route.page === "audit" && <Audit me={me} />}
         {route.page === "start" && <Start me={me} />}
         {route.page === "members" && <Members me={me} />}
         {route.page === "settings" && <Settings me={me} onOrgChanged={refreshMe} />}

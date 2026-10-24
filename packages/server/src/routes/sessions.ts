@@ -4,6 +4,9 @@ import { HTTPException } from "hono/http-exception";
 import {
   createRedactor,
   DetailMode,
+  diffStats,
+  matchTemplate,
+  missingSections,
   newId,
   NewComment,
   type Comment,
@@ -13,18 +16,31 @@ import {
   type SessionDetail,
   type SessionListItem,
   type ChainLink,
+  renderHandoff,
 } from "@session-relay/shared";
 import type { AppEnv, AuthContext } from "../auth.js";
 import { audit, recordUsage } from "../audit.js";
 import type { Sql } from "../db/client.js";
 import { iso, parseBody } from "../http.js";
-import { transcriptKey, type BlobStorage } from "../storage/types.js";
+import { diffKey, transcriptKey, type BlobStorage } from "../storage/types.js";
 import { purgeRateLimits } from "../ratelimit.js";
 
 const MAX_LIST = 100;
 const MAX_CHAIN = 20;
 const FULL_PAGE = 200;
 const MAX_COMMENTS = 100;
+/** Text indexed per full transcript; Postgres caps a tsvector at 1 MB. */
+const SEARCH_CHARS = 300_000;
+
+/** Indexes a full transcript for search. Best effort: a failure leaves the share unsearchable, not broken. */
+async function indexTranscript(sql: Sql, sessionId: string, messages: Message[]): Promise<void> {
+  const text = messages.map((m) => m.text).join("\n").slice(0, SEARCH_CHARS);
+  try {
+    await sql`UPDATE sessions SET transcript_search = strip(to_tsvector('english', ${text})) WHERE id = ${sessionId}`;
+  } catch {
+    // e.g. an unusual transcript that still exceeds the tsvector limit
+  }
+}
 
 /** Rows the caller may see: same org, live, and either team-visible, theirs, for them, or shared with them. */
 export function visible(sql: Sql, auth: AuthContext) {
@@ -45,7 +61,7 @@ export function visible(sql: Sql, auth: AuthContext) {
 /** Owner of the share, or an org admin. */
 async function loadOwned(sql: Sql, auth: AuthContext, id: string) {
   const [row] = await sql`
-    SELECT id, author_id, transcript_key FROM sessions
+    SELECT id, author_id, transcript_key, diff_key FROM sessions
     WHERE id = ${id} AND org_id = ${auth.orgId} AND deleted_at IS NULL
   `;
   if (!row) throw new HTTPException(404, { message: "Session not found" });
@@ -88,7 +104,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
 
   app.post("/", async (c) => {
     const auth = c.get("auth");
-    const { session: s, transcript } = parseBody(ShareRequest, await c.req.json());
+    const { session: s, transcript, diff } = parseBody(ShareRequest, await c.req.json());
 
     const [settings] = await sql`SELECT retention_days, repo_allowlist FROM org_settings WHERE org_id = ${auth.orgId}`;
     if (s.continues) {
@@ -105,6 +121,10 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
     const blob = wantFull ? gzipSync(JSON.stringify(transcript)) : null;
     const key = blob ? transcriptKey(auth.orgId, id) : null;
     if (blob && key) await storage.put(key, blob);
+    const patch = diff?.trim() ? gzipSync(diff) : null;
+    const dKey = patch ? diffKey(auth.orgId, id) : null;
+    if (patch && dKey) await storage.put(dKey, patch);
+    const dStats = patch ? diffStats(diff!) : null;
     const messages = s.include === "summary" ? [] : s.messages;
 
     try {
@@ -113,24 +133,28 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
           INSERT INTO sessions (
             id, org_id, author_id, source_tool, source_version, native_id, repo, branch, commit_sha,
             title, summary, files_touched, messages, include_mode, visibility_team, redactions,
-            transcript_key, transcript_bytes, started_at, expires_at, continues_session_id, assignee_id, pr_url, draft
+            transcript_key, transcript_bytes, started_at, expires_at, continues_session_id, assignee_id, pr_url, draft,
+            diff_key, diff_stats
           ) VALUES (
             ${id}, ${auth.orgId}, ${auth.userId}, ${s.source.tool}, ${s.source.version ?? null}, ${s.source.native_id},
             ${s.repo}, ${s.branch ?? null}, ${s.commit ?? null}, ${s.title}, ${tx.json(s.summary)},
             ${s.files_touched}, ${tx.json(messages)}, ${s.include}, ${s.visibility.team}, ${s.redactions},
             ${key}, ${blob?.byteLength ?? null}, ${s.started_at ?? null},
             now() + make_interval(days => ${settings!.retention_days}),
-            ${s.continues ?? null}, ${s.assignee ?? null}, ${s.pr_url ?? null}, ${s.draft}
+            ${s.continues ?? null}, ${s.assignee ?? null}, ${s.pr_url ?? null}, ${s.draft},
+            ${dKey}, ${dStats ? tx.json({ ...dStats }) : null}
           )
         `;
         if (!s.visibility.team) await setPeople(tx as unknown as Sql, auth.orgId, id, s.visibility.people);
       });
     } catch (err) {
       if (key) await storage.delete(key);
+      if (dKey) await storage.delete(dKey);
       throw err;
     }
 
-    const bytes = Buffer.byteLength(JSON.stringify(messages)) + (blob?.byteLength ?? 0);
+    if (wantFull) await indexTranscript(sql, id, transcript!);
+    const bytes = Buffer.byteLength(JSON.stringify(messages)) + (blob?.byteLength ?? 0) + (patch?.byteLength ?? 0);
     await recordUsage(sql, auth, "session.share", bytes);
     if (s.draft) await audit(sql, auth, "session.draft", id, { repo: s.repo });
     else await audit(sql, auth, "session.share", id, { repo: s.repo, include: s.include, team: s.visibility.team, assignee: s.assignee ?? null });
@@ -151,10 +175,16 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
     const rows = await sql`
       SELECT s.id, s.title, s.repo, s.branch, s.source_tool, s.summary->>'goal' AS goal, s.include_mode,
              jsonb_array_length(s.messages) AS message_count, s.transcript_key IS NOT NULL AS has_full,
-             s.visibility_team, s.continues_session_id, s.pr_url, s.draft, s.created_at, s.updated_at,
+             s.visibility_team, s.continues_session_id, s.pr_url, s.draft, s.diff_key IS NOT NULL AS has_diff, s.created_at, s.updated_at,
              u.id AS author_id, u.name AS author_name, a.id AS assignee_id, a.name AS assignee_name,
              (SELECT count(*)::int FROM session_comments c WHERE c.session_id = s.id AND c.deleted_at IS NULL) AS comment_count
-             ${text ? sql`, ts_rank(s.search, websearch_to_tsquery('english', ${text})) AS rank` : sql``}
+             ${
+               text
+                 ? sql`, ts_rank(s.search, websearch_to_tsquery('english', ${text}))
+                        + 0.1 * coalesce(ts_rank(s.transcript_search, websearch_to_tsquery('english', ${text})), 0) AS rank,
+                      NOT (s.search @@ websearch_to_tsquery('english', ${text}) OR s.title ILIKE ${"%" + text + "%"}) AS transcript_only`
+                 : sql``
+             }
       FROM sessions s JOIN users u ON u.id = s.author_id LEFT JOIN users a ON a.id = s.assignee_id
       WHERE ${visible(sql, auth)}
         ${q.repo ? sql`AND s.repo = ${q.repo}` : sql``}
@@ -164,7 +194,12 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
         ${assignee ? sql`AND s.assignee_id = ${assignee}` : sql``}
         ${file ? sql`AND EXISTS (SELECT 1 FROM unnest(s.files_touched) f WHERE f ILIKE ${"%" + file.replace(/[\\%_]/g, (ch) => "\\" + ch) + "%"})` : sql``}
         ${q.pr ? sql`AND s.pr_url = ${q.pr}` : sql``}
-        ${text ? sql`AND (s.search @@ websearch_to_tsquery('english', ${text}) OR s.title ILIKE ${"%" + text + "%"})` : sql``}
+        ${
+          text
+            ? sql`AND (s.search @@ websearch_to_tsquery('english', ${text}) OR s.title ILIKE ${"%" + text + "%"}
+                   OR s.transcript_search @@ websearch_to_tsquery('english', ${text}))`
+            : sql``
+        }
         ${q.before ? sql`AND s.created_at < ${q.before}` : sql``}
         ${q.since ? sql`AND s.created_at >= ${q.since}` : sql``}
         ${q.native_id ? sql`AND s.native_id = ${q.native_id}` : sql``}
@@ -189,22 +224,54 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       pr_url: r.pr_url,
       comment_count: r.comment_count,
       draft: r.draft,
+      has_diff: r.has_diff,
+      matched_in: r.transcript_only ? "transcript" : null,
       created_at: r.created_at.toISOString(),
       updated_at: iso(r.updated_at),
     }));
     return c.json({ sessions });
   });
 
-  app.get("/:id", async (c) => {
+  /**
+   * Every visible session matching the filters, one JSON object per line (newest first, at most 1000).
+   * Registered before "/:id" so "export" isn't read as an id. `full=1` includes full transcripts.
+   */
+  app.get("/export", async (c) => {
     const auth = c.get("auth");
-    const id = c.req.param("id");
-    const mode = DetailMode.catch("tail").parse(c.req.query("mode") ?? "tail");
+    const q = c.req.query();
+    const rows = await sql`
+      SELECT s.id FROM sessions s JOIN users u ON u.id = s.author_id
+      WHERE ${visible(sql, auth)} AND NOT s.draft
+        ${q.repo ? sql`AND s.repo = ${q.repo}` : sql``}
+        ${q.since ? sql`AND s.created_at >= ${q.since}` : sql``}
+        ${q.author === "me" ? sql`AND s.author_id = ${auth.userId}` : sql``}
+      ORDER BY s.created_at DESC LIMIT 1000
+    `;
+    const full = q.full === "1";
+    await audit(sql, auth, "session.export", null, { bulk: true, count: rows.length, repo: q.repo ?? null, full });
+    c.header("content-type", "application/x-ndjson; charset=utf-8");
+    c.header("content-disposition", `attachment; filename="sessions${q.repo ? "-" + q.repo.split("/").slice(-1)[0] : ""}.ndjson"`);
+    const lines: string[] = [];
+    for (const r of rows) {
+      const d = await loadDetail(auth, r.id, full ? "full" : "tail", { all: full });
+      if (d) lines.push(JSON.stringify(d));
+    }
+    return c.body(lines.join("\n") + (lines.length ? "\n" : ""));
+  });
+
+  /** A session as the caller may see it; `page` picks the window of messages. Null when not visible. */
+  async function loadDetail(
+    auth: AuthContext,
+    id: string,
+    mode: DetailMode,
+    page: { tail?: unknown; offset?: unknown; limit?: unknown; all?: boolean } = {},
+  ): Promise<SessionDetail | null> {
     const [r] = await sql`
       SELECT s.*, u.name AS author_name, a.name AS assignee_name
       FROM sessions s JOIN users u ON u.id = s.author_id LEFT JOIN users a ON a.id = s.assignee_id
       WHERE s.id = ${id} AND ${visible(sql, auth)}
     `;
-    if (!r) throw new HTTPException(404, { message: "Session not found" });
+    if (!r) return null;
 
     let all: Message[] = r.messages;
     if (mode === "full" && r.transcript_key) {
@@ -214,12 +281,12 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
     let window: Message[] = [];
     let offset = 0;
     if (mode === "tail") {
-      const tail = Math.max(1, Number(c.req.query("tail")) || all.length);
+      const tail = Math.max(1, Number(page.tail) || all.length);
       offset = Math.max(0, all.length - tail);
       window = all.slice(offset);
     } else if (mode === "full") {
-      offset = Math.max(0, Number(c.req.query("offset")) || 0);
-      const limit = Math.min(Number(c.req.query("limit")) || FULL_PAGE, 1000);
+      offset = Math.max(0, Number(page.offset) || 0);
+      const limit = page.all ? all.length : Math.min(Number(page.limit) || FULL_PAGE, 1000);
       window = all.slice(offset, offset + limit);
     }
 
@@ -247,6 +314,8 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       ORDER BY s.created_at
     `;
     const comments = await listComments(sql, id, MAX_COMMENTS);
+    const [settings] = await sql`SELECT share_templates FROM org_settings WHERE org_id = ${auth.orgId}`;
+    const missing = missingSections(matchTemplate(settings?.share_templates ?? [], r.repo), r.summary);
     const link = (x: (typeof chain)[number]): ChainLink => ({
       id: x.id,
       title: x.title,
@@ -254,11 +323,6 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       author: { id: x.author_id, name: x.author_name },
       created_at: x.created_at.toISOString(),
     });
-    await recordUsage(sql, auth, `session.get.${mode}`);
-    if (mode !== "summary") await audit(sql, auth, "session.pull", id, { mode });
-    // The CLI and agents say when they load a session to continue it (relay pull, /pickup).
-    if (c.req.query("pickup") === "1") await audit(sql, auth, "session.pickup", id);
-
     const body: SessionDetail = {
       id: r.id,
       org_id: r.org_id,
@@ -290,8 +354,59 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       continued_by: children.map(link),
       assigned_to: r.assignee_id ? { id: r.assignee_id, name: r.assignee_name } : null,
       comments,
+      missing_sections: missing,
+      diff: r.diff_stats ?? null,
     };
+    return body;
+  }
+
+  app.get("/:id", async (c) => {
+    const auth = c.get("auth");
+    const id = c.req.param("id");
+    const mode = DetailMode.catch("tail").parse(c.req.query("mode") ?? "tail");
+    const body = await loadDetail(auth, id, mode, c.req.query());
+    if (!body) throw new HTTPException(404, { message: "Session not found" });
+    await recordUsage(sql, auth, `session.get.${mode}`);
+    if (mode !== "summary") await audit(sql, auth, "session.pull", id, { mode });
+    // The CLI and agents say when they load a session to continue it (relay pull, /pickup).
+    if (c.req.query("pickup") === "1") await audit(sql, auth, "session.pickup", id);
     return c.json(body);
+  });
+
+  /** The uncommitted changes attached to a share, as a patch (`git apply`-able). */
+  app.get("/:id/diff", async (c) => {
+    const auth = c.get("auth");
+    const id = c.req.param("id");
+    const [r] = await sql`SELECT s.diff_key FROM sessions s WHERE s.id = ${id} AND ${visible(sql, auth)}`;
+    if (!r) throw new HTTPException(404, { message: "Session not found" });
+    if (!r.diff_key) throw new HTTPException(404, { message: "This share has no diff" });
+    const blob = await storage.get(r.diff_key);
+    if (!blob) throw new HTTPException(404, { message: "This share has no diff" });
+    c.header("content-type", "text/x-diff; charset=utf-8");
+    c.header("content-disposition", `attachment; filename="${id}.patch"`);
+    return c.body(gunzipSync(blob).toString("utf8"));
+  });
+
+  /** The whole session, full transcript included, as Markdown or JSON. */
+  app.get("/:id/export", async (c) => {
+    const auth = c.get("auth");
+    const id = c.req.param("id");
+    const format = c.req.query("format") === "json" ? "json" : "md";
+    const body = await loadDetail(auth, id, "full", { all: true });
+    if (!body) throw new HTTPException(404, { message: "Session not found" });
+    await audit(sql, auth, "session.export", id, { format });
+    const name = `${body.id}-${body.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "session"}`;
+    if (format === "json") {
+      c.header("content-disposition", `attachment; filename="${name}.json"`);
+      return c.json(body);
+    }
+    let md = renderHandoff(body);
+    const [d] = await sql`SELECT diff_key FROM sessions WHERE id = ${id}`;
+    const blob = d?.diff_key ? await storage.get(d.diff_key) : null;
+    if (blob) md += `\n## Uncommitted changes\n\n\`\`\`diff\n${gunzipSync(blob).toString("utf8")}\n\`\`\`\n`;
+    c.header("content-type", "text/markdown; charset=utf-8");
+    c.header("content-disposition", `attachment; filename="${name}.md"`);
+    return c.body(md);
   });
 
   app.patch("/:id", async (c) => {
@@ -373,14 +488,32 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
     const auth = c.get("auth");
     const id = c.req.param("id");
     const row = await loadOwned(sql, auth, id);
-    await sql`UPDATE sessions SET deleted_at = now(), messages = '[]', transcript_key = NULL WHERE id = ${id}`;
+    await sql`UPDATE sessions SET deleted_at = now(), messages = '[]', transcript_key = NULL, diff_key = NULL WHERE id = ${id}`;
     await sql`DELETE FROM session_comments WHERE session_id = ${id}`;
     if (row.transcript_key) await storage.delete(row.transcript_key);
+    if (row.diff_key) await storage.delete(row.diff_key);
     await audit(sql, auth, "session.delete", id);
     return c.json({ ok: true });
   });
 
   return app;
+}
+
+/** Indexes full transcripts shared before search covered them, a few per run. */
+export async function backfillTranscriptSearch(sql: Sql, storage: BlobStorage, limit = 25): Promise<number> {
+  const rows = await sql`
+    SELECT id, transcript_key FROM sessions
+    WHERE deleted_at IS NULL AND transcript_key IS NOT NULL AND transcript_search IS NULL
+    ORDER BY created_at DESC LIMIT ${limit}
+  `;
+  for (const r of rows) {
+    const blob = await storage.get(r.transcript_key).catch(() => null);
+    const messages: Message[] = blob ? JSON.parse(gunzipSync(blob).toString("utf8")) : [];
+    await indexTranscript(sql, r.id, messages);
+    // Mark unreadable ones as done so they aren't retried every hour.
+    await sql`UPDATE sessions SET transcript_search = coalesce(transcript_search, ''::tsvector) WHERE id = ${r.id}`;
+  }
+  return rows.length;
 }
 
 /** Live comments on a session, oldest first (the most recent `limit`). */
@@ -400,16 +533,20 @@ async function listComments(sql: Sql, sessionId: string, limit: number): Promise
 export async function purgeExpired(sql: Sql, storage: BlobStorage): Promise<number> {
   const rows = await sql`
     WITH expired AS (
-      SELECT id, transcript_key FROM sessions
+      SELECT id, transcript_key, diff_key FROM sessions
       WHERE deleted_at IS NULL AND expires_at <= now()
       FOR UPDATE
     )
-    UPDATE sessions s SET deleted_at = now(), messages = '[]', transcript_key = NULL
+    UPDATE sessions s SET deleted_at = now(), messages = '[]', transcript_key = NULL, diff_key = NULL
     FROM expired e WHERE s.id = e.id
-    RETURNING e.transcript_key AS old_key
+    RETURNING e.transcript_key AS old_key, e.diff_key AS old_diff
   `;
-  for (const r of rows) if (r.old_key) await storage.delete(r.old_key);
+  for (const r of rows) {
+    if (r.old_key) await storage.delete(r.old_key);
+    if (r.old_diff) await storage.delete(r.old_diff);
+  }
   await sql`DELETE FROM session_comments c USING sessions s WHERE c.session_id = s.id AND s.deleted_at IS NOT NULL`;
+  await backfillTranscriptSearch(sql, storage);
   await purgeRateLimits(sql);
   return rows.length;
 }

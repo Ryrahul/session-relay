@@ -1,4 +1,4 @@
-import type { SessionDetail } from "@session-relay/shared";
+import type { SessionDetail } from "./api.js";
 
 const TOOL_NAMES = { "claude-code": "Claude Code", codex: "Codex", opencode: "OpenCode", zcode: "ZCode", gemini: "Gemini CLI", copilot: "Copilot CLI", cursor: "Cursor" } as const;
 
@@ -19,6 +19,9 @@ export function renderHandoff(s: SessionDetail): string {
       : []),
     ...(s.assigned_to ? [`For **${s.assigned_to.name}**`] : []),
     ...(s.pr_url ? [`Pull request: ${s.pr_url}`] : []),
+    ...(s.diff
+      ? [`Uncommitted changes attached: ${s.diff.files} file${s.diff.files === 1 ? "" : "s"} (+${s.diff.additions} −${s.diff.deletions}). \`relay pull ${s.id}\` writes them as a patch you can \`git apply\`.`]
+      : []),
     ...(s.updated_at ? [`Edited ${new Date(s.updated_at).toISOString().slice(0, 16).replace("T", " ")} UTC`] : []),
     ...(s.continued_by?.length
       ? [`Continued by ${s.continued_by.map((c) => `"${c.title}" (${c.author.name}, \`${c.id}\`)`).join(", ")}`]
@@ -33,6 +36,8 @@ export function renderHandoff(s: SessionDetail): string {
     list("Done", s.summary.done) +
     list("Next steps", s.summary.next) +
     list("Open questions", s.summary.open_questions) +
+    (s.summary.sections ?? []).map((sec) => list(sec.title, sec.items)).join("") +
+    (s.missing_sections?.length ? `\n> Missing from this repo's handoff template: ${s.missing_sections.join(", ")}\n` : "") +
     list("Files touched", s.files_touched.map((f) => `\`${f}\``));
 
   // Teammates' notes come before the conversation: they are often the latest word on the work.

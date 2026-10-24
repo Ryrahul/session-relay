@@ -47,6 +47,8 @@ The CLI's token is saved in `~/.config/session-relay/config.json`, readable only
 relay setup
 ```
 
+Installed another agent later? Connect just that one with `relay setup --tools gemini` (or `cursor`, `copilot`, `codex`, `opencode`, `zcode`, `claude`).
+
 Optional: `relay setup --auto-share on` saves every Claude Code, Gemini CLI and Copilot CLI session as a private draft when it ends, so you can publish it later without remembering to `/share` ([details](agents.md#auto-share-drafts)).
 
 This adds the relay MCP server and two commands, `/share` and `/pickup`, to each agent that is installed: Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor and ZCode. Restart your agents afterwards. Details and manual setup are in [Agents](agents.md).
@@ -75,8 +77,11 @@ You can add instructions:
 /share only Bob
 /share for Akshat              # a handoff for them: first in their /pickup
 /share full transcript
+/share with the diff           # attach your uncommitted changes
 /share title: payment retry, half done
 ```
+
+Some repos have a **handoff template** (set by an admin) asking for extra sections, like "Tests run". `/share` fills them in; `relay template` shows what's asked.
 
 If your branch has an open pull request (and the GitHub CLI `gh` is installed), the share links to it.
 
@@ -86,6 +91,7 @@ Or share from a terminal, inside the repo:
 relay share               # pick a session, choose what to include and who sees it
 relay share --dry-run     # see exactly what would be uploaded, upload nothing
 relay share --for akshat  # a handoff for someone
+relay share --diff        # attach uncommitted changes; teammates `git apply` them after relay pull
 ```
 
 Changed your mind? Edit a share later in the web app (**Edit** on the session), with `relay edit`, or ask your agent ("add a next step to my last share"):
@@ -114,7 +120,7 @@ From a terminal:
 ```sh
 relay list                     # shared sessions for this repo
 relay list --for-me            # handoffs for you, any repo
-relay search "idempotency"
+relay search "idempotency"          # also searches full transcripts
 relay search "file:src/webhooks.ts"   # every session that touched a file
 relay pull rs_7KQ2M9XA         # writes .relay/handoff-rs_7KQ2M9XA.md
 ```
@@ -132,6 +138,8 @@ Open your server's address in a browser and sign in with your token. You can:
 - **Edit** your shares: title, summary, next steps, who it's for, the pull request
 - **Comment** on any session you can see
 - see **Activity** (what the team shared, picked up and discussed) and **Stats** (who shares and picks up, by agent and repo)
+- **download** a session as Markdown or JSON, or export many from **Settings → Export**
+- admins: the **Audit log** of everything that happened
 - invite teammates with a link (admins), and create or revoke your own tokens
 - if you're an admin, change org settings: retention, allowed repositories, extra secret patterns
 

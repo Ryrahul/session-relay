@@ -23,3 +23,19 @@ export async function api<T>(config: CliConfig, method: string, route: string, b
   if (!res.ok) throw new ApiError(res.status, data?.error ?? `${res.status} ${res.statusText}`);
   return data as T;
 }
+
+/** GETs a route and returns the body as text (exports). */
+export async function apiText(config: CliConfig, route: string): Promise<string> {
+  const res = await fetch(new URL(route, config.server.replace(/\/?$/, "/")), { headers: { authorization: `Bearer ${config.token}` } });
+  const text = await res.text();
+  if (!res.ok) {
+    let message = `${res.status} ${res.statusText}`;
+    try {
+      message = JSON.parse(text).error ?? message;
+    } catch {
+      // not JSON
+    }
+    throw new ApiError(res.status, message);
+  }
+  return text;
+}

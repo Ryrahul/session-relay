@@ -25,12 +25,16 @@ You need a Session Relay server for your team; see [self-hosting](https://relay.
 |---|---|
 | `relay sessions` | Your local agent sessions for this repo |
 | `relay share [--dry-run]` | Pick a session, choose what to include and who sees it |
+| `relay share --diff` | Attach your uncommitted changes; teammates `git apply` them after `relay pull` |
 | `relay share --for <name>` | A handoff for a teammate (also `--pr <url>`; the branch's PR is found automatically) |
 | `relay list`, `relay search "<q>"` | Shared sessions. `--for-me`, `--file <path>`, or `file:` / `branch:` in the query |
 | `relay show <id>`, `relay pull <id>` | Read a session, or write `.relay/handoff-<id>.md` for your agent |
 | `relay edit <id>` | Change your share: title, summary, next steps, who it's for, PR |
 | `relay pr-comment <id>` | Post the session on its pull request |
 | `relay setup --auto-share on` | Save each Claude Code, Gemini CLI and Copilot CLI session as a private draft when it ends; `relay publish <id>` shares it |
+| `relay template` | The handoff template for this repo |
+| `relay export <id>`, `relay export --all` | Download a session (Markdown/JSON) or many (NDJSON) |
+| `relay setup --tools gemini` | Connect one agent you installed later |
 | `relay digest`, `relay stats` | What the team did lately; team stats |
 | `relay comment <id> "<text>"` | Leave a note on a session (the next agent reads it) |
 | `relay delete <id>` | Delete your share |

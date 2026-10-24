@@ -4,10 +4,14 @@ import { IncludeMode, Message, PrUrl, SessionRecord, SessionUpload, SourceTool, 
 export const Role = z.enum(["owner", "admin", "member"]);
 export type Role = z.infer<typeof Role>;
 
-/** POST /v1/sessions. `transcript` is only sent for include = "full". */
+/** Most uncommitted changes a share can carry (the CLI truncates before this). */
+export const MAX_DIFF_CHARS = 1_000_000;
+
+/** POST /v1/sessions. `transcript` is only sent for include = "full"; `diff` is `git diff` output, redacted. */
 export const ShareRequest = z.object({
   session: SessionUpload,
   transcript: z.array(Message).optional(),
+  diff: z.string().max(MAX_DIFF_CHARS).optional(),
 });
 export type ShareRequest = z.infer<typeof ShareRequest>;
 
@@ -30,6 +34,9 @@ export const SessionListItem = z.object({
   pr_url: z.string().nullable(),
   comment_count: z.number().int(),
   draft: z.boolean(),
+  has_diff: z.boolean(),
+  /** "transcript" when a search matched only inside the full transcript. */
+  matched_in: z.literal("transcript").nullable(),
   created_at: z.string(),
   updated_at: z.string().nullable(),
 });
@@ -74,6 +81,10 @@ export const SessionDetail = SessionRecord.extend({
   assigned_to: z.object({ id: z.string(), name: z.string() }).nullable(),
   /** Oldest first; the most recent 100. */
   comments: z.array(Comment),
+  /** Required sections of the repo's template that this share leaves empty. */
+  missing_sections: z.array(z.string()),
+  /** Uncommitted changes attached at share time (GET /v1/sessions/:id/diff). */
+  diff: z.object({ files: z.number().int(), additions: z.number().int(), deletions: z.number().int() }).nullable(),
 });
 export type SessionDetail = z.infer<typeof SessionDetail>;
 
@@ -89,10 +100,28 @@ export const SessionPatch = z.object({
 });
 export type SessionPatch = z.infer<typeof SessionPatch>;
 
+/** What a handoff in matching repos should contain. `repo`: exact, "github.com/acme/*", or "*". */
+export const ShareTemplate = z.object({
+  repo: z.string().trim().min(1).max(300),
+  instructions: z.string().max(2000).default(""),
+  sections: z
+    .array(
+      z.object({
+        title: z.string().trim().min(1).max(60),
+        hint: z.string().max(300).default(""),
+        required: z.boolean().default(false),
+      }),
+    )
+    .max(10)
+    .default([]),
+});
+export type ShareTemplate = z.infer<typeof ShareTemplate>;
+
 export const OrgSettings = z.object({
   retention_days: z.number().int(),
   repo_allowlist: z.array(z.string()),
   redaction_patterns: z.array(z.string()),
+  share_templates: z.array(ShareTemplate).default([]),
 });
 export type OrgSettings = z.infer<typeof OrgSettings>;
 
@@ -152,6 +181,7 @@ export const OrgPatch = z.object({
     )
     .max(50)
     .optional(),
+  share_templates: z.array(ShareTemplate).max(50).optional(),
 });
 export type OrgPatch = z.infer<typeof OrgPatch>;
 
@@ -218,3 +248,16 @@ export const Stats = z.object({
   by_person: z.array(z.object({ id: z.string(), name: z.string(), shares: Count, pickups: Count, comments: Count })),
 });
 export type Stats = z.infer<typeof Stats>;
+
+/** GET /v1/audit (admins) */
+export const AuditEntry = z.object({
+  id: z.number().int(),
+  action: z.string(),
+  user: z.object({ id: z.string(), name: z.string() }).nullable(),
+  target_id: z.string().nullable(),
+  /** Title of the session the entry is about, if it still exists. */
+  session_title: z.string().nullable(),
+  meta: z.record(z.unknown()),
+  created_at: z.string(),
+});
+export type AuditEntry = z.infer<typeof AuditEntry>;

@@ -1,4 +1,4 @@
-import type { Activity, Stats, InviteInfo, JoinInfo, Member, MeResponse, OrgInfo, OrgPatch, SessionDetail, SessionListItem, SessionPatch } from "@session-relay/shared";
+import type { Activity, AuditEntry, Stats, InviteInfo, JoinInfo, Member, MeResponse, OrgInfo, OrgPatch, SessionDetail, SessionListItem, SessionPatch } from "@session-relay/shared";
 
 const KEY = "relay.token";
 
@@ -39,6 +39,22 @@ async function call<T>(method: string, path: string, body?: unknown, token = get
   return data as T;
 }
 
+/** Fetches a file with the token and saves it through the browser. */
+export async function download(path: string, fallbackName: string): Promise<void> {
+  const res = await fetch(path, { headers: { authorization: `Bearer ${getToken() ?? ""}` } });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.error ?? res.statusText);
+  }
+  const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(await res.blob());
+  const a = Object.assign(document.createElement("a"), { href: url, download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export interface TokenInfo {
   id: string;
   name: string;
@@ -62,8 +78,17 @@ export const api = {
   comment: (id: string, body: string) => call<{ id: string }>("POST", `/v1/sessions/${encodeURIComponent(id)}/comments`, { body }),
   deleteComment: (id: string, commentId: string) =>
     call<{ ok: true }>("DELETE", `/v1/sessions/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}`),
+  diff: async (id: string) => {
+    const res = await fetch(`/v1/sessions/${encodeURIComponent(id)}/diff`, { headers: { authorization: `Bearer ${getToken() ?? ""}` } });
+    if (!res.ok) throw new ApiError(res.status, ((await res.json().catch(() => ({}))) as { error?: string }).error ?? res.statusText);
+    return res.text();
+  },
   update: (id: string, patch: SessionPatch) => call<{ ok: true }>("PATCH", `/v1/sessions/${encodeURIComponent(id)}`, patch),
   members: () => call<{ members: Member[] }>("GET", "/v1/members"),
+  audit: (params: Record<string, string>) => {
+    const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v));
+    return call<{ entries: AuditEntry[]; next: number | null }>("GET", `/v1/audit?${q}`);
+  },
   activity: (days: number) => call<Activity>("GET", `/v1/activity?days=${days}`),
   stats: (days: number) => call<Stats>("GET", `/v1/stats?days=${days}`),
   invite: (email: string, name: string, role: string) =>

@@ -5,7 +5,8 @@ import { ADAPTERS, findSessions, type SessionRef } from "./adapters/index.js";
 import { buildShare, type BuiltShare } from "./build.js";
 import { resolvePeople, resolvePerson, type RelayClient } from "./client.js";
 import { ApiError } from "./api.js";
-import { currentPr, repoInfo, type RepoInfo } from "./git.js";
+import { createRedactor, type RedactionHit } from "@session-relay/shared";
+import { currentPr, repoInfo, workingDiff, type RepoInfo } from "./git.js";
 import { forgetPickup, resolveContinues } from "./pickups.js";
 
 export interface ShareInput {
@@ -26,6 +27,8 @@ export interface ShareInput {
   assign?: string;
   /** Pull request URL, "none", or undefined to look up the current branch's PR with gh. */
   pr?: string;
+  /** Attach uncommitted changes (`git diff HEAD` plus new files), redacted. */
+  diff?: boolean;
 }
 
 export interface PreparedShare {
@@ -69,6 +72,17 @@ export async function prepareShare(client: RelayClient | null, input: ShareInput
   if (client && input.assign) built.session.assignee = await resolvePerson(client, input.assign);
   const pr = input.pr === "none" ? undefined : (input.pr ?? (await currentPr(repo.root)));
   if (pr) built.session.pr_url = pr;
+  if (input.diff) {
+    const { diff, truncated } = await workingDiff(repo.root);
+    if (diff.trim()) {
+      const redact = createRedactor(me?.settings.redaction_patterns);
+      built.diff = redact(diff);
+      for (const [k, n] of Object.entries(redact.counts)) built.redactions[k] = (built.redactions[k] ?? 0) + n;
+      built.hits.push(...redact.hits.map((h) => ({ ...h, context: `(diff) ${h.context}` })));
+      built.session.redactions += redact.total();
+      if (truncated) built.diffTruncated = true;
+    }
+  }
   return { repo, ref, built, continuesAuto: continues.auto };
 }
 
@@ -77,15 +91,15 @@ export async function prepareShare(client: RelayClient | null, input: ShareInput
  * (deleted, or not visible any more), shares without the link instead of failing.
  */
 export async function uploadShare(client: RelayClient, prepared: PreparedShare): Promise<{ id: string; continues?: string }> {
-  const { session, transcript } = prepared.built;
+  const { session, transcript, diff } = prepared.built;
   try {
-    const { id } = await client.share({ session, transcript });
+    const { id } = await client.share({ session, transcript, diff });
     return { id, continues: session.continues };
   } catch (err) {
     if (!(prepared.continuesAuto && err instanceof ApiError && err.status === 400 && /continues/.test(err.message))) throw err;
     await forgetPickup(prepared.repo.root);
     const { continues: _dropped, ...rest } = session;
-    const { id } = await client.share({ session: rest, transcript });
+    const { id } = await client.share({ session: rest, transcript, diff });
     return { id };
   }
 }
@@ -104,6 +118,14 @@ export async function writeDryRun(prepared: PreparedShare): Promise<string> {
   const file = path.join(dir, `dry-run-${prepared.ref.tool}-${prepared.ref.nativeId.slice(0, 12)}.json`);
   await writeFile(file, JSON.stringify({ session: prepared.built.session, transcript: prepared.built.transcript }, null, 2) + "\n");
   return file;
+}
+
+/** One line per removed secret, with the text around it (already redacted). */
+export function listRedactions(hits: RedactionHit[], max = 20): string {
+  if (!hits.length) return "";
+  const lines = hits.slice(0, max).map((h) => `  ${h.kind.padEnd(18)} ${h.context}`);
+  if (hits.length > max) lines.push(`  …and ${hits.length - max} more`);
+  return lines.join("\n");
 }
 
 export function describeRedactions(counts: Record<string, number>): string {

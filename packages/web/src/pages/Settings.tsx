@@ -1,8 +1,8 @@
-import { useEffect, useState, type FormEvent } from "react";
-import type { MeResponse, OrgInfo } from "@session-relay/shared";
-import { api, type TokenInfo } from "../api";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { createRedactor, type MeResponse, type OrgInfo, type ShareTemplate } from "@session-relay/shared";
+import { api, download, type TokenInfo } from "../api";
 import { ago, bytes } from "../format";
-import { Command } from "../ui";
+import { Command, Icon } from "../ui";
 
 const lines = (s: string) => s.split("\n").map((l) => l.trim()).filter(Boolean);
 
@@ -99,6 +99,7 @@ function OrgSettings({ me, onOrgChanged }: { me: MeResponse; onOrgChanged: () =>
             <p className="hint">
               Regular expressions, one per line. Matches are removed on each laptop before upload, in addition to the built-in rules.
             </p>
+            <RedactionPreview patterns={lines(patterns)} />
           </div>
           {isAdmin && (
             <div className="row">
@@ -195,6 +196,193 @@ function Tokens() {
   );
 }
 
+const SAMPLE = `Deployed with AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY to staging.
+curl -H "Authorization: Bearer abcdefghijklmnop1234567890" https://api.example.com
+Ticket ACME-123456 is fixed; db at postgres://app:hunter2secret@db.internal:5432/app`;
+
+/** Try the built-in rules plus the (unsaved) org patterns on sample text, right in the browser. */
+function RedactionPreview({ patterns }: { patterns: string[] }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(SAMPLE);
+  const result = useMemo(() => {
+    const bad = patterns.filter((p) => {
+      try {
+        new RegExp(p);
+        return false;
+      } catch {
+        return true;
+      }
+    });
+    const r = createRedactor(patterns);
+    return { out: r(text), counts: r.counts, total: r.total(), bad };
+  }, [patterns, text]);
+  if (!open) {
+    return (
+      <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(true)}>
+        Test patterns on sample text
+      </button>
+    );
+  }
+  return (
+    <div className="redaction-preview">
+      <label htmlFor="redaction-sample">Sample text</label>
+      <textarea id="redaction-sample" rows={4} className="mono" value={text} onChange={(e) => setText(e.target.value)} />
+      <p className="small" role="status">
+        {result.total ? `${result.total} removed: ${Object.entries(result.counts).map(([k, n]) => `${n} ${k}`).join(", ")}` : "Nothing would be removed."}
+        {result.bad.length > 0 && <span className="error"> Invalid: {result.bad.join(", ")}</span>}
+      </p>
+      <pre className="redaction-out" aria-label="What would be uploaded">
+        {result.out.split(/(\[REDACTED:[a-z-]+\])/).map((part, i) =>
+          part.startsWith("[REDACTED:") ? (
+            <mark key={i}>{part}</mark>
+          ) : (
+            <span key={i}>{part}</span>
+          ),
+        )}
+      </pre>
+    </div>
+  );
+}
+
+const blankTemplate = (): ShareTemplate => ({ repo: "*", instructions: "", sections: [{ title: "", hint: "", required: true }] });
+
+/** Admins: what a handoff should contain, per repo pattern. */
+function Templates({ me, onSaved }: { me: MeResponse; onSaved: () => void }) {
+  const isAdmin = me.role !== "member";
+  const [list, setList] = useState<ShareTemplate[]>(() => structuredClone(me.settings.share_templates ?? []));
+  const [status, setStatus] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const update = (i: number, t: ShareTemplate) => setList(list.map((x, n) => (n === i ? t : x)));
+
+  async function save() {
+    setSaving(true);
+    setStatus(null);
+    try {
+      const cleaned = list.map((t) => ({ ...t, repo: t.repo.trim(), sections: t.sections.filter((x) => x.title.trim()) })).filter((t) => t.repo);
+      await api.updateOrg({ share_templates: cleaned });
+      setList(cleaned);
+      setStatus({ kind: "ok", text: "Saved." });
+      onSaved();
+    } catch (e) {
+      setStatus({ kind: "error", text: (e as Error).message });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="card">
+      <h2>Handoff templates</h2>
+      <p className="muted small">
+        Extra sections a share should have in matching repos, like "Tests run" or "Migration notes". <code>/share</code> asks the agent to fill them in;
+        required ones that are empty are flagged on the session. Repo: an exact repo (<code>github.com/acme/api</code>), a prefix (
+        <code>github.com/acme/*</code>), or <code>*</code> for all. The most specific match wins.
+      </p>
+      {list.length === 0 && <p className="faint small">No templates yet.</p>}
+      <fieldset disabled={!isAdmin} className="templates">
+        {list.map((t, i) => (
+          <div key={i} className="template-card">
+            <div className="row">
+              <div className="field grow">
+                <label htmlFor={`tpl-repo-${i}`}>Repositories</label>
+                <input id={`tpl-repo-${i}`} value={t.repo} onChange={(e) => update(i, { ...t, repo: e.target.value })} placeholder="github.com/acme/*" />
+              </div>
+              <button type="button" className="icon-btn" aria-label={`Remove template ${i + 1}`} onClick={() => setList(list.filter((_, n) => n !== i))}>
+                <Icon name="trash" size={14} />
+              </button>
+            </div>
+            <div className="field">
+              <label htmlFor={`tpl-ins-${i}`}>Instructions for the agent (optional)</label>
+              <textarea id={`tpl-ins-${i}`} rows={2} value={t.instructions} maxLength={2000} onChange={(e) => update(i, { ...t, instructions: e.target.value })} placeholder="Mention feature flags you touched." />
+            </div>
+            <div className="template-sections">
+              {t.sections.map((sec, j) => (
+                <div key={j} className="template-section-row">
+                  <input aria-label={`Section ${j + 1} title`} placeholder="Tests run" value={sec.title} maxLength={60}
+                    onChange={(e) => update(i, { ...t, sections: t.sections.map((x, n) => (n === j ? { ...x, title: e.target.value } : x)) })} />
+                  <input aria-label={`Section ${j + 1} hint`} placeholder="Hint for the agent (optional)" value={sec.hint} maxLength={300}
+                    onChange={(e) => update(i, { ...t, sections: t.sections.map((x, n) => (n === j ? { ...x, hint: e.target.value } : x)) })} />
+                  <label className="check">
+                    <input type="checkbox" checked={sec.required}
+                      onChange={(e) => update(i, { ...t, sections: t.sections.map((x, n) => (n === j ? { ...x, required: e.target.checked } : x)) })} /> Required
+                  </label>
+                  <button type="button" className="icon-btn" aria-label={`Remove section ${j + 1}`} onClick={() => update(i, { ...t, sections: t.sections.filter((_, n) => n !== j) })}>
+                    <Icon name="trash" size={14} />
+                  </button>
+                </div>
+              ))}
+              {t.sections.length < 10 && (
+                <button type="button" className="btn-ghost btn-sm" onClick={() => update(i, { ...t, sections: [...t.sections, { title: "", hint: "", required: false }] })}>
+                  <Icon name="plus" size={14} /> Section
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </fieldset>
+      {isAdmin ? (
+        <div className="row">
+          <button type="button" className="btn-ghost btn-sm" onClick={() => setList([...list, blankTemplate()])}>
+            <Icon name="plus" size={14} /> Template
+          </button>
+          <button type="button" className="btn-primary btn-sm" onClick={save} disabled={saving}>
+            {saving ? "Saving…" : "Save templates"}
+          </button>
+          {status && <span className={status.kind === "ok" ? "ok-text" : "error"} role="status">{status.text}</span>}
+        </div>
+      ) : (
+        <p className="hint">Only admins can change templates.</p>
+      )}
+    </section>
+  );
+}
+
+/** Download the sessions you can see, as NDJSON (one session per line). */
+function ExportCard() {
+  const [repos, setRepos] = useState<string[]>([]);
+  const [repo, setRepo] = useState("");
+  const [full, setFull] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    api.list({ limit: "100" }).then((r) => setRepos([...new Set(r.sessions.map((s) => s.repo))].sort()), () => undefined);
+  }, []);
+  async function run() {
+    setBusy(true);
+    setError("");
+    try {
+      await download(`/v1/sessions/export?${new URLSearchParams({ ...(repo ? { repo } : {}), ...(full ? { full: "1" } : {}) })}`, "sessions.ndjson");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="card">
+      <h2>Export</h2>
+      <p className="muted small">Download the sessions you can see, one JSON object per line (the newest 1000). Single sessions download from their page.</p>
+      <div className="row">
+        <select aria-label="Repository to export" value={repo} onChange={(e) => setRepo(e.target.value)}>
+          <option value="">All repositories</option>
+          {repos.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+        <label className="check">
+          <input type="checkbox" checked={full} onChange={(e) => setFull(e.target.checked)} /> Full transcripts
+        </label>
+        <button type="button" className="btn-primary btn-sm" onClick={run} disabled={busy}>
+          {busy ? "Preparing…" : "Download"}
+        </button>
+      </div>
+      {error && <p className="error">{error}</p>}
+    </section>
+  );
+}
+
 export function Settings({ me, onOrgChanged }: { me: MeResponse; onOrgChanged: () => void }) {
   return (
     <div className="page">
@@ -207,7 +395,9 @@ export function Settings({ me, onOrgChanged }: { me: MeResponse; onOrgChanged: (
         </div>
       </header>
       <OrgSettings me={me} onOrgChanged={onOrgChanged} />
+      <Templates me={me} onSaved={onOrgChanged} />
       <Tokens />
+      <ExportCard />
     </div>
   );
 }

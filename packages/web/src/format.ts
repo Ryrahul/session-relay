@@ -43,6 +43,7 @@ export type Route =
   | { page: "sessions" }
   | { page: "activity" }
   | { page: "stats" }
+  | { page: "audit" }
   | { page: "session"; id: string }
   | { page: "start" }
   | { page: "members" }
@@ -58,6 +59,7 @@ export function parseRoute(hash: string): Route {
   if (hash.startsWith("#/start")) return { page: "start" };
   if (hash.startsWith("#/activity")) return { page: "activity" };
   if (hash.startsWith("#/stats")) return { page: "stats" };
+  if (hash.startsWith("#/audit")) return { page: "audit" };
   if (hash.startsWith("#/members")) return { page: "members" };
   if (hash.startsWith("#/settings")) return { page: "settings" };
   return { page: "sessions" };

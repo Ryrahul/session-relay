@@ -11,7 +11,7 @@ import { createApp } from "./app.js";
 import { generateToken, hashToken } from "./auth.js";
 import { createDb, type Sql } from "./db/client.js";
 import { migrate } from "./db/migrate.js";
-import { purgeExpired } from "./routes/sessions.js";
+import { backfillTranscriptSearch, purgeExpired } from "./routes/sessions.js";
 import { LocalDiskStorage } from "./storage/local.js";
 
 const DB = process.env.TEST_DATABASE_URL;
@@ -238,7 +238,7 @@ describe.skipIf(!DB)("API (integration)", () => {
     expect(ok.status).toBe(200);
     const after = await call(alice.token, "GET", "/v1/me");
     expect(after.body.org.name).toBe("Team A Renamed");
-    expect(after.body.settings).toEqual({ retention_days: 30, repo_allowlist: ["github.com/acme/*"], redaction_patterns: ["ACME-[0-9]{6}"] });
+    expect(after.body.settings).toEqual({ retention_days: 30, repo_allowlist: ["github.com/acme/*"], redaction_patterns: ["ACME-[0-9]{6}"], share_templates: [] });
     expect((await call(outsider.token, "GET", "/v1/org")).body.id).toBe(orgB);
     await call(owner.token, "PATCH", "/v1/org", { retention_days: 90, repo_allowlist: [], redaction_patterns: [] });
   });
@@ -507,6 +507,119 @@ describe.skipIf(!DB)("API (integration)", () => {
     expect((await call(eli.token, "GET", `/v1/sessions/${id}`)).body.draft).toBe(false);
     expect((await call(eli.token, "GET", "/v1/stats?days=1")).body.totals.shares).toBe(1);
     expect((await call(dee.token, "PATCH", `/v1/sessions/${id}`, { draft: true })).status).toBe(400);
+  });
+
+  it("exports a session as Markdown or JSON (full transcript), and a repo as NDJSON", async () => {
+    const repo = "github.com/acme/export";
+    const transcript = Array.from({ length: 300 }, (_, i) => ({ role: i % 2 ? "assistant" : "user", text: `full message ${i}` }) as const);
+    const id = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo, title: "Export me!", include: "full" }), transcript })).body.id;
+    await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo, title: "second" }) });
+    await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo, title: "hidden", visibility: { team: false, people: [] } }) });
+
+    const md = await app.request(`/v1/sessions/${id}/export`, { headers: { authorization: `Bearer ${bob.token}` } });
+    expect(md.headers.get("content-type")).toContain("text/markdown");
+    expect(md.headers.get("content-disposition")).toContain(`${id}-export-me.md`);
+    const text = await md.text();
+    expect(text).toContain("# Export me!");
+    expect(text).toContain("messages 1–300 of 300");
+    const json = (await call(bob.token, "GET", `/v1/sessions/${id}/export?format=json`)).body;
+    expect(json.messages).toHaveLength(300);
+    expect((await call(outsider.token, "GET", `/v1/sessions/${id}/export`)).status).toBe(404);
+
+    const nd = await app.request(`/v1/sessions/export?repo=${repo}`, { headers: { authorization: `Bearer ${bob.token}` } });
+    const lines = (await nd.text()).trim().split("\n").map((l) => JSON.parse(l));
+    expect(lines.map((l) => l.title).sort()).toEqual(["Export me!", "second"]); // not the private one
+    expect(lines.find((l) => l.id === id).messages).toHaveLength(40); // stored tail without full=1
+    const ndFull = await app.request(`/v1/sessions/export?repo=${repo}&full=1`, { headers: { authorization: `Bearer ${bob.token}` } });
+    expect((await ndFull.text()).trim().split("\n").map((l) => JSON.parse(l)).find((l) => l.id === id).messages).toHaveLength(300);
+  });
+
+  it("audit log: admins only, newest first, filters and paging", async () => {
+    expect((await call(alice.token, "GET", "/v1/audit")).status).toBe(403);
+    const first = (await call(owner.token, "GET", "/v1/audit?limit=5")).body;
+    expect(first.entries).toHaveLength(5);
+    expect(first.entries[0].id).toBeGreaterThan(first.entries[4].id);
+    const next = (await call(owner.token, "GET", `/v1/audit?limit=5&before=${first.next}`)).body;
+    expect(next.entries[0].id).toBeLessThan(first.entries[4].id);
+    const exports = (await call(owner.token, "GET", "/v1/audit?action=session.export")).body.entries;
+    expect(exports.length).toBeGreaterThanOrEqual(3);
+    expect(exports.every((e: any) => e.action === "session.export")).toBe(true);
+    const shares = (await call(owner.token, "GET", `/v1/audit?action=session.share&user=${alice.userId}`)).body.entries;
+    expect(shares.length).toBeGreaterThan(0);
+    expect(shares[0].user.name).toBe("Alice");
+    expect(shares.some((e: any) => e.session_title)).toBe(true);
+    expect((await call(outsider.token, "GET", "/v1/audit?action=session.share")).body.entries.every((e: any) => e.user?.name !== "Alice")).toBe(true);
+  });
+
+  it("handoff templates: admins set them, members read the match, sessions report missing sections", async () => {
+    const templates = [
+      { repo: "github.com/acme/*", instructions: "Mention flags.", sections: [{ title: "Tests run", hint: "commands", required: true }, { title: "Risks", required: false }] },
+      { repo: "*", sections: [] },
+    ];
+    expect((await call(alice.token, "PATCH", "/v1/org", { share_templates: templates })).status).toBe(403);
+    expect((await call(owner.token, "PATCH", "/v1/org", { share_templates: [{ repo: "", sections: [] }] })).status).toBe(400);
+    expect((await call(owner.token, "PATCH", "/v1/org", { share_templates: templates })).status).toBe(200);
+    expect((await call(alice.token, "GET", "/v1/me")).body.settings.share_templates).toHaveLength(2);
+    const got = (await call(alice.token, "GET", "/v1/org/template?repo=github.com/acme/tpl")).body.template;
+    expect(got).toMatchObject({ repo: "github.com/acme/*", sections: [{ title: "Tests run", required: true, hint: "commands" }, { title: "Risks", required: false, hint: "" }] });
+    expect((await call(alice.token, "GET", "/v1/org/template?repo=gitlab.com/x")).body.template.repo).toBe("*");
+
+    const id = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo: "github.com/acme/tpl" }) })).body.id;
+    expect((await call(bob.token, "GET", `/v1/sessions/${id}?mode=summary`)).body.missing_sections).toEqual(["Tests run"]);
+    const sections = [{ title: "tests run", items: ["npm test: 15 passed"] }];
+    const cur = (await call(alice.token, "GET", `/v1/sessions/${id}?mode=summary`)).body.summary;
+    await call(alice.token, "PATCH", `/v1/sessions/${id}`, { summary: { ...cur, sections } });
+    const after = (await call(bob.token, "GET", `/v1/sessions/${id}?mode=summary`)).body;
+    expect(after.missing_sections).toEqual([]);
+    expect(after.summary.sections).toEqual(sections);
+    // Search covers section text too (it's part of the summary).
+    expect((await call(bob.token, "GET", "/v1/sessions?q=passed&repo=github.com/acme/tpl")).body.sessions.map((x: any) => x.id)).toContain(id);
+    const [log] = (await call(owner.token, "GET", "/v1/audit?action=org.update&limit=1")).body.entries;
+    expect(log.meta.share_templates).toBe(2);
+    await call(owner.token, "PATCH", "/v1/org", { share_templates: [] });
+  });
+
+  it("diffs: attached at share time, served as a patch, counted, exported, deleted with the share", async () => {
+    const diff = "diff --git a/x.ts b/x.ts\n--- a/x.ts\n+++ b/x.ts\n@@ -1 +1,2 @@\n-old\n+new\n+more\n";
+    const id = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo: "github.com/acme/diffs", title: "with diff" }), diff })).body.id;
+    const none = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo: "github.com/acme/diffs", title: "no diff" }) })).body.id;
+    expect((await call(bob.token, "GET", `/v1/sessions/${id}?mode=summary`)).body.diff).toEqual({ files: 1, additions: 2, deletions: 1 });
+    expect((await call(bob.token, "GET", `/v1/sessions/${none}?mode=summary`)).body.diff).toBeNull();
+    const rows = (await call(bob.token, "GET", "/v1/sessions?repo=github.com/acme/diffs")).body.sessions;
+    expect(Object.fromEntries(rows.map((r: any) => [r.title, r.has_diff]))).toEqual({ "with diff": true, "no diff": false });
+    const res = await app.request(`/v1/sessions/${id}/diff`, { headers: { authorization: `Bearer ${bob.token}` } });
+    expect(res.headers.get("content-type")).toContain("text/x-diff");
+    expect(await res.text()).toBe(diff);
+    expect((await call(bob.token, "GET", `/v1/sessions/${none}/diff`)).status).toBe(404);
+    expect((await call(outsider.token, "GET", `/v1/sessions/${id}/diff`)).status).toBe(404);
+    const md = await (await app.request(`/v1/sessions/${id}/export`, { headers: { authorization: `Bearer ${bob.token}` } })).text();
+    expect(md).toContain("## Uncommitted changes");
+    expect(md).toContain("+more");
+    expect(await storage.get(`${orgA}/${id}.diff.gz`)).not.toBeNull();
+    await call(alice.token, "DELETE", `/v1/sessions/${id}`);
+    expect(await storage.get(`${orgA}/${id}.diff.gz`)).toBeNull();
+    expect((await call(alice.token, "POST", "/v1/sessions", { session: upload(), diff: "x".repeat(1_000_001) })).status).toBe(400);
+  });
+
+  it("search covers full transcripts (new shares and backfilled old ones)", async () => {
+    const repo = "github.com/acme/fullsearch";
+    const transcript = [
+      { role: "user", text: "early on we discussed the flamingo cache eviction" },
+      ...Array.from({ length: 60 }, (_, i) => ({ role: "assistant", text: `filler ${i}` })),
+    ] as const;
+    // The stored tail (last 40) doesn't include the first message; only the full transcript does.
+    const id = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo, title: "full one", include: "full", messages: transcript.slice(-40) as never }), transcript })).body.id;
+    const hit = (await call(bob.token, "GET", `/v1/sessions?q=flamingo&repo=${repo}`)).body.sessions;
+    expect(hit.map((s: any) => [s.id, s.matched_in])).toEqual([[id, "transcript"]]);
+    expect((await call(bob.token, "GET", `/v1/sessions?q=filler&repo=${repo}`)).body.sessions[0].matched_in).toBeNull();
+    expect((await call(outsider.token, "GET", "/v1/sessions?q=flamingo")).body.sessions).toEqual([]);
+
+    // An older share without the index gets it from the hourly job.
+    await sql`UPDATE sessions SET transcript_search = NULL WHERE id = ${id}`;
+    expect((await call(bob.token, "GET", `/v1/sessions?q=flamingo&repo=${repo}`)).body.sessions).toEqual([]);
+    expect(await backfillTranscriptSearch(sql, storage)).toBeGreaterThanOrEqual(1);
+    expect((await call(bob.token, "GET", `/v1/sessions?q=flamingo&repo=${repo}`)).body.sessions.map((s: any) => s.id)).toEqual([id]);
+    expect(await backfillTranscriptSearch(sql, storage)).toBe(0);
   });
 
   it("records usage and audit events", async () => {

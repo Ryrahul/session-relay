@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { IncludeMode, Message, SessionUpload, Summary, Visibility } from "@session-relay/shared";
+import type { IncludeMode, Message, SessionUpload, Summary, Visibility, RedactionHit } from "@session-relay/shared";
 import type { LocalSession } from "./adapters/types.js";
 import type { RepoInfo } from "./git.js";
 import { createRedactor } from "@session-relay/shared";
@@ -19,6 +19,11 @@ export interface BuildOptions {
 export interface BuiltShare {
   session: SessionUpload;
   transcript?: Message[];
+  /** Uncommitted changes, redacted (only when asked for). */
+  diff?: string;
+  diffTruncated?: boolean;
+  /** Where secrets were removed, with redacted context (first 500). */
+  hits: RedactionHit[];
   redactions: Record<string, number>;
 }
 
@@ -38,6 +43,7 @@ export function fallbackSummary(messages: Message[]): Summary {
     done: lastAnswer ? [lastAnswer.slice(0, 500)] : [],
     next: [],
     open_questions: [],
+    sections: [],
   };
 }
 
@@ -61,6 +67,7 @@ export function buildShare(local: LocalSession, repo: RepoInfo, opts: BuildOptio
     done: raw.done.map(clean),
     next: raw.next.map(clean),
     open_questions: raw.open_questions.map(clean),
+    sections: (raw.sections ?? []).map((s) => ({ title: clean(s.title).slice(0, 60), items: s.items.map(clean) })),
   };
 
   const session: SessionUpload = {
@@ -79,5 +86,5 @@ export function buildShare(local: LocalSession, repo: RepoInfo, opts: BuildOptio
     draft: false,
   };
   session.redactions = redact.total();
-  return { session, transcript: opts.include === "full" ? all : undefined, redactions: { ...redact.counts } };
+  return { session, transcript: opts.include === "full" ? all : undefined, redactions: { ...redact.counts }, hits: redact.hits };
 }

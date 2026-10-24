@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ChainLink, Member, MeResponse, Message, SessionDetail } from "@session-relay/shared";
-import { api } from "../api";
+import { matchTemplate, splitDiff, type DiffFile, type ChainLink, type Member, type MeResponse, type Message, type SessionDetail, type SummarySection } from "@session-relay/shared";
+import { api, download } from "../api";
 import { ago, dateTime, prLabel, shortRepo, TOOL_NAMES } from "../format";
 import { RichText } from "../text";
 import { Avatar, Command, Icon, ToolBadge } from "../ui";
@@ -86,7 +86,18 @@ function ItemsField({ id, label, items, onChange }: { id: string; label: string;
 const clean = (items: string[]) => items.map((i) => i.trim()).filter(Boolean);
 
 /** Edit a share in place: title, summary, who it's for and the PR. Author or admin. */
-function EditPanel({ s, onSaved, onCancel }: { s: SessionDetail; onSaved: () => void; onCancel: () => void }) {
+function EditPanel({ s, me, onSaved, onCancel }: { s: SessionDetail; me: MeResponse; onSaved: () => void; onCancel: () => void }) {
+  // The share's own sections, plus empty ones the repo's template asks for.
+  const template = matchTemplate(me.settings.share_templates ?? [], s.repo);
+  const [sections, setSections] = useState<SummarySection[]>(() => {
+    const own = (s.summary.sections ?? []).map((x) => ({ ...x, items: [...x.items] }));
+    for (const t of template?.sections ?? []) {
+      // Required ones start with a box to type in.
+      if (!own.some((o) => o.title.toLowerCase() === t.title.toLowerCase())) own.push({ title: t.title, items: t.required ? [""] : [] });
+    }
+    return own;
+  });
+  const hintFor = (title: string) => template?.sections.find((t) => t.title.toLowerCase() === title.toLowerCase());
   const [title, setTitle] = useState(s.title);
   const [goal, setGoal] = useState(s.summary.goal);
   const [next, setNext] = useState(s.summary.next);
@@ -110,7 +121,14 @@ function EditPanel({ s, onSaved, onCancel }: { s: SessionDetail; onSaved: () => 
     try {
       await api.update(s.id, {
         title: title.trim() || s.title,
-        summary: { goal: goal.trim(), next: clean(next), decisions: clean(decisions), done: clean(done), open_questions: clean(questions) },
+        summary: {
+          goal: goal.trim(),
+          next: clean(next),
+          decisions: clean(decisions),
+          done: clean(done),
+          open_questions: clean(questions),
+          sections: sections.map((x) => ({ title: x.title, items: clean(x.items) })).filter((x) => x.items.length),
+        },
         assignee: assignee || null,
         pr_url: pr.trim() || null,
       });
@@ -139,6 +157,20 @@ function EditPanel({ s, onSaved, onCancel }: { s: SessionDetail; onSaved: () => 
       <ItemsField id="edit-decisions" label="Decisions" items={decisions} onChange={setDecisions} />
       <ItemsField id="edit-done" label="Done" items={done} onChange={setDone} />
       <ItemsField id="edit-questions" label="Open questions" items={questions} onChange={setQuestions} />
+      {sections.map((sec, i) => {
+        const t = hintFor(sec.title);
+        return (
+          <div key={sec.title} className="template-section">
+            <ItemsField
+              id={`edit-section-${i}`}
+              label={sec.title + (t?.required ? " (required)" : "")}
+              items={sec.items}
+              onChange={(items) => setSections(sections.map((x, n) => (n === i ? { ...x, items } : x)))}
+            />
+            {t?.hint && <p className="faint small">{t.hint}</p>}
+          </div>
+        );
+      })}
       <div className="edit-row">
         <div className="field">
           <label htmlFor="edit-assignee">For</label>
@@ -247,6 +279,72 @@ function Comments({ s, me, onChange }: { s: SessionDetail; me: MeResponse; onCha
           <span className="faint small">Don't paste secrets here.</span>
         </div>
       </form>
+    </section>
+  );
+}
+
+function DiffFileView({ f }: { f: DiffFile }) {
+  const [open, setOpen] = useState(false);
+  const lines = f.patch.split("\n");
+  // Skip the git headers; show from the first hunk.
+  const body = lines.slice(Math.max(0, lines.findIndex((l) => l.startsWith("@@"))));
+  return (
+    <li className="diff-file">
+      <button type="button" className="diff-file-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <span className={`chev ${open ? "open" : ""}`}>
+          <Icon name="chevron" size={12} />
+        </span>
+        <span className="mono diff-path">{f.path}</span>
+        <span className="diff-count">
+          {f.binary ? "binary" : <><span className="add">+{f.additions}</span> <span className="del">−{f.deletions}</span></>}
+        </span>
+      </button>
+      {open && !f.binary && (
+        <pre className="diff-body">
+          {body.map((l, i) => (
+            <span key={i} className={l.startsWith("@@") ? "hunk" : l.startsWith("+") ? "add" : l.startsWith("-") ? "del" : ""}>
+              {l + "\n"}
+            </span>
+          ))}
+        </pre>
+      )}
+    </li>
+  );
+}
+
+/** Uncommitted changes attached at share time, loaded on demand. */
+function DiffCard({ s }: { s: SessionDetail }) {
+  const [files, setFiles] = useState<DiffFile[] | null>(null);
+  const [error, setError] = useState("");
+  if (!s.diff) return null;
+  const load = () => api.diff(s.id).then((d) => setFiles(splitDiff(d)), (e) => setError(e.message));
+  return (
+    <section className="diff-card">
+      <div className="conversation-head">
+        <h2>Uncommitted changes</h2>
+        <span className="muted">
+          {s.diff.files} file{s.diff.files === 1 ? "" : "s"} · <span className="add">+{s.diff.additions}</span> <span className="del">−{s.diff.deletions}</span>
+        </span>
+        {!files && (
+          <button type="button" className="btn-ghost btn-sm" onClick={load}>
+            Show changes
+          </button>
+        )}
+        <button type="button" className="btn-ghost btn-sm" onClick={() => download(`/v1/sessions/${s.id}/diff`, `${s.id}.patch`).catch((e) => setError(e.message))}>
+          <Icon name="download" size={14} /> .patch
+        </button>
+      </div>
+      <p className="muted small">
+        The author's working tree when they shared. Apply it with <code>relay pull {s.id}</code> then <code>git apply</code>.
+      </p>
+      {error && <p className="error">{error}</p>}
+      {files && (
+        <ul className="diff-files">
+          {files.map((f) => (
+            <DiffFileView key={f.path} f={f} />
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
@@ -427,6 +525,7 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
           {editing && (
             <EditPanel
               s={s}
+              me={me}
               onCancel={() => setEditing(false)}
               onSaved={() => {
                 setEditing(false);
@@ -442,7 +541,23 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
           <Section title="Decisions" items={s.summary.decisions} />
           <Section title="Done" items={s.summary.done} />
           <Section title="Open questions" items={s.summary.open_questions} />
+          {(s.summary.sections ?? []).map((sec) => (
+            <Section key={sec.title} title={sec.title} items={sec.items} />
+          ))}
+          {s.missing_sections.length > 0 && (
+            <section className="card missing-banner" role="note">
+              <div>
+                <strong>Missing from this repo's handoff template:</strong> {s.missing_sections.join(", ")}
+              </div>
+              {canEdit && !editing && (
+                <button type="button" className="btn-ghost btn-sm" onClick={() => setEditing(true)}>
+                  <Icon name="edit" size={14} /> Add them
+                </button>
+              )}
+            </section>
+          )}
 
+          <DiffCard s={s} />
           <section className="conversation">
             <div className="conversation-head">
               <h2>Conversation</h2>
@@ -546,6 +661,19 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
                 <Icon name="lock" size={12} /> {s.redactions} secret{s.redactions === 1 ? " was" : "s were"} removed before upload.
               </p>
             )}
+          </section>
+
+          <section className="card">
+            <h2>Download</h2>
+            <p className="muted small">The whole session{s.has_full_transcript ? ", full transcript included" : ""}.</p>
+            <div className="row">
+              <button type="button" className="btn-ghost btn-sm" onClick={() => download(`/v1/sessions/${s.id}/export?format=md`, `${s.id}.md`).catch((e) => setError(e.message))}>
+                <Icon name="download" size={14} /> Markdown
+              </button>
+              <button type="button" className="btn-ghost btn-sm" onClick={() => download(`/v1/sessions/${s.id}/export?format=json`, `${s.id}.json`).catch((e) => setError(e.message))}>
+                <Icon name="download" size={14} /> JSON
+              </button>
+            </div>
           </section>
 
           {s.files_touched.length > 0 && (

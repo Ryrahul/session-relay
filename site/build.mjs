@@ -163,11 +163,11 @@ retry path. Starting with that now.</pre>
     </div>
     <div>
       <h3>Private by default</h3>
-      <p>Nothing leaves your laptop unless you share it. API keys, tokens, passwords and private keys are removed before upload. Share with the whole team or specific people.</p>
+      <p>Nothing leaves your laptop unless you share it. API keys, tokens, passwords and private keys are removed before upload; test your own patterns in Settings. Share with the whole team or specific people.</p>
     </div>
     <div>
       <h3>Built for teams</h3>
-      <p>Organizations, roles, retention, a repo allowlist, your own secret patterns and an audit log. An Activity digest and Stats show who shares and who picks up.</p>
+      <p>Organizations, roles, handoff templates per repo, retention, a repo allowlist, your own secret patterns and an audit log. An Activity digest and Stats show who shares and who picks up.</p>
     </div>
     <div>
       <h3>Handoff chains</h3>
@@ -183,7 +183,7 @@ retry path. Starting with that now.</pre>
     </div>
     <div>
       <h3>Linked to your PRs</h3>
-      <p>Shares pick up the branch's open pull request automatically. Find every session that touched a file with <code>file:src/billing.ts</code>.</p>
+      <p>Shares pick up the branch's open pull request automatically, and can carry your uncommitted changes as a patch. Find every session that touched a file with <code>file:src/billing.ts</code>.</p>
     </div>
     <div>
       <h3>Small to run</h3>

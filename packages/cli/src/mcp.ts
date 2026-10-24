@@ -3,9 +3,9 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { SourceTool } from "@session-relay/shared";
 import { z } from "zod";
 import { RelayClient, resolvePeople, resolvePerson } from "./client.js";
-import type { SessionPatch } from "@session-relay/shared";
+import { describeTemplate, matchTemplate, missingSections, type SessionPatch } from "@session-relay/shared";
 import { repoInfo } from "./git.js";
-import { renderHandoff } from "./handoff.js";
+import { renderHandoff } from "@session-relay/shared";
 import { recordPickup } from "./pickups.js";
 import { renderDigest } from "./digest.js";
 import { describeRedactions, prepareShare, uploadShare } from "./share.js";
@@ -16,7 +16,7 @@ import { VERSION } from "./version.js";
 const INSTRUCTIONS = `Session Relay shares coding-agent sessions between teammates (Claude Code, Codex, OpenCode, ZCode, Gemini CLI, Copilot CLI, Cursor).
 - To continue someone's work: search_sessions or list_sessions, then get_session (mode "tail") and read the summary, next steps and recent conversation before acting.
 - Handoffs assigned to you: list_sessions with for_me.
-- To share this session: write an honest handoff summary (goal, decisions, done, next, open questions; never secrets) and call share_current_session.
+- To share this session: call share_template first (some repos ask for extra sections), then write an honest handoff summary (goal, decisions, done, next, open questions, plus the template's sections; never secrets) and call share_current_session.
 - To fix or extend a share you made (new next steps, PR link, who it's for): update_session.
 - "What did the team do today/this week?": team_activity.
 - To leave a note on someone's session (a question, "picked this up", a finding): comment_on_session. Comments show up in get_session.`;
@@ -43,7 +43,7 @@ function formatList(rows: Awaited<ReturnType<RelayClient["list"]>>["sessions"]):
     .map(
       (s) =>
         `- ${s.id} · "${s.title}" · ${s.author.name} · ${s.tool} · ${s.branch ?? "-"} · ${ago(s.created_at)}` +
-        `${s.assignee ? ` · for ${s.assignee.name}` : ""}${s.pr_url ? ` · ${s.pr_url}` : ""}${s.comment_count ? ` · ${s.comment_count} comments` : ""}` +
+        `${s.assignee ? ` · for ${s.assignee.name}` : ""}${s.pr_url ? ` · ${s.pr_url}` : ""}${s.comment_count ? ` · ${s.comment_count} comments` : ""}${s.matched_in === "transcript" ? " · matched in the full transcript (get_session mode full)" : ""}` +
         `\n  goal: ${s.goal.slice(0, 200)}`,
     )
     .join("\n");
@@ -126,6 +126,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         let out = renderHandoff(s);
         const end = s.message_offset + s.messages.length;
         if (mode === "full" && end < s.message_total) out += `\n(More messages: call get_session with mode "full" and offset ${end}.)`;
+        if (s.diff) out += `\n(Uncommitted changes are attached: call get_session_diff with id "${s.id}".)`;
         return text(out);
       } catch (err) {
         return fail(err);
@@ -151,6 +152,9 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
           .string()
           .optional()
           .describe('Id of the shared session this work continues. Defaults to the one loaded with get_session in this repo; "none" to unlink.'),
+        sections: z.array(z.object({ title: z.string(), items: z.array(z.string()) })).optional().describe("Extra sections, e.g. the ones share_template asks for"),
+        include_diff: z.boolean().optional().describe("Attach the uncommitted changes in this repo (redacted), so the next person gets the exact code state"),
+        ignore_template: z.boolean().optional().describe("Share even if the repo's template has required sections you left empty"),
         for: z.string().optional().describe("Name or email of the teammate this handoff is for"),
         pr_url: z.string().optional().describe('Pull request URL. Defaults to the current branch\'s open PR (via gh); "none" to leave out'),
       },
@@ -167,19 +171,70 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
           continues: args.continues,
           assign: args.for,
           pr: args.pr_url,
+          diff: args.include_diff,
           summary: {
             goal: args.goal,
             decisions: args.decisions ?? [],
             done: args.done ?? [],
             next: args.next ?? [],
             open_questions: args.open_questions ?? [],
+            sections: (args.sections ?? []).map((x) => ({ title: x.title.slice(0, 60), items: x.items })),
           },
         });
         const { session } = prepared.built;
+        if (!args.ignore_template) {
+          const t = matchTemplate((await client.me()).settings.share_templates ?? [], session.repo);
+          const missing = missingSections(t, session.summary);
+          if (missing.length && t) {
+            return fail(
+              new Error(
+                `Not shared yet: this repo's handoff template requires ${missing.join(", ")}. Add them as \`sections\` and call again (or pass ignore_template if they don't apply).\n\n${describeTemplate(t)}`,
+              ),
+            );
+          }
+        }
         const { id, continues } = await uploadShare(client, prepared);
         return text(
           `Shared as ${id}: "${session.title}" (${session.include}, ${session.messages.length} messages, ${session.visibility.team ? "whole team" : "selected people"}). ${describeRedactions(prepared.built.redactions)}${continues ? `\nContinues ${continues}.` : ""}${args.for ? `\nFor ${args.for}.` : ""}${session.pr_url ? `\nPR ${session.pr_url}.` : ""}\nTeammates can load it with get_session("${id}") or \`relay pull ${id}\`.`,
         );
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_session_diff",
+    {
+      description:
+        "The uncommitted changes a teammate attached to a shared session, as a unified diff. Use it to see exact code state; to apply it, write it to a file and run `git apply`.",
+      inputSchema: { id: z.string(), max_chars: z.number().int().min(1000).max(500000).optional() },
+    },
+    async ({ id, max_chars }) => {
+      try {
+        const client = await getClient();
+        const diff = await client.diff(id);
+        const max = max_chars ?? 100_000;
+        return text(diff.length > max ? `${diff.slice(0, max)}\n[cut at ${max} characters of ${diff.length}; ask for more with max_chars]` : diff);
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "share_template",
+    {
+      description: "The handoff template for the current repo: extra sections (some required) and instructions to follow when sharing. Call it before share_current_session.",
+      inputSchema: {},
+    },
+    async () => {
+      try {
+        const client = await getClient();
+        const repo = await currentRepo();
+        if (!repo) return text("Not in a git repo; no template applies.");
+        const { template: t } = await client.template(repo);
+        return text(t ? describeTemplate(t) : `No handoff template for ${repo}: the standard summary is enough.`);
       } catch (err) {
         return fail(err);
       }
@@ -234,6 +289,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         next: z.array(z.string()).optional(),
         add_next: z.array(z.string()).optional().describe("Next steps to append to the existing ones"),
         open_questions: z.array(z.string()).optional(),
+        sections: z.array(z.object({ title: z.string(), items: z.array(z.string()) })).optional().describe("Replaces the extra sections"),
         for: z.string().optional().describe('Teammate name or email, or "none"'),
         pr_url: z.string().optional().describe('Pull request URL, or "none"'),
         people: z.array(z.string()).optional().describe("Make it visible only to these people; an empty list makes it visible to the whole team"),
@@ -245,7 +301,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         const client = await getClient();
         const patch: SessionPatch = {};
         if (args.title) patch.title = args.title;
-        const summaryKeys = ["goal", "decisions", "done", "next", "add_next", "open_questions"] as const;
+        const summaryKeys = ["goal", "decisions", "done", "next", "add_next", "open_questions", "sections"] as const;
         if (summaryKeys.some((k) => args[k] !== undefined)) {
           const cur = (await client.get(args.id, "summary")).summary;
           patch.summary = {
@@ -254,6 +310,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
             done: args.done ?? cur.done,
             next: [...(args.next ?? cur.next), ...(args.add_next ?? [])],
             open_questions: args.open_questions ?? cur.open_questions,
+            sections: args.sections ?? cur.sections ?? [],
           };
         }
         if (args.for) patch.assignee = args.for === "none" ? null : await resolvePerson(client, args.for);

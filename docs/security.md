@@ -52,8 +52,11 @@ The number of redactions is shown when you share and on the session page. Redact
 ## Who can see a share
 
 - Sessions belong to your **org**. Nobody outside it can list, read or even confirm that a session exists. That's enforced on every query and covered by tests.
+- Admins can test the built-in rules and the org's patterns on sample text in **Settings → Extra secret patterns → Test patterns** (runs in the browser; nothing is sent). `relay share --dry-run` lists each redaction with surrounding (already redacted) text.
+- Full transcripts are searchable: when a full transcript is shared, an index of its words (not the text) is stored in Postgres next to the share and deleted with it.
 - Inside the org, a share is visible to **everyone** (default) or only to **selected people** (`/share only Bob`, `--people`). A handoff **for** someone (`--for`) is always visible to that person too.
 - Comments are visible to everyone who can see the session. Secrets are removed from them (by the CLI, and again on the server for comments typed in the web app). Only a comment's author or an admin can delete it.
+- **Diffs** are only attached when you ask (`--diff`, "with the diff"). They contain your code changes; secrets in them are redacted like the conversation, files over 100 KB are left out, and the total is capped at 500 KB. They're stored next to full transcripts and deleted with the share.
 - **Drafts** (from `--auto-share`) are visible only to their author, admins included, until published. Turning auto-share on uploads drafts automatically, so only enable it if that's fine for your repos; redaction applies as usual.
 - Only the author or an admin can edit a share. Pull request links must be `http(s)` URLs.
 - The author or an org admin can change or delete a share.
@@ -84,7 +87,7 @@ The number of redactions is shown when you share and on the session page. Redact
 
 ## Audit and usage
 
-Every share, pull, pickup, edit, comment, delete, invite, token change and settings change is recorded in an audit log, with who did it and when. Admin access to it in the web app is planned; it is in the `audit_log` table today.
+Every share, pull, pickup, edit, comment, delete, invite, token change and settings change is recorded in an audit log, with who did it and when. Admins see it in the web app (**Audit log**) and with `relay audit`. Exports are recorded too.
 
 ## Self-hosted data
 

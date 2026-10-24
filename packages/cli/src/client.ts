@@ -1,5 +1,6 @@
 import type {
   Activity,
+  AuditEntry,
   Comment,
   Stats,
   DetailMode,
@@ -8,9 +9,10 @@ import type {
   SessionDetail,
   SessionListItem,
   SessionPatch,
+  ShareTemplate,
   ShareRequest,
 } from "@session-relay/shared";
-import { api } from "./api.js";
+import { api, apiText } from "./api.js";
 import { resolveConfig, type CliConfig } from "./config.js";
 import { createRedactor } from "@session-relay/shared";
 
@@ -72,11 +74,30 @@ export class RelayClient {
   remove(id: string) {
     return api<{ ok: true }>(this.config, "DELETE", `v1/sessions/${encodeURIComponent(id)}`);
   }
+  template(repo: string) {
+    return api<{ template: ShareTemplate | null }>(this.config, "GET", `v1/org/template?repo=${encodeURIComponent(repo)}`);
+  }
   activity(days = 1) {
     return api<Activity>(this.config, "GET", `v1/activity?days=${days}`);
   }
   stats(days = 30) {
     return api<Stats>(this.config, "GET", `v1/stats?days=${days}`);
+  }
+  diff(id: string) {
+    return apiText(this.config, `v1/sessions/${encodeURIComponent(id)}/diff`);
+  }
+  export(id: string, format: "md" | "json") {
+    return apiText(this.config, `v1/sessions/${encodeURIComponent(id)}/export?format=${format}`);
+  }
+  exportAll(query: { repo?: string; since?: string; author?: string; full?: boolean }) {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(query)) if (v) params.set(k, v === true ? "1" : String(v));
+    return apiText(this.config, `v1/sessions/export?${params}`);
+  }
+  audit(query: { action?: string; user?: string; target?: string; before?: number; limit?: number }) {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== "") params.set(k, String(v));
+    return api<{ entries: AuditEntry[]; next: number | null }>(this.config, "GET", `v1/audit?${params}`);
   }
   members() {
     return api<{ members: Member[] }>(this.config, "GET", "v1/members");

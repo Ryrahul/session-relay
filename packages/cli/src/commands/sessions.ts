@@ -2,14 +2,14 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { IncludeMode, SourceTool, Summary, type DetailMode, type SessionPatch } from "@session-relay/shared";
+import { describeTemplate, diffStats, IncludeMode, matchTemplate, missingSections, SourceTool, Summary, type DetailMode, type SessionPatch, type SummarySection } from "@session-relay/shared";
 import { findSessions } from "../adapters/index.js";
 import { RelayClient, resolvePeople, resolvePerson } from "../client.js";
 import { repoInfo } from "../git.js";
 import { renderDigest } from "../digest.js";
-import { renderHandoff } from "../handoff.js";
+import { renderHandoff } from "@session-relay/shared";
 import { recordPickup } from "../pickups.js";
-import { describeRedactions, prepareShare, relayDir, uploadShare, writeDryRun } from "../share.js";
+import { describeRedactions, listRedactions, prepareShare, relayDir, uploadShare, writeDryRun } from "../share.js";
 import { ago, ask, choose, confirm, interactive, toolLabel } from "../ui.js";
 
 interface ShareOpts {
@@ -27,6 +27,7 @@ interface ShareOpts {
   continues?: string;
   for?: string;
   pr?: string;
+  diff?: boolean;
 }
 
 function parseTool(t?: string): SourceTool | undefined {
@@ -90,20 +91,32 @@ export async function share(opts: ShareOpts): Promise<void> {
     continues: opts.continues,
     assign: opts.for,
     pr: opts.pr,
+    diff: opts.diff,
   });
   const { session } = prepared.built;
   const redactNote = describeRedactions(prepared.built.redactions);
 
+  const hitList = listRedactions(prepared.built.hits);
   if (opts.dryRun) {
     const file = await writeDryRun(prepared);
-    console.log(`${redactNote}\nDry run: nothing was uploaded. Review ${path.relative(process.cwd(), file) || file}`);
+    console.log(`${redactNote}${hitList ? `\n${hitList}` : ""}\nDry run: nothing was uploaded. Review ${path.relative(process.cwd(), file) || file}`);
     return;
   }
   if (!opts.json) {
     console.log(`\n"${session.title}" · ${toolLabel(prepared.ref.tool).trim()} · ${session.include} · ${session.messages.length} messages · ${session.visibility.team ? "whole team" : `${session.visibility.people.length} people`}`);
     console.log(redactNote);
+    if (hitList && ask_) console.log(hitList);
     if (session.continues) console.log(`Continues ${session.continues}${prepared.continuesAuto ? " (the session you picked up here)" : ""}. Use --continues none to unlink.`);
     if (opts.for) console.log(`For ${opts.for}.`);
+    if (opts.diff) {
+      const d = prepared.built.diff;
+      console.log(d ? `Uncommitted changes: ${diffStats(d).files} files${prepared.built.diffTruncated ? " (cut to fit)" : ""}.` : "No uncommitted changes to attach.");
+    }
+    if (client) {
+      const t = matchTemplate((await client.me()).settings.share_templates ?? [], session.repo);
+      const missing = missingSections(t, session.summary);
+      if (missing.length) console.log(`Note: this repo's handoff template asks for ${missing.join(", ")}. Add them with --summary-file, or later: relay edit <id> --section "${missing[0]}=…"`);
+    }
     if (session.pr_url) console.log(`PR ${session.pr_url}${opts.pr ? "" : " (this branch's open PR; --pr none to leave it out)"}`);
   }
   if (ask_ && !(await confirm("Share it?"))) return console.log("Cancelled.");
@@ -139,6 +152,7 @@ async function printList(query: Record<string, string | number | undefined>, jso
       s.pr_url ? `PR #${s.pr_url.split("/").pop()}` : "",
       s.comment_count ? `${s.comment_count} comment${s.comment_count === 1 ? "" : "s"}` : "",
       s.draft ? "draft" : "",
+      s.matched_in === "transcript" ? "matched in full transcript" : "",
     ]
       .filter(Boolean)
       .join(", ");
@@ -181,6 +195,8 @@ interface EditOpts {
   addDone?: string[];
   addNext?: string[];
   addQuestion?: string[];
+  /** "Title=item": add an item to a section (created if missing). */
+  section?: string[];
   clearNext?: boolean;
   summaryFile?: string;
   for?: string;
@@ -189,12 +205,36 @@ interface EditOpts {
   people?: string;
 }
 
+/** Applies "Title=item" additions to a summary's sections. */
+export function addToSections(sections: SummarySection[], adds: string[]): SummarySection[] {
+  const out = sections.map((s) => ({ ...s, items: [...s.items] }));
+  for (const add of adds) {
+    const at = add.indexOf("=");
+    if (at < 1) throw new Error(`--section takes "Title=item", got "${add}"`);
+    const title = add.slice(0, at).trim();
+    const item = add.slice(at + 1).trim();
+    const hit = out.find((s) => s.title.toLowerCase() === title.toLowerCase());
+    if (hit) hit.items.push(item);
+    else out.push({ title, items: [item] });
+  }
+  return out;
+}
+
+/** relay template: the handoff template for this repo. */
+export async function template(opts: { repo?: string }): Promise<void> {
+  const client = await RelayClient.fromConfig();
+  const repo = opts.repo ?? (await repoInfo()).repo;
+  const { template: t } = await client.template(repo);
+  console.log(t ? describeTemplate(t) : `No handoff template for ${repo}. Admins can add one in the web app: Settings → Handoff templates.`);
+}
+
 /** relay edit: change a share after it was made (author or admin). */
 export async function edit(id: string, opts: EditOpts): Promise<void> {
   const client = await RelayClient.fromConfig();
   const patch: SessionPatch = {};
   if (opts.title) patch.title = opts.title;
-  const touchesSummary = opts.goal || opts.summaryFile || opts.clearNext || opts.addDecision || opts.addDone || opts.addNext || opts.addQuestion;
+  const touchesSummary =
+    opts.goal || opts.summaryFile || opts.clearNext || opts.addDecision || opts.addDone || opts.addNext || opts.addQuestion || opts.section;
   if (touchesSummary) {
     const current = opts.summaryFile
       ? Summary.parse(JSON.parse(await readFile(opts.summaryFile, "utf8")))
@@ -205,6 +245,7 @@ export async function edit(id: string, opts: EditOpts): Promise<void> {
       done: [...current.done, ...(opts.addDone ?? [])],
       next: [...(opts.clearNext ? [] : current.next), ...(opts.addNext ?? [])],
       open_questions: [...current.open_questions, ...(opts.addQuestion ?? [])],
+      sections: addToSections(current.sections ?? [], opts.section ?? []),
     };
   }
   if (opts.for) patch.assignee = opts.for === "none" ? null : await resolvePerson(client, opts.for);
@@ -279,6 +320,53 @@ export async function pull(id: string, opts: { full?: boolean; summaryOnly?: boo
   await writeFile(file, renderHandoff(s));
   const rel = path.relative(process.cwd(), file) || file;
   console.log(`Wrote ${rel}\nTell your agent: "Read ${rel} and continue from where it stopped."`);
+  if (s.diff) {
+    const patch = path.join(path.dirname(file), `diff-${s.id}.patch`);
+    await writeFile(patch, await client.diff(s.id));
+    const prel = path.relative(process.cwd(), patch) || patch;
+    console.log(`Wrote ${prel} (${s.diff.files} files of uncommitted changes). Apply them with: git apply ${prel}`);
+  }
+}
+
+/** relay export: one session as Markdown/JSON, or (with no id) every session of a repo as NDJSON. */
+export async function exportCmd(
+  id: string | undefined,
+  opts: { format?: string; out?: string; repo?: string; all?: boolean; full?: boolean; since?: string },
+): Promise<void> {
+  const client = await RelayClient.fromConfig();
+  if (id) {
+    const format = opts.format === "json" ? "json" : "md";
+    const body = await client.export(id, format);
+    if (!opts.out) return void process.stdout.write(body);
+    await writeFile(opts.out, body);
+    return console.log(`Wrote ${opts.out}`);
+  }
+  let repo = opts.repo;
+  if (!repo && !opts.all) repo = await repoInfo().then((r) => r.repo).catch(() => undefined);
+  if (!repo && !opts.all) throw new Error("Run inside a repo, or pass --repo <repo> or --all.");
+  const body = await client.exportAll({ repo, since: opts.since, full: opts.full });
+  const count = body.trim() ? body.trim().split("\n").length : 0;
+  const out = opts.out ?? `sessions-${(repo ?? "all").split("/").pop()}.ndjson`;
+  await writeFile(out, body);
+  console.log(`Wrote ${count} session${count === 1 ? "" : "s"} to ${out} (one JSON object per line${opts.full ? ", full transcripts" : ""}).`);
+}
+
+/** relay audit: the org's audit log (admins). */
+export async function auditCmd(opts: { action?: string; user?: string; session?: string; limit?: string; json?: boolean }): Promise<void> {
+  const client = await RelayClient.fromConfig();
+  const user = opts.user ? await resolvePerson(client, opts.user) : undefined;
+  const { entries } = await client.audit({ action: opts.action, user, target: opts.session, limit: Number(opts.limit) || 50 });
+  if (opts.json) return console.log(JSON.stringify(entries, null, 2));
+  if (!entries.length) return console.log("No audit entries.");
+  for (const e of entries) {
+    const when = new Date(e.created_at).toISOString().slice(0, 16).replace("T", " ");
+    const meta = Object.entries(e.meta)
+      .filter(([, v]) => v !== null && v !== undefined && typeof v !== "object")
+      .map(([k, v]) => `${k}=${v}`)
+      .join(" ");
+    const target = e.session_title ? `"${e.session_title}" (${e.target_id})` : (e.target_id ?? meta);
+    console.log(`${when}  ${(e.user?.name ?? "-").slice(0, 16).padEnd(16)} ${e.action.padEnd(22)} ${target}`);
+  }
 }
 
 /** relay digest: what the team did lately. */

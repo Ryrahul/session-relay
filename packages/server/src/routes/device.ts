@@ -30,7 +30,7 @@ export function deviceRoutes(sql: Sql, publicUrl: string) {
   const app = new Hono<AppEnv>();
   const base = publicUrl.replace(/\/$/, "");
 
-  app.post("/", rateLimit(20, 60_000), async (c) => {
+  app.post("/", rateLimit(sql, "device-start", 20, 60_000), async (c) => {
     const { client_name } = parseBody(z.object({ client_name: z.string().trim().min(1).max(80).default("relay CLI") }), await c.req.json().catch(() => ({})));
     const deviceCode = "dev_" + randomBytes(32).toString("base64url");
     const code = userCode();
@@ -50,7 +50,7 @@ export function deviceRoutes(sql: Sql, publicUrl: string) {
     return c.json(body, 201);
   });
 
-  app.post("/token", rateLimit(60, 60_000), async (c) => {
+  app.post("/token", rateLimit(sql, "device-poll", 60, 60_000), async (c) => {
     const { device_code } = parseBody(z.object({ device_code: z.string().min(10).max(200) }), await c.req.json().catch(() => ({})));
     const hash = hashToken(device_code);
     const result = await sql.begin(async (tx) => {

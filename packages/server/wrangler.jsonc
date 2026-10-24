@@ -1,0 +1,31 @@
+// Session Relay on Cloudflare Workers. See docs/cloudflare.md.
+// Replace the two REPLACE_ME values (or let the Deploy workflow do it from repository variables).
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "session-relay",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // The web app (packages/web/dist) is served as static assets; the API runs in the Worker.
+  "assets": {
+    "directory": "../web/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/v1/*", "/health"]
+  },
+
+  // Postgres through Hyperdrive: `wrangler hyperdrive create session-relay --connection-string=...`
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "REPLACE_ME_HYPERDRIVE_ID" }],
+
+  // Full transcripts: `wrangler r2 bucket create session-relay-transcripts`
+  "r2_buckets": [{ "binding": "TRANSCRIPTS", "bucket_name": "session-relay-transcripts" }],
+
+  // Hourly: delete expired shares and old rate-limit counters.
+  "triggers": { "crons": ["17 * * * *"] },
+
+  // The URL people use (shown in invite links and `relay login`).
+  "vars": { "PUBLIC_URL": "https://REPLACE_ME.example.com" }
+
+  // Secret, only for first-run setup: `wrangler secret put SETUP_CODE` (remove it after setup).
+}

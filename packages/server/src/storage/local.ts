@@ -1,6 +1,6 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { BlobStorage } from "./index.js";
+import type { BlobStorage } from "./types.js";
 
 export class LocalDiskStorage implements BlobStorage {
   private readonly root: string;

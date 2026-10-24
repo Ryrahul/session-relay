@@ -72,7 +72,7 @@ export function inviteRoutes(sql: Sql, publicUrl: string) {
 /** Public side: look at an invite and accept it. No auth; the secret in the link is the credential. */
 export function joinRoutes(sql: Sql) {
   const app = new Hono<AppEnv>();
-  app.use("*", rateLimit(30, 60_000));
+  app.use("*", rateLimit(sql, "join", 30, 60_000));
 
   const live = (s: string) => sql`
     SELECT i.id, i.org_id, i.role, i.expires_at, o.name AS org_name

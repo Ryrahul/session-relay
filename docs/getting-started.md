@@ -93,6 +93,8 @@ relay edit rs_7KQ2M9XA --add-next "load-test the retry path" --for bob
 relay pr-comment rs_7KQ2M9XA    # post a link to the session on its pull request
 ```
 
+Teammates can leave **comments** on a session (web app, `relay comment rs_7KQ2M9XA "…"`, or "comment on Alice's session that…" in an agent). Whoever picks it up next sees them.
+
 ## 5. Pick up a session
 
 In your agent:
@@ -124,6 +126,7 @@ Open your server's address in a browser and sign in with your token. You can:
 - browse, search and read shared sessions, including the full conversation and tool calls
 - filter to **For me**, by agent, by repo, or search `file:` and `branch:`
 - **Edit** your shares: title, summary, next steps, who it's for, the pull request
+- **Comment** on any session you can see
 - invite teammates with a link (admins), and create or revoke your own tokens
 - if you're an admin, change org settings: retention, allowed repositories, extra secret patterns
 

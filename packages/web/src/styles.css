@@ -338,3 +338,14 @@ a.badge-link:hover { color: var(--accent); }
 .setup-card .stack > label { margin-top: 6px; }
 .check { display: flex; gap: 8px; align-items: center; font-size: 14px; font-weight: 500; color: var(--ink); }
 .check input { width: auto; accent-color: var(--accent); }
+
+/* Comments */
+.comments { display: grid; gap: 12px; margin-top: 8px; }
+.comments h2 { font-size: 16px; margin: 0; }
+.comment-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.comment { display: flex; gap: 10px; align-items: flex-start; }
+.comment-body { flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.comment-head { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.comment-head .push { margin-left: auto; padding: 2px; }
+.comment-body p { margin: 4px 0 0; }
+.comment-form { display: grid; gap: 8px; }

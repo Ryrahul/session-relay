@@ -2,7 +2,7 @@ import path from "node:path";
 import type { IncludeMode, Message, SessionUpload, Summary, Visibility } from "@session-relay/shared";
 import type { LocalSession } from "./adapters/types.js";
 import type { RepoInfo } from "./git.js";
-import { createRedactor } from "./redact.js";
+import { createRedactor } from "@session-relay/shared";
 
 export const DEFAULT_TAIL = 30;
 const MAX_MESSAGE_CHARS = 8000;

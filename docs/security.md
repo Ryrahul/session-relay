@@ -53,6 +53,7 @@ The number of redactions is shown when you share and on the session page. Redact
 
 - Sessions belong to your **org**. Nobody outside it can list, read or even confirm that a session exists. That's enforced on every query and covered by tests.
 - Inside the org, a share is visible to **everyone** (default) or only to **selected people** (`/share only Bob`, `--people`). A handoff **for** someone (`--for`) is always visible to that person too.
+- Comments are visible to everyone who can see the session. Secrets are removed from them (by the CLI, and again on the server for comments typed in the web app). Only a comment's author or an admin can delete it.
 - Only the author or an admin can edit a share. Pull request links must be `http(s)` URLs.
 - The author or an org admin can change or delete a share.
 
@@ -82,7 +83,7 @@ The number of redactions is shown when you share and on the session page. Redact
 
 ## Audit and usage
 
-Every share, pull, edit, delete, invite, token change and settings change is recorded in an audit log, with who did it and when. Admin access to it in the web app is planned; it is in the `audit_log` table today.
+Every share, pull, edit, comment, delete, invite, token change and settings change is recorded in an audit log, with who did it and when. Admin access to it in the web app is planned; it is in the `audit_log` table today.
 
 ## Self-hosted data
 

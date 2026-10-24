@@ -2,8 +2,11 @@ import { gunzipSync, gzipSync } from "node:zlib";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import {
+  createRedactor,
   DetailMode,
   newId,
+  NewComment,
+  type Comment,
   SessionPatch,
   ShareRequest,
   type Message,
@@ -21,6 +24,7 @@ import { purgeRateLimits } from "../ratelimit.js";
 const MAX_LIST = 100;
 const MAX_CHAIN = 20;
 const FULL_PAGE = 200;
+const MAX_COMMENTS = 100;
 
 /** Rows the caller may see: same org, live, and either team-visible, theirs, for them, or shared with them. */
 function visible(sql: Sql, auth: AuthContext) {
@@ -146,7 +150,8 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       SELECT s.id, s.title, s.repo, s.branch, s.source_tool, s.summary->>'goal' AS goal, s.include_mode,
              jsonb_array_length(s.messages) AS message_count, s.transcript_key IS NOT NULL AS has_full,
              s.visibility_team, s.continues_session_id, s.pr_url, s.created_at, s.updated_at,
-             u.id AS author_id, u.name AS author_name, a.id AS assignee_id, a.name AS assignee_name
+             u.id AS author_id, u.name AS author_name, a.id AS assignee_id, a.name AS assignee_name,
+             (SELECT count(*)::int FROM session_comments c WHERE c.session_id = s.id AND c.deleted_at IS NULL) AS comment_count
              ${text ? sql`, ts_rank(s.search, websearch_to_tsquery('english', ${text})) AS rank` : sql``}
       FROM sessions s JOIN users u ON u.id = s.author_id LEFT JOIN users a ON a.id = s.assignee_id
       WHERE ${visible(sql, auth)}
@@ -177,6 +182,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       continues_id: r.continues_session_id,
       assignee: r.assignee_id ? { id: r.assignee_id, name: r.assignee_name } : null,
       pr_url: r.pr_url,
+      comment_count: r.comment_count,
       created_at: r.created_at.toISOString(),
       updated_at: iso(r.updated_at),
     }));
@@ -234,6 +240,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       WHERE s.continues_session_id = ${id} AND ${visible(sql, auth)}
       ORDER BY s.created_at
     `;
+    const comments = await listComments(sql, id, MAX_COMMENTS);
     const link = (x: (typeof chain)[number]): ChainLink => ({
       id: x.id,
       title: x.title,
@@ -273,6 +280,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       chain: chain.map(link),
       continued_by: children.map(link),
       assigned_to: r.assignee_id ? { id: r.assignee_id, name: r.assignee_name } : null,
+      comments,
     };
     return c.json(body);
   });
@@ -300,17 +308,74 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
     return c.json({ ok: true });
   });
 
+  app.get("/:id/comments", async (c) => {
+    const auth = c.get("auth");
+    const id = c.req.param("id");
+    const [s] = await sql`SELECT s.id FROM sessions s WHERE s.id = ${id} AND ${visible(sql, auth)}`;
+    if (!s) throw new HTTPException(404, { message: "Session not found" });
+    return c.json({ comments: await listComments(sql, id, 1000) });
+  });
+
+  app.post("/:id/comments", async (c) => {
+    const auth = c.get("auth");
+    const id = c.req.param("id");
+    // Comments can be typed in the web app, so secrets are removed here too (with the org's own patterns).
+    const parsed = parseBody(NewComment, await c.req.json());
+    const [settings] = await sql`SELECT redaction_patterns FROM org_settings WHERE org_id = ${auth.orgId}`;
+    const body = createRedactor(settings?.redaction_patterns ?? [])(parsed.body);
+    const [s] = await sql`SELECT s.id FROM sessions s WHERE s.id = ${id} AND ${visible(sql, auth)}`;
+    if (!s) throw new HTTPException(404, { message: "Session not found" });
+    const commentId = newId("cm");
+    await sql`
+      INSERT INTO session_comments (id, session_id, org_id, author_id, body)
+      VALUES (${commentId}, ${id}, ${auth.orgId}, ${auth.userId}, ${body})
+    `;
+    await audit(sql, auth, "session.comment", id, { comment: commentId });
+    return c.json({ id: commentId }, 201);
+  });
+
+  /** Comment author, or an admin. */
+  app.delete("/:id/comments/:commentId", async (c) => {
+    const auth = c.get("auth");
+    const { id, commentId } = c.req.param();
+    const [row] = await sql`
+      SELECT author_id FROM session_comments
+      WHERE id = ${commentId} AND session_id = ${id} AND org_id = ${auth.orgId} AND deleted_at IS NULL
+    `;
+    if (!row) throw new HTTPException(404, { message: "Comment not found" });
+    if (row.author_id !== auth.userId && auth.role === "member") {
+      throw new HTTPException(403, { message: "Only the comment's author or an admin can delete it" });
+    }
+    await sql`UPDATE session_comments SET deleted_at = now(), body = '' WHERE id = ${commentId}`;
+    await audit(sql, auth, "session.comment.delete", id, { comment: commentId });
+    return c.json({ ok: true });
+  });
+
   app.delete("/:id", async (c) => {
     const auth = c.get("auth");
     const id = c.req.param("id");
     const row = await loadOwned(sql, auth, id);
     await sql`UPDATE sessions SET deleted_at = now(), messages = '[]', transcript_key = NULL WHERE id = ${id}`;
+    await sql`DELETE FROM session_comments WHERE session_id = ${id}`;
     if (row.transcript_key) await storage.delete(row.transcript_key);
     await audit(sql, auth, "session.delete", id);
     return c.json({ ok: true });
   });
 
   return app;
+}
+
+/** Live comments on a session, oldest first (the most recent `limit`). */
+async function listComments(sql: Sql, sessionId: string, limit: number): Promise<Comment[]> {
+  const rows = await sql`
+    SELECT * FROM (
+      SELECT c.id, c.body, c.created_at, u.id AS author_id, u.name AS author_name
+      FROM session_comments c JOIN users u ON u.id = c.author_id
+      WHERE c.session_id = ${sessionId} AND c.deleted_at IS NULL
+      ORDER BY c.created_at DESC LIMIT ${limit}
+    ) x ORDER BY created_at
+  `;
+  return rows.map((r) => ({ id: r.id, body: r.body, author: { id: r.author_id, name: r.author_name }, created_at: r.created_at.toISOString() }));
 }
 
 /** Deletes expired shares and their transcripts. Runs on an interval in the server process. */
@@ -326,6 +391,7 @@ export async function purgeExpired(sql: Sql, storage: BlobStorage): Promise<numb
     RETURNING e.transcript_key AS old_key
   `;
   for (const r of rows) if (r.old_key) await storage.delete(r.old_key);
+  await sql`DELETE FROM session_comments c USING sessions s WHERE c.session_id = s.id AND s.deleted_at IS NOT NULL`;
   await purgeRateLimits(sql);
   return rows.length;
 }

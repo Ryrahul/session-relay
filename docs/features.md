@@ -13,6 +13,7 @@ Everything Session Relay does today. Each item links to where it's explained in 
 | **Handoffs for someone** | `/share for Akshat`, `relay share --for akshat`, or **For** in the web app. It shows as **For you** in their list, and `/pickup` with no request checks their handoffs first. They can see it even if the share is private. |
 | **Edit after sharing** | Fix the title, goal, next steps, decisions or who it's for, in the web app (**Edit**), with `relay edit`, or by asking your agent (`update_session`). Only the author or an admin can edit. |
 | **Pull request links** | `relay share` attaches the current branch's open PR (found with the GitHub CLI), or pass `--pr <url>`. The session shows the PR, and `relay pr-comment <id>` posts a link to the session on the PR. |
+| **Comments** | Leave a note on any session you can see: in the web app, with `relay comment <id> "…"`, or from your agent (`comment_on_session`). The agent that picks the session up reads them first. Secrets are removed from comments too. |
 | **Without MCP** | `relay pull <id>` writes a handoff file any agent can read. |
 
 ## Finding sessions
@@ -32,7 +33,7 @@ Everything Session Relay does today. Each item links to where it's explained in 
 | **Visibility** | The whole team, or only the people you choose. |
 | **Retention** | Shares expire after the org's retention period (default 90 days) and are deleted, transcripts included. |
 | **Repo allowlist** | Admins can limit which repositories can be shared. |
-| **Audit log** | Every share, pull, edit and delete is recorded. |
+| **Audit log** | Every share, pull, edit, comment and delete is recorded. |
 
 ## Teams
 

@@ -17,6 +17,7 @@ Handing off agent work means copy-pasting chat logs, or the next person starting
 - **`/pickup`**: the next person's agent finds it, reads it, checks the code and continues, in any of the four agents.
 - **Handoff chains**: work picked up and shared again is linked, so every session shows who started it and who continued it.
 - **Handoffs for someone**: share "for Akshat" and it's first in their `/pickup`. Edit a share any time (next steps, title, who it's for).
+- **Comments**: teammates leave notes on a session; the agent that picks it up reads them.
 - **Linked to PRs and files**: shares carry the branch's pull request; find every session that touched a file with `file:src/billing.ts`.
 - **Web app**: browse, search and read everything your team has shared.
 - **Easy onboarding**: invite links, and `relay login` signs in through the browser.

@@ -132,7 +132,13 @@ async function printList(query: Record<string, string | number | undefined>, jso
   if (json) return console.log(JSON.stringify(sessions, null, 2));
   if (!sessions.length) return console.log("No shared sessions found.");
   for (const s of sessions) {
-    const tags = [s.assignee ? `for ${s.assignee.name}` : "", s.pr_url ? `PR #${s.pr_url.split("/").pop()}` : ""].filter(Boolean).join(", ");
+    const tags = [
+      s.assignee ? `for ${s.assignee.name}` : "",
+      s.pr_url ? `PR #${s.pr_url.split("/").pop()}` : "",
+      s.comment_count ? `${s.comment_count} comment${s.comment_count === 1 ? "" : "s"}` : "",
+    ]
+      .filter(Boolean)
+      .join(", ");
     console.log(
       `${s.id}  ${s.author.name.slice(0, 12).padEnd(12)} ${toolLabel(s.tool)} ${ago(s.created_at).padEnd(9)} ${(s.branch ?? "").slice(0, 18).padEnd(18)} ${s.title}${tags ? `  (${tags})` : ""}`,
     );
@@ -251,6 +257,19 @@ export async function pull(id: string, opts: { full?: boolean; summaryOnly?: boo
   await writeFile(file, renderHandoff(s));
   const rel = path.relative(process.cwd(), file) || file;
   console.log(`Wrote ${rel}\nTell your agent: "Read ${rel} and continue from where it stopped."`);
+}
+
+/** relay comment <id> <text>: leave a note; with no text, list the comments. */
+export async function comment(id: string, words: string[]): Promise<void> {
+  const client = await RelayClient.fromConfig();
+  const body = words.join(" ").trim();
+  if (body) {
+    await client.comment(id, body);
+    return console.log(`Commented on ${id}.`);
+  }
+  const { comments } = await client.comments(id);
+  if (!comments.length) return console.log(`No comments on ${id}. Add one: relay comment ${id} "your note"`);
+  for (const c of comments) console.log(`${c.author.name} · ${ago(c.created_at)}\n  ${c.body.replace(/\n/g, "\n  ")}\n`);
 }
 
 export async function remove(id: string, opts: { yes?: boolean }): Promise<void> {

@@ -22,6 +22,8 @@ Everything Session Relay does today. Each item links to where it's explained in 
 |---|---|
 | **Search** | Full-text search over titles, summaries and conversations, in the web app, the CLI (`relay search`) and from your agent. |
 | **Filters** | By repo, branch, agent, author, who it's for, and **touched file**: `relay list --file billing/invoice.ts`, or type `file:invoice.ts branch:main` in any search box. |
+| **Activity (digest)** | What the team did in the last day, week or month: new shares by repo, handoffs for you, who picked up what, and new comments. In the web app (**Activity**), with `relay digest`, or ask your agent ("what did the team do today?" → `team_activity`). |
+| **Stats** | Shares, pickups, continued handoffs, comments and active people per period; shares per day; by person, agent and repo. **Stats** in the web app, or `relay stats`. |
 | **Web app** | Browse by day, read the full conversation with tool calls folded, copy the `/pickup` command. Light and dark mode, works on phones. |
 
 ## Privacy and control

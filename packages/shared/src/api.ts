@@ -191,3 +191,27 @@ export const DeviceStart = z.object({
   expires_in: z.number().int(),
 });
 export type DeviceStart = z.infer<typeof DeviceStart>;
+
+const Person = z.object({ id: z.string(), name: z.string() });
+
+/** GET /v1/activity?days=N: what happened on sessions the caller can see. */
+export const Activity = z.object({
+  since: z.string(),
+  pickups: z.array(z.object({ session_id: z.string(), session_title: z.string(), session_author: Person, by: Person, at: z.string() })),
+  comments: z.array(z.object({ session_id: z.string(), session_title: z.string(), author: Person, body: z.string(), created_at: z.string() })),
+});
+export type Activity = z.infer<typeof Activity>;
+
+const Count = z.number().int();
+
+/** GET /v1/stats?days=N: org-wide counts. Repos only include sessions the caller can see. */
+export const Stats = z.object({
+  since: z.string(),
+  days: Count,
+  totals: z.object({ shares: Count, pickups: Count, continued: Count, comments: Count, active_people: Count }),
+  by_day: z.array(z.object({ day: z.string(), shares: Count, pickups: Count })),
+  by_tool: z.array(z.object({ tool: SourceTool, shares: Count })),
+  by_repo: z.array(z.object({ repo: z.string(), shares: Count })),
+  by_person: z.array(z.object({ id: z.string(), name: z.string(), shares: Count, pickups: Count, comments: Count })),
+});
+export type Stats = z.infer<typeof Stats>;

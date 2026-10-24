@@ -50,8 +50,10 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 | `relay list --all` | All repos |
 | `relay list --for-me` | Handoffs assigned to you, from any repo |
 | `relay search "<query>"` | Full-text search over titles, summaries and messages. Add `file:<path>` or `branch:<name>` to filter |
+| `relay digest [--days 1]` | What the team did lately: new shares by repo, handoffs for you, pickups, comments |
+| `relay stats [--days 30] [--json]` | Shares, pickups, continued handoffs and comments, by day, person, agent and repo |
 | `relay show <id>` | Print a session as a handoff |
-| `relay pull <id>` | Write `.relay/handoff-<id>.md` for your agent |
+| `relay pull <id>` | Write `.relay/handoff-<id>.md` for your agent. Counts as a pickup in Activity and Stats |
 
 `list` and `search` options: `--repo`, `--branch`, `--author <name|email|me>`, `--tool`, `--file <path>` (sessions that touched it; part of the path is fine), `--for-me`, `--limit` (default 20), `--json`.
 

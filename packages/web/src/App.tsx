@@ -3,7 +3,9 @@ import type { MeResponse } from "@session-relay/shared";
 import { api, getToken, setToken } from "./api";
 import { parseRoute, type Route } from "./format";
 import { Login } from "./pages/Login";
+import { Activity } from "./pages/Activity";
 import { Members } from "./pages/Members";
+import { Stats } from "./pages/Stats";
 import { SessionPage } from "./pages/SessionPage";
 import { Sessions } from "./pages/Sessions";
 import { Settings } from "./pages/Settings";
@@ -15,6 +17,8 @@ import { Avatar, Icon, Mark, ThemeSwitch, useTheme } from "./ui";
 
 const NAV: { page: Route["page"]; href: string; label: string; icon: string }[] = [
   { page: "sessions", href: "#/", label: "Sessions", icon: "sessions" },
+  { page: "activity", href: "#/activity", label: "Activity", icon: "activity" },
+  { page: "stats", href: "#/stats", label: "Stats", icon: "stats" },
   { page: "start", href: "#/start", label: "Get started", icon: "start" },
   { page: "members", href: "#/members", label: "Members", icon: "members" },
   { page: "settings", href: "#/settings", label: "Settings", icon: "settings" },
@@ -105,6 +109,8 @@ export function App() {
         {(route.page === "sessions" || route.page === "join") && <Sessions me={me} />}
         {route.page === "device" && <Device key={route.code} code={route.code} me={me} />}
         {route.page === "session" && <SessionPage id={route.id} me={me} />}
+        {route.page === "activity" && <Activity me={me} />}
+        {route.page === "stats" && <Stats />}
         {route.page === "start" && <Start me={me} />}
         {route.page === "members" && <Members me={me} />}
         {route.page === "settings" && <Settings me={me} onOrgChanged={refreshMe} />}

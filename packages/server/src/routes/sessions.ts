@@ -27,7 +27,7 @@ const FULL_PAGE = 200;
 const MAX_COMMENTS = 100;
 
 /** Rows the caller may see: same org, live, and either team-visible, theirs, for them, or shared with them. */
-function visible(sql: Sql, auth: AuthContext) {
+export function visible(sql: Sql, auth: AuthContext) {
   return sql`
     s.org_id = ${auth.orgId}
     AND s.deleted_at IS NULL
@@ -164,6 +164,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
         ${q.pr ? sql`AND s.pr_url = ${q.pr}` : sql``}
         ${text ? sql`AND (s.search @@ websearch_to_tsquery('english', ${text}) OR s.title ILIKE ${"%" + text + "%"})` : sql``}
         ${q.before ? sql`AND s.created_at < ${q.before}` : sql``}
+        ${q.since ? sql`AND s.created_at >= ${q.since}` : sql``}
       ORDER BY ${text ? sql`rank DESC,` : sql``} s.created_at DESC
       LIMIT ${limit}
     `;
@@ -250,6 +251,8 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
     });
     await recordUsage(sql, auth, `session.get.${mode}`);
     if (mode !== "summary") await audit(sql, auth, "session.pull", id, { mode });
+    // The CLI and agents say when they load a session to continue it (relay pull, /pickup).
+    if (c.req.query("pickup") === "1") await audit(sql, auth, "session.pickup", id);
 
     const body: SessionDetail = {
       id: r.id,

@@ -167,7 +167,7 @@ retry path. Starting with that now.</pre>
     </div>
     <div>
       <h3>Built for teams</h3>
-      <p>Organizations, roles, personal tokens, retention, a repo allowlist, your own secret patterns, and an audit log of every share and pull.</p>
+      <p>Organizations, roles, retention, a repo allowlist, your own secret patterns and an audit log. An Activity digest and Stats show who shares and who picks up.</p>
     </div>
     <div>
       <h3>Handoff chains</h3>

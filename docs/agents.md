@@ -2,7 +2,7 @@
 
 Session Relay works with **Claude Code**, **OpenCode**, **Codex** and **ZCode**. Each one gets the same two things:
 
-1. **The relay MCP server** (`relay mcp`), which gives the agent six tools:
+1. **The relay MCP server** (`relay mcp`), which gives the agent seven tools:
 
    | Tool | What it does |
    |---|---|
@@ -10,6 +10,7 @@ Session Relay works with **Claude Code**, **OpenCode**, **Codex** and **ZCode**.
    | `search_sessions` | Full-text search over titles, summaries and conversations. The query can include `file:` and `branch:` |
    | `get_session` | A session as a handoff: goal, decisions, done, next steps, open questions, files, conversation. `mode`: `tail` (default), `summary`, or `full` (paged) |
    | `share_current_session` | Shares the session the agent is in, with a summary the agent writes. `for` assigns it to a teammate; the branch's PR is attached |
+   | `team_activity` | What the team did in the last day(s): new shares by repo, handoffs for you, pickups, comments |
    | `comment_on_session` | Leaves a note on a session: a question, a finding, "picked this up". `get_session` shows comments before the conversation |
    | `update_session` | Changes a share: title, summary, extra next steps, who it's for, PR, visibility |
 

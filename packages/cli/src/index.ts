@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { login } from "./commands/login.js";
-import { comment, edit, invite, list, localSessions, members, prComment, pull, remove, search, share, show } from "./commands/sessions.js";
+import { comment, digest, edit, invite, list, localSessions, members, prComment, pull, remove, search, share, show, stats } from "./commands/sessions.js";
 import { setup } from "./commands/setup.js";
 import { whoami } from "./commands/whoami.js";
 import { runMcp } from "./mcp.js";
@@ -103,6 +103,19 @@ program
   .description("Comment on the session's pull request with a link and next steps (uses the GitHub CLI)")
   .option("--pr <url>", "pull request URL, if the share doesn't have one yet")
   .action(prComment);
+
+program
+  .command("digest")
+  .description("What the team did lately: new shares by repo, handoffs for you, pickups, comments")
+  .option("--days <n>", "look back this many days (1-30)", "1")
+  .action(digest);
+
+program
+  .command("stats")
+  .description("Team stats: shares, pickups, continued handoffs and comments, by day, person, agent and repo")
+  .option("--days <n>", "period in days (1-90)", "30")
+  .option("--json", "print JSON")
+  .action(stats);
 
 program
   .command("comment <id> [text...]")

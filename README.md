@@ -19,7 +19,7 @@ Handing off agent work means copy-pasting chat logs, or the next person starting
 - **Handoffs for someone**: share "for Akshat" and it's first in their `/pickup`. Edit a share any time (next steps, title, who it's for).
 - **Comments**: teammates leave notes on a session; the agent that picks it up reads them.
 - **Linked to PRs and files**: shares carry the branch's pull request; find every session that touched a file with `file:src/billing.ts`.
-- **Web app**: browse, search and read everything your team has shared.
+- **Web app**: browse, search and read everything your team has shared, plus an **Activity** digest and team **Stats**.
 - **Easy onboarding**: invite links, and `relay login` signs in through the browser.
 - **Private by default**: nothing is uploaded unless you share it, secrets are removed on your laptop first, and shares can be limited to specific people.
 

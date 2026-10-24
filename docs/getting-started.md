@@ -119,6 +119,8 @@ relay pull rs_7KQ2M9XA         # writes .relay/handoff-rs_7KQ2M9XA.md
 
 Then tell any agent: *"Read .relay/handoff-rs_7KQ2M9XA.md and continue."*
 
+To catch up on what the team did: `relay digest` (or `--days 7`), the **Activity** page, or ask your agent "what did the team do today?".
+
 ## The web app
 
 Open your server's address in a browser and sign in with your token. You can:
@@ -127,6 +129,7 @@ Open your server's address in a browser and sign in with your token. You can:
 - filter to **For me**, by agent, by repo, or search `file:` and `branch:`
 - **Edit** your shares: title, summary, next steps, who it's for, the pull request
 - **Comment** on any session you can see
+- see **Activity** (what the team shared, picked up and discussed) and **Stats** (who shares and picks up, by agent and repo)
 - invite teammates with a link (admins), and create or revoke your own tokens
 - if you're an admin, change org settings: retention, allowed repositories, extra secret patterns
 

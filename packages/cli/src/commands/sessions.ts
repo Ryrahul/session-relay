@@ -6,6 +6,7 @@ import { IncludeMode, SourceTool, Summary, type DetailMode, type SessionPatch } 
 import { findSessions } from "../adapters/index.js";
 import { RelayClient, resolvePeople, resolvePerson } from "../client.js";
 import { repoInfo } from "../git.js";
+import { renderDigest } from "../digest.js";
 import { renderHandoff } from "../handoff.js";
 import { recordPickup } from "../pickups.js";
 import { describeRedactions, prepareShare, relayDir, uploadShare, writeDryRun } from "../share.js";
@@ -237,7 +238,7 @@ export async function show(id: string, opts: { full?: boolean; summaryOnly?: boo
 /** Writes the handoff file into .relay/ in the current repo (or the current folder). */
 export async function pull(id: string, opts: { full?: boolean; summaryOnly?: boolean; out?: string }): Promise<void> {
   const client = await RelayClient.fromConfig();
-  let s = await client.get(id, mode(opts));
+  let s = await client.get(id, mode(opts), { pickup: true });
   if (opts.full) {
     // Fetch every page so the file has the whole transcript.
     const messages = [...s.messages];
@@ -257,6 +258,27 @@ export async function pull(id: string, opts: { full?: boolean; summaryOnly?: boo
   await writeFile(file, renderHandoff(s));
   const rel = path.relative(process.cwd(), file) || file;
   console.log(`Wrote ${rel}\nTell your agent: "Read ${rel} and continue from where it stopped."`);
+}
+
+/** relay digest: what the team did lately. */
+export async function digest(opts: { days?: string }): Promise<void> {
+  const client = await RelayClient.fromConfig();
+  console.log(await renderDigest(client, Math.min(Math.max(Number(opts.days) || 1, 1), 30)));
+}
+
+/** relay stats: org-wide counts for a period. */
+export async function stats(opts: { days?: string; json?: boolean }): Promise<void> {
+  const client = await RelayClient.fromConfig();
+  const st = await client.stats(Math.min(Math.max(Number(opts.days) || 30, 1), 90));
+  if (opts.json) return console.log(JSON.stringify(st, null, 2));
+  const t = st.totals;
+  console.log(`Last ${st.days} days: ${t.shares} shared · ${t.pickups} picked up · ${t.continued} continued · ${t.comments} comments · ${t.active_people} active people\n`);
+  const max = Math.max(1, ...st.by_day.map((d) => d.shares));
+  for (const d of st.by_day.slice(-14)) console.log(`${d.day}  ${"█".repeat(Math.round((d.shares / max) * 30)).padEnd(30)} ${d.shares} shared, ${d.pickups} picked up`);
+  console.log(`\nBy person`);
+  for (const p of st.by_person) console.log(`  ${p.name.slice(0, 20).padEnd(20)} ${String(p.shares).padStart(4)} shared ${String(p.pickups).padStart(4)} picked up ${String(p.comments).padStart(4)} comments`);
+  if (st.by_tool.length) console.log(`\nBy agent: ${st.by_tool.map((x) => `${x.tool} ${x.shares}`).join(", ")}`);
+  if (st.by_repo.length) console.log(`By repo:  ${st.by_repo.map((x) => `${x.repo} ${x.shares}`).join(", ")}`);
 }
 
 /** relay comment <id> <text>: leave a note; with no text, list the comments. */

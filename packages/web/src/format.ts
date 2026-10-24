@@ -41,6 +41,8 @@ export type Route =
   | { page: "join"; secret: string }
   | { page: "device"; code: string }
   | { page: "sessions" }
+  | { page: "activity" }
+  | { page: "stats" }
   | { page: "session"; id: string }
   | { page: "start" }
   | { page: "members" }
@@ -54,6 +56,8 @@ export function parseRoute(hash: string): Route {
   const m = /^#\/s\/([\w-]+)/.exec(hash);
   if (m) return { page: "session", id: m[1]! };
   if (hash.startsWith("#/start")) return { page: "start" };
+  if (hash.startsWith("#/activity")) return { page: "activity" };
+  if (hash.startsWith("#/stats")) return { page: "stats" };
   if (hash.startsWith("#/members")) return { page: "members" };
   if (hash.startsWith("#/settings")) return { page: "settings" };
   return { page: "sessions" };

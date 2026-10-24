@@ -455,6 +455,39 @@ describe.skipIf(!DB)("API (integration)", () => {
     expect(n).toBe(0);
   });
 
+  it("activity and stats: pickups, comments, shares by day/tool/repo/person, only visible sessions listed", async () => {
+    const team = await makeOrg("Stats Team");
+    const ann = await makeUser(team, "Ann", "owner");
+    const ben = await makeUser(team, "Ben", "member");
+    const a1 = (await call(ann.token, "POST", "/v1/sessions", { session: upload({ repo: "github.com/s/api" }) })).body.id;
+    await call(ann.token, "POST", "/v1/sessions", { session: upload({ repo: "github.com/s/api", source: { tool: "zcode", native_id: "z" } }) });
+    const hidden = (await call(ann.token, "POST", "/v1/sessions", { session: upload({ repo: "github.com/s/secret", visibility: { team: false, people: [] } }) })).body.id;
+    // Ben opens a1 in the web app (not a pickup), then picks it up twice (counted once) and continues it.
+    await call(ben.token, "GET", `/v1/sessions/${a1}`);
+    await call(ben.token, "GET", `/v1/sessions/${a1}?pickup=1`);
+    await call(ben.token, "GET", `/v1/sessions/${a1}?pickup=1`);
+    await call(ben.token, "POST", "/v1/sessions", { session: upload({ repo: "github.com/s/api", continues: a1 }) });
+    await call(ben.token, "POST", `/v1/sessions/${a1}/comments`, { body: "on it" });
+    await call(ann.token, "GET", `/v1/sessions/${hidden}?pickup=1`);
+
+    const act = (await call(ben.token, "GET", "/v1/activity?days=1")).body;
+    expect(act.pickups.map((p: any) => [p.by.name, p.session_id])).toEqual([["Ben", a1]]); // Ann's pickup of a private share is hidden from Ben
+    expect(act.comments.map((x: any) => [x.author.name, x.body])).toEqual([["Ben", "on it"]]);
+    expect((await call(ann.token, "GET", "/v1/activity")).body.pickups).toHaveLength(2);
+
+    const st = (await call(ben.token, "GET", "/v1/stats?days=7")).body;
+    expect(st.days).toBe(7);
+    expect(st.totals).toEqual({ shares: 4, pickups: 2, continued: 1, comments: 1, active_people: 2 });
+    expect(st.by_day).toHaveLength(8);
+    expect(st.by_day.at(-1)).toMatchObject({ shares: 4, pickups: 2 });
+    expect(st.by_tool).toEqual([{ tool: "claude-code", shares: 3 }, { tool: "zcode", shares: 1 }]);
+    expect(st.by_repo).toEqual([{ repo: "github.com/s/api", shares: 3 }]); // the private repo isn't shown to Ben
+    expect(st.by_person.map((p: any) => [p.name, p.shares, p.pickups, p.comments])).toEqual([["Ann", 3, 1, 0], ["Ben", 1, 1, 1]]);
+    // since filter on the list
+    expect((await call(ben.token, "GET", `/v1/sessions?since=${encodeURIComponent(new Date(Date.now() + 60_000).toISOString())}`)).body.sessions).toEqual([]);
+    expect((await call(outsider.token, "GET", "/v1/stats")).body.totals.shares).toBe(0);
+  });
+
   it("records usage and audit events", async () => {
     const [u] = await sql`SELECT count(*)::int AS n FROM usage_events WHERE org_id = ${orgA} AND kind = 'session.share'`;
     const [a] = await sql`SELECT count(*)::int AS n FROM audit_log WHERE org_id = ${orgA} AND action = 'session.pull'`;

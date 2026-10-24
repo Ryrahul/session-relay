@@ -21,11 +21,11 @@
 - **Pull request links**: the branch's open PR is attached automatically; `relay pr-comment` posts the session on the PR.
 - **Search by file and branch**: `file:` and `branch:` in any search, `--file` in the CLI.
 - **Comments** on sessions, in the web app, the CLI and from agents; the next agent reads them.
+- **Activity digest** and **stats**: web pages, `relay digest`, `relay stats`, and the `team_activity` MCP tool.
 
 ## Next
 
 - **Auto-share at session end** (opt-in): a private draft you publish when ready.
-- **Digest** of what the team shared, and **usage stats** per org.
 - **More agents**: Gemini CLI and GitHub Copilot CLI, then Cursor.
 - Prebuilt public Docker image, so self-hosting needs no build.
 - Full live test of Codex with a real session fixture.
@@ -47,8 +47,8 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 
 | Version | Date | |
 |---|---|---|
-| CLI `0.4.0` on npm | 2026-10-24 | `relay edit`, `relay pr-comment`, `relay comment`, `--for`, `--pr`, `--for-me`, `--file`; MCP `update_session`, `comment_on_session` |
-| Server and web app | 2026-10-24 | Edit after sharing, handoffs for someone, PR links, file and branch search, comments (migrations 0006, 0007) |
+| CLI `0.4.0` on npm | 2026-10-24 | `relay edit`, `relay pr-comment`, `relay comment`, `relay digest`, `relay stats`, `--for`, `--pr`, `--for-me`, `--file`; MCP `update_session`, `comment_on_session`, `team_activity` |
+| Server and web app | 2026-10-24 | Edit after sharing, handoffs for someone, PR links, file and branch search, comments, Activity and Stats pages (migrations 0006, 0007) |
 | CLI `0.3.0` on npm | 2026-10-24 | ZCode support |
 | CLI `0.2.0` on npm | 2026-10-24 | Handoff chains (`--continues`), browser login, `relay invite --link` |
 | Server and web app | 2026-10-24 | Handoff chains, invite links, browser login (migrations 0002, 0003) |
@@ -68,6 +68,7 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 | Invite links, browser login | Done; integration and browser tested |
 | Edit, assign, PR links, file search | Done; integration, CLI, MCP and browser tested |
 | Comments | Done; integration, CLI, MCP and browser tested, with redaction |
+| Activity digest, stats | Done; integration, CLI, MCP and browser tested (desktop, phone, light, dark) |
 | Self-hosting (Docker, Caddy or nginx) | Done; running in production |
 | Cloudflare Workers | Done; smoke-tested in CI with wrangler dev + Postgres on every PR |
 | CI/CD (deploy branch, rehearsal, backup, rollback) | Done; see [deploy-pipeline.md](deploy-pipeline.md) |

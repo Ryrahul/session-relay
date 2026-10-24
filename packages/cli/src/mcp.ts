@@ -7,6 +7,7 @@ import type { SessionPatch } from "@session-relay/shared";
 import { repoInfo } from "./git.js";
 import { renderHandoff } from "./handoff.js";
 import { recordPickup } from "./pickups.js";
+import { renderDigest } from "./digest.js";
 import { describeRedactions, prepareShare, uploadShare } from "./share.js";
 import { ago } from "./ui.js";
 import { VERSION } from "./version.js";
@@ -17,6 +18,7 @@ const INSTRUCTIONS = `Session Relay shares coding-agent sessions between teammat
 - Handoffs assigned to you: list_sessions with for_me.
 - To share this session: write an honest handoff summary (goal, decisions, done, next, open questions; never secrets) and call share_current_session.
 - To fix or extend a share you made (new next steps, PR link, who it's for): update_session.
+- "What did the team do today/this week?": team_activity.
 - To leave a note on someone's session (a question, "picked this up", a finding): comment_on_session. Comments show up in get_session.`;
 
 /** Which agent launched us, from the MCP client name. */
@@ -114,7 +116,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
     async ({ id, mode, tail, offset }) => {
       try {
         const client = await getClient();
-        const s = await client.get(id, mode ?? "tail", { tail, offset });
+        const s = await client.get(id, mode ?? "tail", { tail, offset, pickup: !offset });
         // Loading a session to work on it: the next share in this repo continues it.
         const root = await repoInfo().then((r) => r.root).catch(() => null);
         if (root) await recordPickup(root, s.id);
@@ -175,6 +177,22 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         return text(
           `Shared as ${id}: "${session.title}" (${session.include}, ${session.messages.length} messages, ${session.visibility.team ? "whole team" : "selected people"}). ${describeRedactions(prepared.built.redactions)}${continues ? `\nContinues ${continues}.` : ""}${args.for ? `\nFor ${args.for}.` : ""}${session.pr_url ? `\nPR ${session.pr_url}.` : ""}\nTeammates can load it with get_session("${id}") or \`relay pull ${id}\`.`,
         );
+      } catch (err) {
+        return fail(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "team_activity",
+    {
+      description: "What the team did recently: new shares by repo, handoffs for you, who picked up what, and new comments.",
+      inputSchema: { days: z.number().int().min(1).max(30).optional().describe("Look back this many days (default 1)") },
+    },
+    async ({ days }) => {
+      try {
+        const client = await getClient();
+        return text(await renderDigest(client, days ?? 1));
       } catch (err) {
         return fail(err);
       }

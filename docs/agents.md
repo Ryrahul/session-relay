@@ -2,14 +2,15 @@
 
 Session Relay works with **Claude Code**, **Codex**, **OpenCode**, **Gemini CLI**, **Copilot CLI**, **Cursor** and **ZCode** (Cursor is experimental). Each one gets the same two things:
 
-1. **The relay MCP server** (`relay mcp`), which gives the agent seven tools:
+1. **The relay MCP server** (`relay mcp`), which gives the agent eight tools:
 
    | Tool | What it does |
    |---|---|
    | `list_sessions` | Shared sessions for the current repo (or all repos), newest first. `for_me` lists handoffs assigned to you; `file` filters by touched file |
    | `search_sessions` | Full-text search over titles, summaries and conversations. The query can include `file:` and `branch:` |
    | `get_session` | A session as a handoff: goal, decisions, done, next steps, open questions, files, conversation. `mode`: `tail` (default), `summary`, or `full` (paged) |
-   | `share_current_session` | Shares the session the agent is in, with a summary the agent writes. `for` assigns it to a teammate; the branch's PR is attached |
+   | `share_current_session` | Shares the session the agent is in, with a summary the agent writes (plus the template's `sections`). Refuses while required template sections are empty, unless `ignore_template`. `for` assigns it to a teammate; the branch's PR is attached |
+   | `share_template` | The repo's handoff template: extra sections and instructions. `/share` calls it first |
    | `team_activity` | What the team did in the last day(s): new shares by repo, handoffs for you, pickups, comments |
    | `comment_on_session` | Leaves a note on a session: a question, a finding, "picked this up". `get_session` shows comments before the conversation |
    | `update_session` | Changes a share: title, summary, extra next steps, who it's for, PR, visibility. `publish` shares a draft |
@@ -129,6 +130,16 @@ Copilot's slash commands are skills: `~/.copilot/skills/share/SKILL.md` and `pic
 Commands go in `~/.cursor/commands/share.md` and `pickup.md`.
 
 The command files `relay setup` writes are in [`packages/cli/src/commands/setup.ts`](../packages/cli/src/commands/setup.ts) (`SHARE_PROMPT`, `PICKUP_PROMPT`). Copy them if you set things up by hand.
+
+## Handoff templates
+
+Admins can ask for more than the standard summary in some repos: **Settings → Handoff templates** in the web app. A template has:
+
+- **Repositories**: `github.com/acme/api`, `github.com/acme/*` (a prefix), or `*` (all). The most specific match wins.
+- **Sections**: a title, a hint for the agent, and whether it's required, e.g. *Tests run (required): commands you ran and their results*.
+- **Instructions** (optional), e.g. "Mention any feature flags you touched".
+
+`/share` calls `share_template` first and fills the sections in. If a required one is empty, the agent is told what's missing and tries again (it can pass `ignore_template` when a section doesn't apply). `relay share` from a terminal shares anyway and prints a note; add sections later with `relay edit <id> --section "Tests run=npm test passes"` or **Edit** in the web app, which flags shares that are missing required sections. `relay template` shows the template for the current repo.
 
 ## Auto-share drafts
 

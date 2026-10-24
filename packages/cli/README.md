@@ -31,6 +31,7 @@ You need a Session Relay server for your team; see [self-hosting](https://relay.
 | `relay edit <id>` | Change your share: title, summary, next steps, who it's for, PR |
 | `relay pr-comment <id>` | Post the session on its pull request |
 | `relay setup --auto-share on` | Save each Claude Code, Gemini CLI and Copilot CLI session as a private draft when it ends; `relay publish <id>` shares it |
+| `relay template` | The handoff template for this repo |
 | `relay export <id>`, `relay export --all` | Download a session (Markdown/JSON) or many (NDJSON) |
 | `relay setup --tools gemini` | Connect one agent you installed later |
 | `relay digest`, `relay stats` | What the team did lately; team stats |

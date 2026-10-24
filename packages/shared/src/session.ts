@@ -22,12 +22,20 @@ export const Message = z.object({
 });
 export type Message = z.infer<typeof Message>;
 
+/** An extra handoff section, usually asked for by the repo's template ("Tests run", "Migration notes"). */
+export const SummarySection = z.object({
+  title: z.string().trim().min(1).max(60),
+  items: z.array(z.string()).default([]),
+});
+export type SummarySection = z.infer<typeof SummarySection>;
+
 export const Summary = z.object({
   goal: z.string(),
   decisions: z.array(z.string()).default([]),
   done: z.array(z.string()).default([]),
   next: z.array(z.string()).default([]),
   open_questions: z.array(z.string()).default([]),
+  sections: z.array(SummarySection).max(20).default([]),
 });
 export type Summary = z.infer<typeof Summary>;
 

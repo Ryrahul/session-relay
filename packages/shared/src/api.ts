@@ -74,6 +74,8 @@ export const SessionDetail = SessionRecord.extend({
   assigned_to: z.object({ id: z.string(), name: z.string() }).nullable(),
   /** Oldest first; the most recent 100. */
   comments: z.array(Comment),
+  /** Required sections of the repo's template that this share leaves empty. */
+  missing_sections: z.array(z.string()),
 });
 export type SessionDetail = z.infer<typeof SessionDetail>;
 
@@ -89,10 +91,28 @@ export const SessionPatch = z.object({
 });
 export type SessionPatch = z.infer<typeof SessionPatch>;
 
+/** What a handoff in matching repos should contain. `repo`: exact, "github.com/acme/*", or "*". */
+export const ShareTemplate = z.object({
+  repo: z.string().trim().min(1).max(300),
+  instructions: z.string().max(2000).default(""),
+  sections: z
+    .array(
+      z.object({
+        title: z.string().trim().min(1).max(60),
+        hint: z.string().max(300).default(""),
+        required: z.boolean().default(false),
+      }),
+    )
+    .max(10)
+    .default([]),
+});
+export type ShareTemplate = z.infer<typeof ShareTemplate>;
+
 export const OrgSettings = z.object({
   retention_days: z.number().int(),
   repo_allowlist: z.array(z.string()),
   redaction_patterns: z.array(z.string()),
+  share_templates: z.array(ShareTemplate).default([]),
 });
 export type OrgSettings = z.infer<typeof OrgSettings>;
 
@@ -152,6 +172,7 @@ export const OrgPatch = z.object({
     )
     .max(50)
     .optional(),
+  share_templates: z.array(ShareTemplate).max(50).optional(),
 });
 export type OrgPatch = z.infer<typeof OrgPatch>;
 

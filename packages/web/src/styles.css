@@ -414,3 +414,14 @@ a.badge-link:hover { color: var(--accent); }
 .audit-what { min-width: 0; overflow-wrap: anywhere; }
 .audit-what .who { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; }
 @media (max-width: 640px) { .audit-row { grid-template-columns: 1fr; gap: 2px; } }
+
+/* Templates */
+.templates { border: 0; padding: 0; margin: 0 0 12px; display: grid; gap: 12px; }
+.template-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; display: grid; gap: 10px; }
+.template-card .row { align-items: flex-end; flex-wrap: nowrap; }
+.grow { flex: 1; }
+.template-sections { display: grid; gap: 8px; }
+.template-section-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto auto; gap: 8px; align-items: center; }
+@media (max-width: 640px) { .template-section-row { grid-template-columns: 1fr auto; } .template-section-row input:nth-child(2) { grid-column: 1 / -1; grid-row: 2; } }
+.template-section p { margin: 4px 0 0; }
+.missing-banner { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; border-style: dashed; }

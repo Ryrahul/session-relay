@@ -2,7 +2,7 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { IncludeMode, SourceTool, Summary, type DetailMode, type SessionPatch } from "@session-relay/shared";
+import { describeTemplate, IncludeMode, matchTemplate, missingSections, SourceTool, Summary, type DetailMode, type SessionPatch, type SummarySection } from "@session-relay/shared";
 import { findSessions } from "../adapters/index.js";
 import { RelayClient, resolvePeople, resolvePerson } from "../client.js";
 import { repoInfo } from "../git.js";
@@ -104,6 +104,11 @@ export async function share(opts: ShareOpts): Promise<void> {
     console.log(redactNote);
     if (session.continues) console.log(`Continues ${session.continues}${prepared.continuesAuto ? " (the session you picked up here)" : ""}. Use --continues none to unlink.`);
     if (opts.for) console.log(`For ${opts.for}.`);
+    if (client) {
+      const t = matchTemplate((await client.me()).settings.share_templates ?? [], session.repo);
+      const missing = missingSections(t, session.summary);
+      if (missing.length) console.log(`Note: this repo's handoff template asks for ${missing.join(", ")}. Add them with --summary-file, or later: relay edit <id> --section "${missing[0]}=…"`);
+    }
     if (session.pr_url) console.log(`PR ${session.pr_url}${opts.pr ? "" : " (this branch's open PR; --pr none to leave it out)"}`);
   }
   if (ask_ && !(await confirm("Share it?"))) return console.log("Cancelled.");
@@ -181,6 +186,8 @@ interface EditOpts {
   addDone?: string[];
   addNext?: string[];
   addQuestion?: string[];
+  /** "Title=item": add an item to a section (created if missing). */
+  section?: string[];
   clearNext?: boolean;
   summaryFile?: string;
   for?: string;
@@ -189,12 +196,36 @@ interface EditOpts {
   people?: string;
 }
 
+/** Applies "Title=item" additions to a summary's sections. */
+export function addToSections(sections: SummarySection[], adds: string[]): SummarySection[] {
+  const out = sections.map((s) => ({ ...s, items: [...s.items] }));
+  for (const add of adds) {
+    const at = add.indexOf("=");
+    if (at < 1) throw new Error(`--section takes "Title=item", got "${add}"`);
+    const title = add.slice(0, at).trim();
+    const item = add.slice(at + 1).trim();
+    const hit = out.find((s) => s.title.toLowerCase() === title.toLowerCase());
+    if (hit) hit.items.push(item);
+    else out.push({ title, items: [item] });
+  }
+  return out;
+}
+
+/** relay template: the handoff template for this repo. */
+export async function template(opts: { repo?: string }): Promise<void> {
+  const client = await RelayClient.fromConfig();
+  const repo = opts.repo ?? (await repoInfo()).repo;
+  const { template: t } = await client.template(repo);
+  console.log(t ? describeTemplate(t) : `No handoff template for ${repo}. Admins can add one in the web app: Settings → Handoff templates.`);
+}
+
 /** relay edit: change a share after it was made (author or admin). */
 export async function edit(id: string, opts: EditOpts): Promise<void> {
   const client = await RelayClient.fromConfig();
   const patch: SessionPatch = {};
   if (opts.title) patch.title = opts.title;
-  const touchesSummary = opts.goal || opts.summaryFile || opts.clearNext || opts.addDecision || opts.addDone || opts.addNext || opts.addQuestion;
+  const touchesSummary =
+    opts.goal || opts.summaryFile || opts.clearNext || opts.addDecision || opts.addDone || opts.addNext || opts.addQuestion || opts.section;
   if (touchesSummary) {
     const current = opts.summaryFile
       ? Summary.parse(JSON.parse(await readFile(opts.summaryFile, "utf8")))
@@ -205,6 +236,7 @@ export async function edit(id: string, opts: EditOpts): Promise<void> {
       done: [...current.done, ...(opts.addDone ?? [])],
       next: [...(opts.clearNext ? [] : current.next), ...(opts.addNext ?? [])],
       open_questions: [...current.open_questions, ...(opts.addQuestion ?? [])],
+      sections: addToSections(current.sections ?? [], opts.section ?? []),
     };
   }
   if (opts.for) patch.assignee = opts.for === "none" ? null : await resolvePerson(client, opts.for);

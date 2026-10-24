@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { login } from "./commands/login.js";
-import { auditCmd, comment, digest, edit, exportCmd, invite, list, localSessions, members, prComment, publish, pull, remove, search, share, show, stats } from "./commands/sessions.js";
+import { auditCmd, comment, digest, edit, exportCmd, template, invite, list, localSessions, members, prComment, publish, pull, remove, search, share, show, stats } from "./commands/sessions.js";
 import { hook } from "./commands/hook.js";
 import { setup } from "./commands/setup.js";
 import { whoami } from "./commands/whoami.js";
@@ -93,6 +93,7 @@ program
   .option("--add-done <text>", "add to done (repeatable)", collect)
   .option("--add-decision <text>", "add a decision (repeatable)", collect)
   .option("--add-question <text>", "add an open question (repeatable)", collect)
+  .option("--section <title=item>", 'add an item to a section, e.g. "Tests run=npm test passes" (repeatable)', collect)
   .option("--summary-file <file>", "replace the whole summary with this JSON")
   .option("--for <name>", 'teammate it\'s for, or "none"')
   .option("--pr <url>", 'pull request URL, or "none"')
@@ -112,6 +113,12 @@ program
   .description("Comment on the session's pull request with a link and next steps (uses the GitHub CLI)")
   .option("--pr <url>", "pull request URL, if the share doesn't have one yet")
   .action(prComment);
+
+program
+  .command("template")
+  .description("Show the handoff template for this repo (sections a share should include)")
+  .option("--repo <repo>", "another repo")
+  .action(template);
 
 program
   .command("export [id]")

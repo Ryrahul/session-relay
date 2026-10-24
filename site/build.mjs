@@ -54,6 +54,8 @@ renderer.table = function (token) {
 };
 marked.use({ renderer, gfm: true });
 
+const GITHUB_ICON = `<svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>`;
+
 const MARK = `<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="13" height="5" rx="2.5" fill="var(--accent)"/><rect x="9" y="14" width="13" height="5" rx="2.5" fill="var(--ink)" opacity="0.85"/></svg>`;
 const FAVICON = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='5' width='13' height='5' rx='2.5' fill='%230f7b6c'/%3E%3Crect x='9' y='14' width='13' height='5' rx='2.5' fill='%2316202b'/%3E%3C/svg%3E`;
 
@@ -85,7 +87,7 @@ function page({ title, description, body, depth, active = "", urlPath = "/" }) {
       <a href="${up}docs/getting-started.html"${active === "docs" ? ' aria-current="page"' : ""}>Docs</a>
       <a href="${up}docs/self-hosting.html">Self-host</a>
       <a href="${up}index.html#hosting">Cloud</a>
-      <a href="${REPO}">GitHub</a>
+      <a href="${REPO}" class="nav-github">${GITHUB_ICON}<span>GitHub</span></a>
     </nav>
   </div>
 </header>
@@ -111,8 +113,10 @@ function landing() {
     <p class="lede">Share a coding-agent session with one command. Your teammate continues it in whichever agent they use, with the goal, the decisions, the next steps and the recent conversation.</p>
     <div class="cta">
       <a class="btn btn-primary" href="docs/self-hosting.html">Self-host it</a>
+      <a class="btn btn-github" href="${REPO}">${GITHUB_ICON}<span>View on GitHub</span></a>
       <a class="btn" href="docs/getting-started.html">Read the docs</a>
     </div>
+    <p class="hero-install"><code>npm install -g session-relay</code></p>
     <div class="handoff" aria-label="Example: share in Claude Code, pick up in OpenCode">
       <div class="term">
         <div class="term-bar"><span class="tool claude">Claude Code</span><span class="faint">Alice</span></div>
@@ -203,9 +207,21 @@ cp deploy/.env.example deploy/.env    <span class="faint"># set password, URL, d
 docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 
 <span class="faint"># on each laptop</span>
+npm install -g session-relay
 relay login --server https://relay.your-team.com --token srk_…
 relay setup                           <span class="faint"># adds /share and /pickup to your agents</span></code></pre>
     <p><a href="docs/getting-started.html">Full getting-started guide →</a></p>
+  </section>
+
+  <section class="oss">
+    <a class="oss-card" href="${REPO}">
+      ${GITHUB_ICON}
+      <div>
+        <h3>Open source on GitHub</h3>
+        <p>AGPL-3.0. Read the code, self-host it, and open a PR if you need a change or want to add another agent.</p>
+      </div>
+      <span class="oss-cta">github.com/Ryrahul/session-relay →</span>
+    </a>
   </section>
 </main>`;
   return page({

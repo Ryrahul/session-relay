@@ -24,6 +24,8 @@ export const SessionListItem = z.object({
   message_count: z.number().int(),
   has_full_transcript: z.boolean(),
   visibility_team: z.boolean(),
+  /** Set when this share continues another session. */
+  continues_id: z.string().nullable(),
   created_at: z.string(),
 });
 export type SessionListItem = z.infer<typeof SessionListItem>;
@@ -31,11 +33,25 @@ export type SessionListItem = z.infer<typeof SessionListItem>;
 export const DetailMode = z.enum(["summary", "tail", "full"]);
 export type DetailMode = z.infer<typeof DetailMode>;
 
+/** A session in a handoff chain. */
+export const ChainLink = z.object({
+  id: z.string(),
+  title: z.string(),
+  tool: SourceTool,
+  author: z.object({ id: z.string(), name: z.string() }),
+  created_at: z.string(),
+});
+export type ChainLink = z.infer<typeof ChainLink>;
+
 /** GET /v1/sessions/:id. `messages` is the requested window. */
 export const SessionDetail = SessionRecord.extend({
   people: z.array(z.object({ id: z.string(), name: z.string() })),
   message_total: z.number().int(),
   message_offset: z.number().int(),
+  /** Sessions this one continues, oldest first (only those visible to the caller). */
+  chain: z.array(ChainLink),
+  /** Sessions that continued this one. */
+  continued_by: z.array(ChainLink),
 });
 export type SessionDetail = z.infer<typeof SessionDetail>;
 

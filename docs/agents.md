@@ -80,6 +80,14 @@ Prompts go in `~/.codex/prompts/share.md` and `pickup.md`.
 
 The command files `relay setup` writes are in [`packages/cli/src/commands/setup.ts`](../packages/cli/src/commands/setup.ts) (`SHARE_PROMPT`, `PICKUP_PROMPT`). Copy them if you set things up by hand.
 
+## Handoff chains
+
+When you load a session with `/pickup` (or `get_session`, or `relay pull`), Session Relay remembers it for that repo for 7 days. Your next `/share` in that repo is linked to it automatically: the web app shows **Continues Alice's session → picked up by Bob**, and each session lists who continued it.
+
+- `/share` with "this is new work, not a continuation", or `relay share --continues none`, skips the link.
+- `relay share --continues rs_…` links to a specific session.
+- If the session you picked up has since been deleted, the share still goes through, just without the link.
+
 ## Using a different account per project
 
 The MCP server reads the same login as the CLI. To use another account or server for one project, point it at another config file:

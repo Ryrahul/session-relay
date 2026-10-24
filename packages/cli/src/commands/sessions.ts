@@ -5,7 +5,8 @@ import { findSessions } from "../adapters/index.js";
 import { RelayClient } from "../client.js";
 import { repoInfo } from "../git.js";
 import { renderHandoff } from "../handoff.js";
-import { describeRedactions, prepareShare, relayDir, writeDryRun } from "../share.js";
+import { recordPickup } from "../pickups.js";
+import { describeRedactions, prepareShare, relayDir, uploadShare, writeDryRun } from "../share.js";
 import { ago, ask, choose, confirm, interactive, toolLabel } from "../ui.js";
 
 interface ShareOpts {
@@ -20,6 +21,7 @@ interface ShareOpts {
   dryRun?: boolean;
   yes?: boolean;
   json?: boolean;
+  continues?: string;
 }
 
 function parseTool(t?: string): SourceTool | undefined {
@@ -80,8 +82,9 @@ export async function share(opts: ShareOpts): Promise<void> {
     summary,
     title: opts.title,
     people,
+    continues: opts.continues,
   });
-  const { session, transcript } = prepared.built;
+  const { session } = prepared.built;
   const redactNote = describeRedactions(prepared.built.redactions);
 
   if (opts.dryRun) {
@@ -92,11 +95,12 @@ export async function share(opts: ShareOpts): Promise<void> {
   if (!opts.json) {
     console.log(`\n"${session.title}" · ${toolLabel(prepared.ref.tool).trim()} · ${session.include} · ${session.messages.length} messages · ${session.visibility.team ? "whole team" : `${session.visibility.people.length} people`}`);
     console.log(redactNote);
+    if (session.continues) console.log(`Continues ${session.continues}${prepared.continuesAuto ? " (the session you picked up here)" : ""}. Use --continues none to unlink.`);
   }
   if (ask_ && !(await confirm("Share it?"))) return console.log("Cancelled.");
 
-  const { id } = await client!.share({ session, transcript });
-  if (opts.json) return console.log(JSON.stringify({ id, title: session.title, redactions: session.redactions }));
+  const { id, continues } = await uploadShare(client!, prepared);
+  if (opts.json) return console.log(JSON.stringify({ id, title: session.title, redactions: session.redactions, continues: continues ?? null }));
   console.log(`Shared as ${id}. Teammates can run: relay pull ${id}`);
 }
 
@@ -156,8 +160,11 @@ export async function pull(id: string, opts: { full?: boolean; summaryOnly?: boo
     }
     s = { ...s, messages, message_offset: 0 };
   }
-  const base = await repoInfo().then((r) => r.root).catch(() => process.cwd());
+  const repoRoot = await repoInfo().then((r) => r.root).catch(() => null);
+  const base = repoRoot ?? process.cwd();
   const file = opts.out ?? path.join(await relayDir(base), `handoff-${s.id}.md`);
+  // Your next share in this repo will link back to this session.
+  if (repoRoot) await recordPickup(repoRoot, s.id);
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, renderHandoff(s));
   const rel = path.relative(process.cwd(), file) || file;

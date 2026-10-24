@@ -5,7 +5,8 @@ import { z } from "zod";
 import { RelayClient } from "./client.js";
 import { repoInfo } from "./git.js";
 import { renderHandoff } from "./handoff.js";
-import { describeRedactions, prepareShare } from "./share.js";
+import { recordPickup } from "./pickups.js";
+import { describeRedactions, prepareShare, uploadShare } from "./share.js";
 import { ago } from "./ui.js";
 import { VERSION } from "./version.js";
 
@@ -99,6 +100,9 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
       try {
         const client = await getClient();
         const s = await client.get(id, mode ?? "tail", { tail, offset });
+        // Loading a session to work on it: the next share in this repo continues it.
+        const root = await repoInfo().then((r) => r.root).catch(() => null);
+        if (root) await recordPickup(root, s.id);
         let out = renderHandoff(s);
         const end = s.message_offset + s.messages.length;
         if (mode === "full" && end < s.message_total) out += `\n(More messages: call get_session with mode "full" and offset ${end}.)`;
@@ -123,6 +127,10 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         title: z.string().max(200).optional(),
         include: z.enum(["summary", "summary+tail", "full"]).optional().describe('Default "summary+tail"'),
         people: z.array(z.string()).optional().describe("Names or emails who can see it; omit for the whole team"),
+        continues: z
+          .string()
+          .optional()
+          .describe('Id of the shared session this work continues. Defaults to the one loaded with get_session in this repo; "none" to unlink.'),
       },
     },
     async (args) => {
@@ -134,6 +142,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
           include: args.include ?? "summary+tail",
           title: args.title,
           people: args.people,
+          continues: args.continues,
           summary: {
             goal: args.goal,
             decisions: args.decisions ?? [],
@@ -142,10 +151,10 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
             open_questions: args.open_questions ?? [],
           },
         });
-        const { session, transcript } = prepared.built;
-        const { id } = await client.share({ session, transcript });
+        const { session } = prepared.built;
+        const { id, continues } = await uploadShare(client, prepared);
         return text(
-          `Shared as ${id}: "${session.title}" (${session.include}, ${session.messages.length} messages, ${session.visibility.team ? "whole team" : "selected people"}). ${describeRedactions(prepared.built.redactions)}\nTeammates can load it with get_session("${id}") or \`relay pull ${id}\`.`,
+          `Shared as ${id}: "${session.title}" (${session.include}, ${session.messages.length} messages, ${session.visibility.team ? "whole team" : "selected people"}). ${describeRedactions(prepared.built.redactions)}${continues ? `\nContinues ${continues}.` : ""}\nTeammates can load it with get_session("${id}") or \`relay pull ${id}\`.`,
         );
       } catch (err) {
         return fail(err);

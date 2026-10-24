@@ -60,6 +60,8 @@ export const SessionUpload = z.object({
   visibility: Visibility.default({ team: true, people: [] }),
   redactions: z.number().int().nonnegative().default(0),
   started_at: z.string().datetime().optional(),
+  /** Id of the shared session this one continues (after a /pickup). */
+  continues: z.string().max(40).optional(),
 });
 export type SessionUpload = z.infer<typeof SessionUpload>;
 

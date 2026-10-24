@@ -21,6 +21,9 @@ Run `relay setup`, then fully restart the agent. Check that `relay mcp` starts: 
 **Can I share without the CLI or MCP?**
 The web app is for reading. Sharing needs the CLI, because sessions live on your laptop.
 
+**How does Session Relay know my share continues someone else's work?**
+When you `/pickup` or `relay pull` a session, it's remembered for that repo for 7 days. Your next share there links to it. Use `relay share --continues none` if it's unrelated.
+
 **Where do handoff files go?**
 `.relay/handoff-<id>.md` in the repo. The folder has its own `.gitignore`, so it's never committed.
 

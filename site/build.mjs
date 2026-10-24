@@ -61,7 +61,7 @@ const GITHUB_ICON = `<svg width="18" height="18" viewBox="0 0 16 16" fill="curre
 const MARK = `<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="13" height="5" rx="2.5" fill="var(--accent)"/><rect x="9" y="14" width="13" height="5" rx="2.5" fill="var(--ink)" opacity="0.85"/></svg>`;
 const FAVICON = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='5' width='13' height='5' rx='2.5' fill='%230f7b6c'/%3E%3Crect x='9' y='14' width='13' height='5' rx='2.5' fill='%2316202b'/%3E%3C/svg%3E`;
 
-function page({ title, description, body, depth, active = "", urlPath = "/" }) {
+function page({ title, description, body, depth, active = "", urlPath = "/", extraHead = "" }) {
   const up = "../".repeat(depth);
   return `<!doctype html>
 <html lang="en">
@@ -75,7 +75,14 @@ function page({ title, description, body, depth, active = "", urlPath = "/" }) {
 <meta property="og:description" content="${esc(description)}">
 <link rel="canonical" href="${SITE_URL}${urlPath}">
 <meta property="og:url" content="${SITE_URL}${urlPath}">
-<link rel="icon" href="${FAVICON}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Session Relay">
+<meta property="og:image" content="${SITE_URL}/images/session.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${esc(title)}">
+<meta name="twitter:description" content="${esc(description)}">
+<meta name="twitter:image" content="${SITE_URL}/images/session.png">
+<link rel="icon" href="${FAVICON}">${extraHead}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -105,6 +112,45 @@ ${body}
 </html>
 `;
 }
+
+const FEATURES = [
+  ["Works across agents", "Start in Claude Code, finish in Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor or ZCode. Each tool's sessions are read in its own format and turned into one handoff any agent understands."],
+  ["Private by default", "Nothing leaves your laptop unless you share it. API keys, tokens, passwords and private keys are removed before upload; add your own patterns and test them on sample text. Share with the whole team or specific people."],
+  ["Handoffs for someone", "Share \"for Akshat\" and it shows up as <b>For you</b> in their list; <code>/pickup</code> checks their handoffs first."],
+  ["Handoff templates", "Decide what every handoff in a repo must include, like \"Tests run\" or \"Rollout notes\". <code>/share</code> fills them in; missing ones are flagged. Set up in a guided editor with ready-made sections."],
+  ["Diff snapshots", "Attach your uncommitted changes with <code>/share with the diff</code>. Your teammate sees them file by file and can <code>git apply</code> the patch."],
+  ["Linked to PRs and files", "Shares pick up the branch's open pull request automatically. Find every session that touched a file with <code>file:src/billing.ts</code>."],
+  ["Comments and edits", "Leave a note on any session; the next agent reads it before it starts. Fix the title, next steps or who it's for any time after sharing."],
+  ["Handoff chains", "Pick up a session and share your work later: it's linked automatically, so every session shows who started it and who continued."],
+  ["Auto-share drafts", "Forget to share? Every Claude Code, Gemini CLI and Copilot CLI session can be saved as a private draft when it ends, for you to publish later."],
+  ["Search everything", "Titles, summaries and full transcripts, from the web app, the <code>relay</code> CLI, or straight from your agent. Filter by repo, branch, agent and person."],
+  ["Activity and stats", "A daily or weekly digest of what the team shared, picked up and discussed, and stats on who shares and who picks up, by agent and repo."],
+  ["Admin controls", "Organizations and roles, retention, a repo allowlist, an audit log of every share, view and change, and export to Markdown, JSON or NDJSON."],
+  ["Easy onboarding", "Invite teammates with a single-use link. <code>relay login</code> signs in by approving a code in the browser. <code>relay setup</code> connects every agent you have."],
+  ["Small to run", "One container plus Postgres with automatic HTTPS, or Cloudflare Workers with no server at all. Free and open source (AGPL-3.0)."],
+];
+
+const FAQ = [
+  ["What is Session Relay?", "An open-source tool for sharing AI coding-agent sessions with your team. Run <code>/share</code> in Claude Code (or Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor, ZCode) and a teammate runs <code>/pickup</code> to continue the work in their own agent, with the goal, decisions, next steps and recent conversation."],
+  ["Is it free?", "Yes. It's open source under AGPL-3.0 and you host it yourself, on a small server with Docker or on your own Cloudflare account. A hosted version is planned."],
+  ["Can I hand a Claude Code session to someone using Codex or Cursor?", "Yes. Session Relay reads each agent's own session format and turns it into one handoff that every supported agent can read through MCP."],
+  ["Does it upload my code or secrets?", "Only what you share: a summary, the recent conversation (or the full transcript if you ask), the files touched, and optionally your uncommitted diff. Secrets are removed on your laptop before upload."],
+  ["How is it different from copying a chat log?", "The agent writes a structured handoff (goal, decisions, done, next steps, open questions), it's searchable by the whole team, it can be addressed to a person, and the next agent loads it directly with <code>/pickup</code> and checks the current code before continuing."],
+];
+
+const JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Session Relay",
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "macOS, Linux, Windows",
+  description: "Open-source tool to share AI coding-agent sessions (Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor, ZCode) with your team: /share in one agent, /pickup in another.",
+  url: SITE_URL + "/",
+  downloadUrl: "https://www.npmjs.com/package/session-relay",
+  codeRepository: REPO,
+  license: "https://www.gnu.org/licenses/agpl-3.0.html",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+};
 
 function landing() {
   const body = `
@@ -152,43 +198,21 @@ retry path. Starting with that now.</pre>
     <ol class="how-steps">
       <li><h3>Share</h3><p>Run <code>/share</code> in your agent. It writes a handoff (goal, decisions, done, next steps, open questions) and shares it with the last 30 messages and the files touched. Secrets are removed on your laptop first.</p></li>
       <li><h3>Find</h3><p>Everything your team shares is in one place. Search it from the web app, the <code>relay</code> CLI, or straight from your agent.</p></li>
-      <li><h3>Pick up</h3><p>Run <code>/pickup</code>. The agent reads the handoff, checks the current code, tells you where things stand and continues, in any of the four agents.</p></li>
+      <li><h3>Pick up</h3><p>Run <code>/pickup</code>. The agent reads the handoff, checks the current code, tells you where things stand and continues, in whichever agent they use.</p></li>
     </ol>
   </section>
 
-  <section class="features">
-    <div>
-      <h3>Works across agents</h3>
-      <p>Start in Claude Code, finish in Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor or ZCode. Each tool's sessions are read in its own format and turned into one handoff any agent understands.</p>
+  <section class="features-wrap">
+    <h2>Everything in it</h2>
+    <div class="features">
+${FEATURES.map(([t, d]) => `      <div>\n        <h3>${t}</h3>\n        <p>${d}</p>\n      </div>`).join("\n")}
     </div>
-    <div>
-      <h3>Private by default</h3>
-      <p>Nothing leaves your laptop unless you share it. API keys, tokens, passwords and private keys are removed before upload; test your own patterns in Settings → Privacy. Share with the whole team or specific people.</p>
-    </div>
-    <div>
-      <h3>Built for teams</h3>
-      <p>Organizations, roles, handoff templates per repo, retention, a repo allowlist, your own secret patterns and an audit log. An Activity digest and Stats show who shares and who picks up.</p>
-    </div>
-    <div>
-      <h3>Handoff chains</h3>
-      <p>Pick up a session and share your work later: it's linked automatically. Every session shows the trail. Forget to share? Auto-share keeps a private draft of each session for you to publish.</p>
-    </div>
-    <div>
-      <h3>Easy onboarding</h3>
-      <p>Invite teammates with a single-use link. <code>relay login</code> signs in by approving a code in the browser, with no tokens to copy around.</p>
-    </div>
-    <div>
-      <h3>Handoffs for someone</h3>
-      <p>Share "for Akshat" and it shows up as <b>For you</b> in their list; <code>/pickup</code> checks their handoffs first. Edit a share any time, and leave comments the next agent reads.</p>
-    </div>
-    <div>
-      <h3>Linked to your PRs</h3>
-      <p>Shares pick up the branch's open pull request automatically, and can carry your uncommitted changes as a patch. Find every session that touched a file with <code>file:src/billing.ts</code>.</p>
-    </div>
-    <div>
-      <h3>Small to run</h3>
-      <p>One container plus Postgres with automatic HTTPS, or Cloudflare Workers with no server at all. Upgrades are a <code>git pull</code> and a restart.</p>
-    </div>
+    <p><a href="docs/features.html">Every feature, with details →</a></p>
+  </section>
+
+  <section class="faq-home">
+    <h2>Questions</h2>
+${FAQ.map(([q, a]) => `    <details>\n      <summary>${q}</summary>\n      <p>${a}</p>\n    </details>`).join("\n")}
   </section>
 
   <section class="hosting" id="hosting">
@@ -248,6 +272,7 @@ relay setup                           <span class="faint"># adds /share and /pic
     description: "Share Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor and ZCode sessions with your team. /share in one agent, /pickup in another. Self-hosted now, cloud coming soon.",
     body,
     depth: 0,
+    extraHead: `\n<script type="application/ld+json">${JSON.stringify(JSON_LD)}</script>`,
   });
 }
 
@@ -315,4 +340,41 @@ for (const f of docs) {
   await writeFile(path.join(OUT, "docs", `${slug}.html`), docPage(slug, await readFile(path.join(ROOT, "docs", f), "utf8")));
 }
 await writeFile(path.join(OUT, "docs", "index.html"), `<!doctype html><meta http-equiv="refresh" content="0; url=getting-started.html"><a href="getting-started.html">Docs</a>`);
+
+// For search engines and AI assistants: sitemap, robots, and llms.txt (https://llmstxt.org).
+const slugs = docs.map((f) => f.replace(/\.md$/, ""));
+const today = new Date().toISOString().slice(0, 10);
+await writeFile(
+  path.join(OUT, "sitemap.xml"),
+  `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    [`${SITE_URL}/`, ...slugs.map((s) => `${SITE_URL}/docs/${s}.html`)].map((u) => `  <url><loc>${u}</loc><lastmod>${today}</lastmod></url>`).join("\n") +
+    `\n</urlset>\n`,
+);
+await writeFile(path.join(OUT, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${SITE_URL}/sitemap.xml\n`);
+const titleOf = async (s) => /^#\s+(.+)$/m.exec(await readFile(path.join(ROOT, "docs", `${s}.md`), "utf8"))?.[1] ?? s;
+const ordered = [...NAV.map(([s]) => s).filter((s) => slugs.includes(s)), ...slugs.filter((s) => !NAV.some(([n]) => n === s))];
+const plain = (h) => h.replace(/<[^>]+>/g, "").replace(/&quot;/g, '"');
+await writeFile(
+  path.join(OUT, "llms.txt"),
+  `# Session Relay
+
+> Open-source (AGPL-3.0), self-hosted tool for sharing AI coding-agent sessions with a team. Run /share in Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor or ZCode; a teammate runs /pickup in any of them to continue with the goal, decisions, next steps and recent conversation. Install the CLI with \`npm install -g session-relay\`; host the server with Docker or on Cloudflare Workers.
+
+${FAQ.map(([q, a]) => `- ${q} ${plain(a)}`).join("\n")}
+
+## Docs
+
+${(await Promise.all(ordered.map(async (s) => `- [${await titleOf(s)}](${SITE_URL}/docs/${s}.html)`))).join("\n")}
+
+## Links
+
+- [Source code](${REPO})
+- [npm package](https://www.npmjs.com/package/session-relay)
+- [All docs in one file](${SITE_URL}/llms-full.txt)
+`,
+);
+await writeFile(
+  path.join(OUT, "llms-full.txt"),
+  (await Promise.all(ordered.map((s) => readFile(path.join(ROOT, "docs", `${s}.md`), "utf8")))).join("\n\n---\n\n"),
+);
 console.log(`Built site: index + ${docs.length} doc pages → ${OUT}`);

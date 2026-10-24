@@ -1,4 +1,7 @@
 import type {
+  Activity,
+  Comment,
+  Stats,
   DetailMode,
   Member,
   MeResponse,
@@ -9,12 +12,22 @@ import type {
 } from "@session-relay/shared";
 import { api } from "./api.js";
 import { resolveConfig, type CliConfig } from "./config.js";
+import { createRedactor } from "@session-relay/shared";
 
 export interface ListQuery {
   repo?: string;
   branch?: string;
   tool?: string;
   author?: string;
+  /** "me" or a user id. */
+  assignee?: string;
+  /** Part of a touched file's path. */
+  file?: string;
+  /** ISO time: only sessions shared since then. */
+  since?: string;
+  native_id?: string;
+  /** Drafts are left out unless "include" or "only". */
+  drafts?: "include" | "only";
   q?: string;
   limit?: number;
 }
@@ -40,16 +53,30 @@ export class RelayClient {
     for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== "") params.set(k, String(v));
     return api<{ sessions: SessionListItem[] }>(this.config, "GET", `v1/sessions?${params}`);
   }
-  get(id: string, mode: DetailMode = "tail", opts: { tail?: number; offset?: number; limit?: number } = {}) {
+  /** `pickup` marks it as picked up to continue (counted in stats and activity), not just viewed. */
+  get(id: string, mode: DetailMode = "tail", opts: { tail?: number; offset?: number; limit?: number; pickup?: boolean } = {}) {
     const params = new URLSearchParams({ mode });
-    for (const [k, v] of Object.entries(opts)) if (v !== undefined) params.set(k, String(v));
+    for (const [k, v] of Object.entries(opts)) if (v !== undefined && v !== false) params.set(k, v === true ? "1" : String(v));
     return api<SessionDetail>(this.config, "GET", `v1/sessions/${encodeURIComponent(id)}?${params}`);
   }
   update(id: string, patch: SessionPatch) {
     return api<{ ok: true }>(this.config, "PATCH", `v1/sessions/${encodeURIComponent(id)}`, patch);
   }
+  comments(id: string) {
+    return api<{ comments: Comment[] }>(this.config, "GET", `v1/sessions/${encodeURIComponent(id)}/comments`);
+  }
+  /** Secrets are removed from the note before it leaves the machine, like shares. */
+  comment(id: string, body: string) {
+    return api<{ id: string }>(this.config, "POST", `v1/sessions/${encodeURIComponent(id)}/comments`, { body: createRedactor()(body) });
+  }
   remove(id: string) {
     return api<{ ok: true }>(this.config, "DELETE", `v1/sessions/${encodeURIComponent(id)}`);
+  }
+  activity(days = 1) {
+    return api<Activity>(this.config, "GET", `v1/activity?days=${days}`);
+  }
+  stats(days = 30) {
+    return api<Stats>(this.config, "GET", `v1/stats?days=${days}`);
   }
   members() {
     return api<{ members: Member[] }>(this.config, "GET", "v1/members");
@@ -60,6 +87,11 @@ export class RelayClient {
   invite(email: string, name: string, role: string) {
     return api<{ user: Member; token: string }>(this.config, "POST", "v1/members", { email, name, role });
   }
+}
+
+/** One member id from a name, email or id. */
+export async function resolvePerson(client: RelayClient, name: string): Promise<string> {
+  return (await resolvePeople(client, [name]))[0]!;
 }
 
 /** Resolves "alice", "alice@x.dev" or a user id to member ids. */

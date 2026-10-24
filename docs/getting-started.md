@@ -1,6 +1,6 @@
 # Getting started
 
-Session Relay lets your team hand coding-agent sessions to each other. You share a session from Claude Code, OpenCode, Codex or ZCode. A teammate picks it up in whichever of those they use. Their agent reads the goal, the decisions, the next steps and the recent conversation, checks the code, and carries on.
+Session Relay lets your team hand coding-agent sessions to each other. You share a session from Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor or ZCode. A teammate picks it up in whichever of those they use. Their agent reads the goal, the decisions, the next steps and the recent conversation, checks the code, and carries on.
 
 ```
 You (Claude Code):       /share
@@ -47,7 +47,9 @@ The CLI's token is saved in `~/.config/session-relay/config.json`, readable only
 relay setup
 ```
 
-This adds the relay MCP server and two commands, `/share` and `/pickup`, to each agent that is installed: Claude Code, OpenCode, Codex and ZCode. Restart your agents afterwards. Details and manual setup are in [Agents](agents.md).
+Optional: `relay setup --auto-share on` saves every Claude Code, Gemini CLI and Copilot CLI session as a private draft when it ends, so you can publish it later without remembering to `/share` ([details](agents.md#auto-share-drafts)).
+
+This adds the relay MCP server and two commands, `/share` and `/pickup`, to each agent that is installed: Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor and ZCode. Restart your agents afterwards. Details and manual setup are in [Agents](agents.md).
 
 ## 4. Share a session
 
@@ -71,22 +73,36 @@ You can add instructions:
 
 ```
 /share only Bob
+/share for Akshat              # a handoff for them: first in their /pickup
 /share full transcript
 /share title: payment retry, half done
 ```
+
+If your branch has an open pull request (and the GitHub CLI `gh` is installed), the share links to it.
 
 Or share from a terminal, inside the repo:
 
 ```sh
 relay share               # pick a session, choose what to include and who sees it
 relay share --dry-run     # see exactly what would be uploaded, upload nothing
+relay share --for akshat  # a handoff for someone
 ```
+
+Changed your mind? Edit a share later in the web app (**Edit** on the session), with `relay edit`, or ask your agent ("add a next step to my last share"):
+
+```sh
+relay edit rs_7KQ2M9XA --add-next "load-test the retry path" --for bob
+relay pr-comment rs_7KQ2M9XA    # post a link to the session on its pull request
+```
+
+Teammates can leave **comments** on a session (web app, `relay comment rs_7KQ2M9XA "…"`, or "comment on Alice's session that…" in an agent). Whoever picks it up next sees them.
 
 ## 5. Pick up a session
 
 In your agent:
 
 ```
+/pickup                        # handoffs for you first
 /pickup alice's webhook retry work
 /pickup rs_7KQ2M9XA
 ```
@@ -97,18 +113,26 @@ From a terminal:
 
 ```sh
 relay list                     # shared sessions for this repo
+relay list --for-me            # handoffs for you, any repo
 relay search "idempotency"
+relay search "file:src/webhooks.ts"   # every session that touched a file
 relay pull rs_7KQ2M9XA         # writes .relay/handoff-rs_7KQ2M9XA.md
 ```
 
 Then tell any agent: *"Read .relay/handoff-rs_7KQ2M9XA.md and continue."*
+
+To catch up on what the team did: `relay digest` (or `--days 7`), the **Activity** page, or ask your agent "what did the team do today?".
 
 ## The web app
 
 Open your server's address in a browser and sign in with your token. You can:
 
 - browse, search and read shared sessions, including the full conversation and tool calls
-- add teammates and create or revoke your own tokens
+- filter to **For me**, by agent, by repo, or search `file:` and `branch:`
+- **Edit** your shares: title, summary, next steps, who it's for, the pull request
+- **Comment** on any session you can see
+- see **Activity** (what the team shared, picked up and discussed) and **Stats** (who shares and picks up, by agent and repo)
+- invite teammates with a link (admins), and create or revoke your own tokens
 - if you're an admin, change org settings: retention, allowed repositories, extra secret patterns
 
 **Get started** in the web app shows the commands above with your server's address filled in.

@@ -1,6 +1,6 @@
 import type { SessionDetail } from "@session-relay/shared";
 
-const TOOL_NAMES = { "claude-code": "Claude Code", codex: "Codex", opencode: "OpenCode", zcode: "ZCode" } as const;
+const TOOL_NAMES = { "claude-code": "Claude Code", codex: "Codex", opencode: "OpenCode", zcode: "ZCode", gemini: "Gemini CLI", copilot: "Copilot CLI", cursor: "Cursor" } as const;
 
 function list(title: string, items: string[]): string {
   return items.length ? `\n## ${title}\n${items.map((i) => `- ${i}`).join("\n")}\n` : "";
@@ -17,6 +17,9 @@ export function renderHandoff(s: SessionDetail): string {
     ...(s.chain?.length
       ? [`Continues ${s.chain.map((c) => `"${c.title}" (${c.author.name}, \`${c.id}\`)`).join(" → ")}`]
       : []),
+    ...(s.assigned_to ? [`For **${s.assigned_to.name}**`] : []),
+    ...(s.pr_url ? [`Pull request: ${s.pr_url}`] : []),
+    ...(s.updated_at ? [`Edited ${new Date(s.updated_at).toISOString().slice(0, 16).replace("T", " ")} UTC`] : []),
     ...(s.continued_by?.length
       ? [`Continued by ${s.continued_by.map((c) => `"${c.title}" (${c.author.name}, \`${c.id}\`)`).join(", ")}`]
       : []),
@@ -32,6 +35,13 @@ export function renderHandoff(s: SessionDetail): string {
     list("Open questions", s.summary.open_questions) +
     list("Files touched", s.files_touched.map((f) => `\`${f}\``));
 
+  // Teammates' notes come before the conversation: they are often the latest word on the work.
+  const notes = s.comments?.length
+    ? `\n## Comments from the team\n${s.comments
+        .map((c) => `- **${c.author.name}** (${new Date(c.created_at).toISOString().slice(0, 16).replace("T", " ")} UTC): ${c.body.replace(/\n/g, "\n  ")}`)
+        .join("\n")}\n`
+    : "";
+
   let convo = "";
   if (s.messages.length) {
     const from = s.message_offset + 1;
@@ -41,5 +51,5 @@ export function renderHandoff(s: SessionDetail): string {
       s.messages.map((m) => (m.role === "tool" ? `> _tool:_ ${m.text}` : `**${m.role}:** ${m.text}`)).join("\n\n") +
       "\n";
   }
-  return `${head}\n${body}${convo}`;
+  return `${head}\n${body}${notes}${convo}`;
 }

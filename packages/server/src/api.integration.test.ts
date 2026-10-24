@@ -371,6 +371,144 @@ describe.skipIf(!DB)("API (integration)", () => {
     expect((await pub("POST", "/v1/auth/device/token", { device_code: "dev_notarealcodenotarealcode" })).status).toBe(404);
   });
 
+  it("edits a share: summary, who it's for and the PR; only author or admin", async () => {
+    const { body } = await call(alice.token, "POST", "/v1/sessions", { session: upload({ title: "edit me", repo: "github.com/acme/edits" }) });
+    const id = body.id;
+    const summary = { goal: "new goal", decisions: ["d1"], done: ["x"], next: ["ship it"], open_questions: [] };
+    expect((await call(bob.token, "PATCH", `/v1/sessions/${id}`, { summary })).status).toBe(403);
+    expect((await call(alice.token, "PATCH", `/v1/sessions/${id}`, { pr_url: "javascript:alert(1)" })).status).toBe(400);
+    expect((await call(alice.token, "PATCH", `/v1/sessions/${id}`, { assignee: outsider.userId })).status).toBe(400);
+    const pr = "https://github.com/acme/edits/pull/42";
+    expect((await call(alice.token, "PATCH", `/v1/sessions/${id}`, { summary, assignee: bob.userId, pr_url: pr })).status).toBe(200);
+    const got = (await call(bob.token, "GET", `/v1/sessions/${id}?mode=summary`)).body;
+    expect(got.summary.goal).toBe("new goal");
+    expect(got.assigned_to).toEqual({ id: bob.userId, name: "Bob" });
+    expect(got.pr_url).toBe(pr);
+    expect(got.updated_at).toBeTruthy();
+    // Search sees the edited summary.
+    const found = (await call(bob.token, "GET", "/v1/sessions?q=ship+it&repo=github.com/acme/edits")).body.sessions;
+    expect(found.map((x: any) => x.id)).toContain(id);
+    // null clears.
+    await call(owner.token, "PATCH", `/v1/sessions/${id}`, { assignee: null, pr_url: null });
+    const cleared = (await call(alice.token, "GET", `/v1/sessions/${id}?mode=summary`)).body;
+    expect(cleared.assigned_to).toBeNull();
+    expect(cleared.pr_url).toBeUndefined();
+  });
+
+  it("handoffs for someone: listed with assignee=me and visible to them even when private", async () => {
+    const r = await call(alice.token, "POST", "/v1/sessions", {
+      session: upload({ title: "for bob only", repo: "github.com/acme/assign", assignee: bob.userId, visibility: { team: false, people: [] } }),
+    });
+    expect(r.status).toBe(201);
+    const mine = (await call(bob.token, "GET", "/v1/sessions?assignee=me")).body.sessions;
+    expect(mine.map((x: any) => x.id)).toEqual([r.body.id]);
+    expect(mine[0].assignee).toEqual({ id: bob.userId, name: "Bob" });
+    expect((await call(bob.token, "GET", `/v1/sessions/${r.body.id}`)).status).toBe(200);
+    expect((await call(owner.token, "GET", "/v1/sessions?assignee=me")).body.sessions).toEqual([]);
+    expect((await call(alice.token, "POST", "/v1/sessions", { session: upload({ assignee: outsider.userId }) })).status).toBe(400);
+  });
+
+  it("filters by touched file and branch, also as file:/branch: in the query", async () => {
+    const repo = "github.com/acme/files";
+    const a = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo, branch: "main", files_touched: ["src/billing/invoice.ts"], title: "invoice rounding" }) })).body.id;
+    const b = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo, branch: "dev", files_touched: ["src/auth/login.ts"], title: "login rounding" }) })).body.id;
+    const ids = async (qs: string) => (await call(bob.token, "GET", `/v1/sessions?repo=${repo}&${qs}`)).body.sessions.map((x: any) => x.id);
+    expect(await ids("file=invoice")).toEqual([a]);
+    expect(await ids("file=src%2Fauth")).toEqual([b]);
+    expect(await ids("file=50%25")).toEqual([]);
+    expect(await ids("q=file%3Ainvoice.ts")).toEqual([a]);
+    expect(await ids("q=rounding+branch%3Adev")).toEqual([b]);
+    expect((await ids("q=rounding")).sort()).toEqual([a, b].sort());
+  });
+
+  it("removing a member unassigns their handoffs", async () => {
+    const carol = await makeUser(orgA, "Carol", "member");
+    const id = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ assignee: carol.userId }) })).body.id;
+    expect((await call(owner.token, "DELETE", `/v1/members/${carol.userId}`)).status).toBe(200);
+    expect((await call(alice.token, "GET", `/v1/sessions/${id}?mode=summary`)).body.assigned_to).toBeNull();
+  });
+
+  it("comments: visible members comment, author or admin deletes, shown on the session and counted in lists", async () => {
+    const repo = "github.com/acme/comments";
+    const id = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo, title: "commented" }) })).body.id;
+    expect((await call(bob.token, "POST", `/v1/sessions/${id}/comments`, { body: "  " })).status).toBe(400);
+    const c1 = (await call(bob.token, "POST", `/v1/sessions/${id}/comments`, { body: "picked this up; tests fail on node 20" })).body.id;
+    await call(alice.token, "POST", `/v1/sessions/${id}/comments`, { body: "thanks!" });
+    // Typed in the web app: secrets are removed on the server.
+    await call(owner.token, "POST", `/v1/sessions/${id}/comments`, { body: "use AKIAIOSFODNN7EXAMPLE for now" });
+    const all = (await call(owner.token, "GET", `/v1/sessions/${id}/comments`)).body.comments;
+    expect(all.at(-1).body).not.toContain("AKIAIOSFODNN7EXAMPLE");
+    await call(owner.token, "DELETE", `/v1/sessions/${id}/comments/${all.at(-1).id}`);
+    const detail = (await call(owner.token, "GET", `/v1/sessions/${id}?mode=summary`)).body;
+    expect(detail.comments.map((c: any) => [c.author.name, c.body])).toEqual([["Bob", "picked this up; tests fail on node 20"], ["Alice", "thanks!"]]);
+    expect((await call(bob.token, "GET", `/v1/sessions?repo=${repo}`)).body.sessions[0].comment_count).toBe(2);
+    expect((await call(alice.token, "DELETE", `/v1/sessions/${id}/comments/${c1}`)).status).toBe(403);
+    expect((await call(outsider.token, "POST", `/v1/sessions/${id}/comments`, { body: "hi" })).status).toBe(404);
+    expect((await call(bob.token, "DELETE", `/v1/sessions/${id}/comments/${c1}`)).status).toBe(200);
+    expect((await call(bob.token, "GET", `/v1/sessions/${id}/comments`)).body.comments).toHaveLength(1);
+    // Private shares: people who can't see the session can't comment on it.
+    const priv = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo, visibility: { team: false, people: [] } }) })).body.id;
+    expect((await call(bob.token, "POST", `/v1/sessions/${priv}/comments`, { body: "x" })).status).toBe(404);
+    // Deleting the share deletes its comments.
+    await call(alice.token, "DELETE", `/v1/sessions/${id}`);
+    const [{ n }] = await sql`SELECT count(*)::int AS n FROM session_comments WHERE session_id = ${id}`;
+    expect(n).toBe(0);
+  });
+
+  it("activity and stats: pickups, comments, shares by day/tool/repo/person, only visible sessions listed", async () => {
+    const team = await makeOrg("Stats Team");
+    const ann = await makeUser(team, "Ann", "owner");
+    const ben = await makeUser(team, "Ben", "member");
+    const a1 = (await call(ann.token, "POST", "/v1/sessions", { session: upload({ repo: "github.com/s/api" }) })).body.id;
+    await call(ann.token, "POST", "/v1/sessions", { session: upload({ repo: "github.com/s/api", source: { tool: "zcode", native_id: "z" } }) });
+    const hidden = (await call(ann.token, "POST", "/v1/sessions", { session: upload({ repo: "github.com/s/secret", visibility: { team: false, people: [] } }) })).body.id;
+    // Ben opens a1 in the web app (not a pickup), then picks it up twice (counted once) and continues it.
+    await call(ben.token, "GET", `/v1/sessions/${a1}`);
+    await call(ben.token, "GET", `/v1/sessions/${a1}?pickup=1`);
+    await call(ben.token, "GET", `/v1/sessions/${a1}?pickup=1`);
+    await call(ben.token, "POST", "/v1/sessions", { session: upload({ repo: "github.com/s/api", continues: a1 }) });
+    await call(ben.token, "POST", `/v1/sessions/${a1}/comments`, { body: "on it" });
+    await call(ann.token, "GET", `/v1/sessions/${hidden}?pickup=1`);
+
+    const act = (await call(ben.token, "GET", "/v1/activity?days=1")).body;
+    expect(act.pickups.map((p: any) => [p.by.name, p.session_id])).toEqual([["Ben", a1]]); // Ann's pickup of a private share is hidden from Ben
+    expect(act.comments.map((x: any) => [x.author.name, x.body])).toEqual([["Ben", "on it"]]);
+    expect((await call(ann.token, "GET", "/v1/activity")).body.pickups).toHaveLength(2);
+
+    const st = (await call(ben.token, "GET", "/v1/stats?days=7")).body;
+    expect(st.days).toBe(7);
+    expect(st.totals).toEqual({ shares: 4, pickups: 2, continued: 1, comments: 1, active_people: 2 });
+    expect(st.by_day).toHaveLength(8);
+    expect(st.by_day.at(-1)).toMatchObject({ shares: 4, pickups: 2 });
+    expect(st.by_tool).toEqual([{ tool: "claude-code", shares: 3 }, { tool: "zcode", shares: 1 }]);
+    expect(st.by_repo).toEqual([{ repo: "github.com/s/api", shares: 3 }]); // the private repo isn't shown to Ben
+    expect(st.by_person.map((p: any) => [p.name, p.shares, p.pickups, p.comments])).toEqual([["Ann", 3, 1, 0], ["Ben", 1, 1, 1]]);
+    // since filter on the list
+    expect((await call(ben.token, "GET", `/v1/sessions?since=${encodeURIComponent(new Date(Date.now() + 60_000).toISOString())}`)).body.sessions).toEqual([]);
+    expect((await call(outsider.token, "GET", "/v1/stats")).body.totals.shares).toBe(0);
+  });
+
+  it("drafts: only the author sees them, they skip stats, and publishing shares them now", async () => {
+    const team = await makeOrg("Drafts Team");
+    const dee = await makeUser(team, "Dee", "member");
+    const eli = await makeUser(team, "Eli", "admin");
+    const id = (await call(dee.token, "POST", "/v1/sessions", { session: upload({ native_id: "n", source: { tool: "claude-code", native_id: "native-d" }, draft: true, visibility: { team: true, people: [] } }) })).body.id;
+    // Hidden from everyone else, admins included, even with team visibility.
+    expect((await call(eli.token, "GET", `/v1/sessions/${id}`)).status).toBe(404);
+    expect((await call(eli.token, "GET", "/v1/sessions")).body.sessions).toEqual([]);
+    // The author's normal list leaves drafts out; drafts=only / native_id find them.
+    expect((await call(dee.token, "GET", "/v1/sessions")).body.sessions).toEqual([]);
+    const mine = (await call(dee.token, "GET", "/v1/sessions?drafts=only")).body.sessions;
+    expect(mine.map((s: any) => [s.id, s.draft])).toEqual([[id, true]]);
+    expect((await call(dee.token, "GET", "/v1/sessions?native_id=native-d&drafts=include")).body.sessions).toHaveLength(1);
+    expect((await call(eli.token, "GET", "/v1/stats?days=1")).body.totals.shares).toBe(0);
+    // Publish.
+    expect((await call(dee.token, "PATCH", `/v1/sessions/${id}`, { draft: false, visibility: { team: true, people: [] } })).status).toBe(200);
+    expect((await call(eli.token, "GET", `/v1/sessions/${id}`)).body.draft).toBe(false);
+    expect((await call(eli.token, "GET", "/v1/stats?days=1")).body.totals.shares).toBe(1);
+    expect((await call(dee.token, "PATCH", `/v1/sessions/${id}`, { draft: true })).status).toBe(400);
+  });
+
   it("records usage and audit events", async () => {
     const [u] = await sql`SELECT count(*)::int AS n FROM usage_events WHERE org_id = ${orgA} AND kind = 'session.share'`;
     const [a] = await sql`SELECT count(*)::int AS n FROM audit_log WHERE org_id = ${orgA} AND action = 'session.pull'`;

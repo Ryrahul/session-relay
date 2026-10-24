@@ -18,6 +18,7 @@ const SITE_URL = (process.env.SITE_URL ?? "https://relay.rahulweb.online").repla
 // Order and titles for the docs nav. Files not listed are still built.
 const NAV = [
   ["getting-started", "Getting started"],
+  ["features", "Features"],
   ["self-hosting", "Self-hosting"],
   ["cloudflare", "Deploy to Cloudflare"],
   ["agents", "Agents"],
@@ -96,7 +97,7 @@ ${body}
 <footer class="foot">
   <div class="foot-inner">
     <span>Session Relay</span>
-    <span class="faint">Share coding-agent sessions across Claude Code, OpenCode, Codex and ZCode.</span>
+    <span class="faint">Share coding-agent sessions across Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor and ZCode.</span>
     <a href="${REPO}">GitHub</a>
   </div>
 </footer>
@@ -109,7 +110,7 @@ function landing() {
   const body = `
 <main class="landing">
   <section class="hero">
-    <p class="eyebrow">For teams using Claude Code, OpenCode, Codex and ZCode</p>
+    <p class="eyebrow">For teams using Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor and ZCode</p>
     <h1>Pick up where your teammate left off.</h1>
     <p class="lede">Share a coding-agent session with one command. Your teammate continues it in whichever agent they use, with the goal, the decisions, the next steps and the recent conversation.</p>
     <div class="cta">
@@ -151,14 +152,14 @@ retry path. Starting with that now.</pre>
     <ol class="how-steps">
       <li><h3>Share</h3><p>Run <code>/share</code> in your agent. It writes a handoff (goal, decisions, done, next steps, open questions) and shares it with the last 30 messages and the files touched. Secrets are removed on your laptop first.</p></li>
       <li><h3>Find</h3><p>Everything your team shares is in one place. Search it from the web app, the <code>relay</code> CLI, or straight from your agent.</p></li>
-      <li><h3>Pick up</h3><p>Run <code>/pickup</code>. The agent reads the handoff, checks the current code, tells you where things stand and continues, in any of the three tools.</p></li>
+      <li><h3>Pick up</h3><p>Run <code>/pickup</code>. The agent reads the handoff, checks the current code, tells you where things stand and continues, in any of the four agents.</p></li>
     </ol>
   </section>
 
   <section class="features">
     <div>
       <h3>Works across agents</h3>
-      <p>Start in Claude Code, finish in OpenCode, Codex or ZCode. Each tool's sessions are read in its own format and turned into one handoff any agent understands.</p>
+      <p>Start in Claude Code, finish in Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor or ZCode. Each tool's sessions are read in its own format and turned into one handoff any agent understands.</p>
     </div>
     <div>
       <h3>Private by default</h3>
@@ -166,19 +167,27 @@ retry path. Starting with that now.</pre>
     </div>
     <div>
       <h3>Built for teams</h3>
-      <p>Organizations, roles, personal tokens, retention, a repo allowlist, your own secret patterns, and an audit log of every share and pull.</p>
+      <p>Organizations, roles, retention, a repo allowlist, your own secret patterns and an audit log. An Activity digest and Stats show who shares and who picks up.</p>
     </div>
     <div>
       <h3>Handoff chains</h3>
-      <p>Pick up a session and share your work later: it's linked automatically. Every session shows the trail, from who started it to who continued it.</p>
+      <p>Pick up a session and share your work later: it's linked automatically. Every session shows the trail. Forget to share? Auto-share keeps a private draft of each session for you to publish.</p>
     </div>
     <div>
       <h3>Easy onboarding</h3>
       <p>Invite teammates with a single-use link. <code>relay login</code> signs in by approving a code in the browser, with no tokens to copy around.</p>
     </div>
     <div>
+      <h3>Handoffs for someone</h3>
+      <p>Share "for Akshat" and it shows up as <b>For you</b> in their list; <code>/pickup</code> checks their handoffs first. Edit a share any time, and leave comments the next agent reads.</p>
+    </div>
+    <div>
+      <h3>Linked to your PRs</h3>
+      <p>Shares pick up the branch's open pull request automatically. Find every session that touched a file with <code>file:src/billing.ts</code>.</p>
+    </div>
+    <div>
       <h3>Small to run</h3>
-      <p>One container plus Postgres, with automatic HTTPS. Upgrades are a <code>git pull</code> and a restart.</p>
+      <p>One container plus Postgres with automatic HTTPS, or Cloudflare Workers with no server at all. Upgrades are a <code>git pull</code> and a restart.</p>
     </div>
   </section>
 
@@ -218,7 +227,7 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 
 <span class="faint"># on each laptop</span>
 npm install -g session-relay
-relay login --server https://relay.your-team.com --token srk_…
+relay login --server https://relay.your-team.com   <span class="faint"># approve in the browser</span>
 relay setup                           <span class="faint"># adds /share and /pickup to your agents</span></code></pre>
     <p><a href="docs/getting-started.html">Full getting-started guide →</a></p>
   </section>
@@ -236,7 +245,7 @@ relay setup                           <span class="faint"># adds /share and /pic
 </main>`;
   return page({
     title: "Session Relay: share coding-agent sessions with your team",
-    description: "Share Claude Code, OpenCode, Codex and ZCode sessions with your team. /share in one agent, /pickup in another. Self-hosted now, cloud coming soon.",
+    description: "Share Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor and ZCode sessions with your team. /share in one agent, /pickup in another. Self-hosted now, cloud coming soon.",
     body,
     depth: 0,
   });

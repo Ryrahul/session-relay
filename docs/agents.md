@@ -1,19 +1,22 @@
 # Agents
 
-Session Relay works with **Claude Code**, **OpenCode**, **Codex** and **ZCode**. Each one gets the same two things:
+Session Relay works with **Claude Code**, **Codex**, **OpenCode**, **Gemini CLI**, **Copilot CLI**, **Cursor** and **ZCode** (Cursor is experimental). Each one gets the same two things:
 
-1. **The relay MCP server** (`relay mcp`), which gives the agent four tools:
+1. **The relay MCP server** (`relay mcp`), which gives the agent seven tools:
 
    | Tool | What it does |
    |---|---|
-   | `list_sessions` | Shared sessions for the current repo (or all repos), newest first |
-   | `search_sessions` | Full-text search over titles, summaries and conversations |
+   | `list_sessions` | Shared sessions for the current repo (or all repos), newest first. `for_me` lists handoffs assigned to you; `file` filters by touched file |
+   | `search_sessions` | Full-text search over titles, summaries and conversations. The query can include `file:` and `branch:` |
    | `get_session` | A session as a handoff: goal, decisions, done, next steps, open questions, files, conversation. `mode`: `tail` (default), `summary`, or `full` (paged) |
-   | `share_current_session` | Shares the session the agent is in, with a summary the agent writes |
+   | `share_current_session` | Shares the session the agent is in, with a summary the agent writes. `for` assigns it to a teammate; the branch's PR is attached |
+   | `team_activity` | What the team did in the last day(s): new shares by repo, handoffs for you, pickups, comments |
+   | `comment_on_session` | Leaves a note on a session: a question, a finding, "picked this up". `get_session` shows comments before the conversation |
+   | `update_session` | Changes a share: title, summary, extra next steps, who it's for, PR, visibility. `publish` shares a draft |
 
 2. **Two commands**:
-   - `/share [instructions]`: write a handoff and share this session.
-   - `/pickup <what or whose>`: find a shared session, read it, check the code and continue.
+   - `/share [instructions]`: write a handoff and share this session. "for Akshat" makes it a handoff for them.
+   - `/pickup [what or whose]`: find a shared session, read it, check the code and continue. With nothing after it, handoffs for you come first.
 
 `relay setup` installs both for every agent it finds. Restart your agents afterwards.
 
@@ -30,6 +33,9 @@ relay setup --scope project         # write config into the current repo instead
 | Claude Code | `~/.claude/projects/<folder>/*.jsonl` | Only conversation entries are read. System prompts and injected context are skipped |
 | OpenCode | `opencode session list` and `opencode export` | Uses OpenCode's own commands, not its database files |
 | Codex | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` | The user and agent message events, plus tool calls |
+| Gemini CLI | `~/.gemini/tmp/<project>/chats/session-*.jsonl` (or `$GEMINI_CLI_HOME/.gemini`) | Matched to the repo by the folder's `.project_root`. Replays rewinds and edits the way Gemini CLI does. Gemini deletes sessions after 30 days by default |
+| Copilot CLI | `~/.copilot/session-state/<id>/events.jsonl` (or `$COPILOT_HOME`) | Matched by the working directory in the session's start event; title from `workspace.yaml` |
+| Cursor (experimental) | `~/.cursor/projects/<folder>/agent-transcripts/` | The agent transcripts Cursor's CLI and editor agent write. They have no tool results or per-message times, so tool lines say what was done but not the outcome. Editor chats that aren't agent sessions aren't read |
 | ZCode | `~/.zcode/cli/db/db.sqlite` (CLI and desktop app) | Opened read-only. Needs Node 22.5+ or the `sqlite3` command (built into macOS). Subagent and archived sessions are skipped |
 
 Tool calls become one line each, so any agent can read them:
@@ -87,7 +93,49 @@ Prompts go in `~/.codex/prompts/share.md` and `pickup.md`.
 
 Commands go in `~/.zcode/commands/` or `.zcode/commands/`. `relay setup` finds ZCode through the `zcode` command or the `~/.zcode` folder, so it works for the desktop app too.
 
+**Gemini CLI**: `~/.gemini/settings.json` or `.gemini/settings.json` in a repo:
+
+```json
+{ "mcpServers": { "relay": { "command": "relay", "args": ["mcp"] } } }
+```
+
+Commands are TOML: `~/.gemini/commands/share.toml` and `pickup.toml` (`description`, `prompt`; `{{args}}` is what you type after the command).
+
+**Copilot CLI**: `~/.copilot/mcp-config.json`:
+
+```json
+{ "mcpServers": { "relay": { "type": "local", "command": "relay", "args": ["mcp"], "tools": ["*"] } } }
+```
+
+Copilot's slash commands are skills: `~/.copilot/skills/share/SKILL.md` and `pickup/SKILL.md`.
+
+**Cursor**: `~/.cursor/mcp.json` or `.cursor/mcp.json`:
+
+```json
+{ "mcpServers": { "relay": { "type": "stdio", "command": "relay", "args": ["mcp"] } } }
+```
+
+Commands go in `~/.cursor/commands/share.md` and `pickup.md`.
+
 The command files `relay setup` writes are in [`packages/cli/src/commands/setup.ts`](../packages/cli/src/commands/setup.ts) (`SHARE_PROMPT`, `PICKUP_PROMPT`). Copy them if you set things up by hand.
+
+## Auto-share drafts
+
+```sh
+relay setup --auto-share on     # off to remove
+```
+
+This adds a session-end hook to each supported agent that's installed:
+
+| Agent | Hook |
+|---|---|
+| Claude Code | `SessionEnd` in `~/.claude/settings.json` |
+| Gemini CLI | `SessionEnd` in `~/.gemini/settings.json` |
+| Copilot CLI | `sessionEnd` in `~/.copilot/hooks/relay.json` |
+
+Codex, OpenCode, Cursor and ZCode don't get a hook yet; use `/share` there. When a session ends, in a git repo, with at least 4 messages, it's saved as a **private draft**: only you can see it, it doesn't count in Activity or Stats, and it follows the org's retention. If you end the same session again, the old draft is replaced; if you already shared it, nothing happens.
+
+Publish a draft when it's ready: **Publish to team** on the session in the web app, `relay publish <id>`, or ask your agent ("publish my last draft"; `update_session` with `publish`). The summary of a draft is the first request and the last answer; edit it before publishing if you like. What the hook did is logged in `hook.log` next to your relay config.
 
 ## Handoff chains
 
@@ -122,5 +170,8 @@ Then tell the agent: *"Read .relay/handoff-rs_7KQ2M9XA.md and continue from wher
 |---|---|
 | Claude Code 2.1 | Tested end to end: real sessions, `/share` via MCP |
 | OpenCode 1.19 | Tested end to end: real sessions, `/pickup` via MCP continued a Claude Code session |
+| Gemini CLI | Session reading tested against fixtures built from its record types (rewind, patch, re-appended messages), setup and hook checked end to end; live run pending |
+| Copilot CLI | Session reading tested against fixtures built from the SDK's event types, setup and hook checked end to end; live run pending |
+| Cursor | Experimental: transcript reading tested against a documented sample; live run pending |
 | Codex 0.145 | Session reading tested against the rollout format; full live run pending |
 | ZCode | Session reading tested against ZCode's own session tables; `relay setup` config checked against its config schema; live run pending |

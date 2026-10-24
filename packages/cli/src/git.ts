@@ -59,3 +59,14 @@ export function samePathVariants(p: string): string[] {
   else if (/^\/(tmp|var)\//.test(p)) out.add("/private" + p);
   return [...out];
 }
+
+/** The open pull request for the current branch, via the GitHub CLI. Undefined when gh is missing or there is none. */
+export async function currentPr(cwd: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await run("gh", ["pr", "view", "--json", "url", "-q", ".url"], { cwd, timeout: 8000 });
+    const url = stdout.trim();
+    return /^https?:\/\//.test(url) ? url : undefined;
+  } catch {
+    return undefined;
+  }
+}

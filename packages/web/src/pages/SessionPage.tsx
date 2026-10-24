@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ChainLink, MeResponse, Message, SessionDetail } from "@session-relay/shared";
+import type { ChainLink, Member, MeResponse, Message, SessionDetail } from "@session-relay/shared";
 import { api } from "../api";
-import { ago, dateTime, shortRepo, TOOL_NAMES } from "../format";
+import { ago, dateTime, prLabel, shortRepo, TOOL_NAMES } from "../format";
 import { RichText } from "../text";
 import { Avatar, Command, Icon, ToolBadge } from "../ui";
 
@@ -56,6 +56,201 @@ function ChainCard({ s }: { s: SessionDetail }) {
   );
 }
 
+/** One text box per item, so items that span several lines (code, output) stay whole. */
+function ItemsField({ id, label, items, onChange }: { id: string; label: string; items: string[]; onChange: (v: string[]) => void }) {
+  const set = (i: number, v: string) => onChange(items.map((x, n) => (n === i ? v : x)));
+  return (
+    <fieldset className="field items-field">
+      <legend>{label}</legend>
+      {items.map((item, i) => (
+        <div key={i} className="item-row">
+          <textarea
+            id={i === 0 ? id : undefined}
+            aria-label={`${label} ${i + 1}`}
+            rows={Math.min(8, item.split("\n").length)}
+            value={item}
+            onChange={(e) => set(i, e.target.value)}
+          />
+          <button type="button" className="icon-btn" aria-label={`Remove ${label.toLowerCase()} ${i + 1}`} onClick={() => onChange(items.filter((_, n) => n !== i))}>
+            <Icon name="trash" size={14} />
+          </button>
+        </div>
+      ))}
+      <button type="button" className="btn-ghost btn-sm add-item" onClick={() => onChange([...items, ""])}>
+        <Icon name="plus" size={14} /> Add
+      </button>
+    </fieldset>
+  );
+}
+
+const clean = (items: string[]) => items.map((i) => i.trim()).filter(Boolean);
+
+/** Edit a share in place: title, summary, who it's for and the PR. Author or admin. */
+function EditPanel({ s, onSaved, onCancel }: { s: SessionDetail; onSaved: () => void; onCancel: () => void }) {
+  const [title, setTitle] = useState(s.title);
+  const [goal, setGoal] = useState(s.summary.goal);
+  const [next, setNext] = useState(s.summary.next);
+  const [decisions, setDecisions] = useState(s.summary.decisions);
+  const [done, setDone] = useState(s.summary.done);
+  const [questions, setQuestions] = useState(s.summary.open_questions);
+  const [assignee, setAssignee] = useState(s.assigned_to?.id ?? "");
+  const [pr, setPr] = useState(s.pr_url ?? "");
+  const [members, setMembers] = useState<Member[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    api.members().then((r) => setMembers(r.members), () => undefined);
+  }, []);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      await api.update(s.id, {
+        title: title.trim() || s.title,
+        summary: { goal: goal.trim(), next: clean(next), decisions: clean(decisions), done: clean(done), open_questions: clean(questions) },
+        assignee: assignee || null,
+        pr_url: pr.trim() || null,
+      });
+      onSaved();
+    } catch (err) {
+      setError((err as Error).message);
+      setSaving(false);
+    }
+  }
+
+
+  return (
+    <form className="card edit-panel" onSubmit={save} aria-label="Edit share">
+      <h2>
+        <Icon name="edit" size={14} /> Edit share
+      </h2>
+      <div className="field">
+        <label htmlFor="edit-title">Title</label>
+        <input id="edit-title" value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} />
+      </div>
+      <div className="field">
+        <label htmlFor="edit-goal">Goal</label>
+        <textarea id="edit-goal" rows={Math.min(8, Math.max(2, goal.split("\n").length))} value={goal} onChange={(e) => setGoal(e.target.value)} />
+      </div>
+      <ItemsField id="edit-next" label="Next steps" items={next} onChange={setNext} />
+      <ItemsField id="edit-decisions" label="Decisions" items={decisions} onChange={setDecisions} />
+      <ItemsField id="edit-done" label="Done" items={done} onChange={setDone} />
+      <ItemsField id="edit-questions" label="Open questions" items={questions} onChange={setQuestions} />
+      <div className="edit-row">
+        <div className="field">
+          <label htmlFor="edit-assignee">For</label>
+          <select id="edit-assignee" value={assignee} onChange={(e) => setAssignee(e.target.value)}>
+            <option value="">Anyone</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="edit-pr">Pull request</label>
+          <input id="edit-pr" type="url" placeholder="https://github.com/acme/api/pull/42" value={pr} onChange={(e) => setPr(e.target.value)} />
+        </div>
+      </div>
+      {error && <p className="error">{error}</p>}
+      <div className="row">
+        <button type="submit" className="btn-primary btn-sm" disabled={saving}>
+          {saving ? "Saving…" : "Save changes"}
+        </button>
+        <button type="button" className="btn-ghost btn-sm" onClick={onCancel} disabled={saving}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function Comments({ s, me, onChange }: { s: SessionDetail; me: MeResponse; onChange: () => void }) {
+  const [body, setBody] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function post(e: React.FormEvent) {
+    e.preventDefault();
+    if (!body.trim()) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api.comment(s.id, body.trim());
+      setBody("");
+      onChange();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(commentId: string) {
+    try {
+      await api.deleteComment(s.id, commentId);
+      onChange();
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  return (
+    <section className="comments" aria-labelledby="comments-title">
+      <h2 id="comments-title">
+        Comments <span className="muted">{s.comments.length || ""}</span>
+      </h2>
+      {s.comments.length === 0 && <p className="muted small">No comments yet. Agents that pick this session up read them too.</p>}
+      <ol className="comment-list">
+        {s.comments.map((c) => (
+          <li key={c.id} className="comment">
+            <Avatar name={c.author.name} size={26} />
+            <div className="comment-body">
+              <div className="comment-head">
+                <strong>{c.author.name}</strong>
+                <span className="faint">{ago(c.created_at)}</span>
+                {(c.author.id === me.user.id || me.role !== "member") && (
+                  <button type="button" className="icon-btn push" aria-label={`Delete comment by ${c.author.name}`} onClick={() => remove(c.id)}>
+                    <Icon name="trash" size={13} />
+                  </button>
+                )}
+              </div>
+              <RichText text={c.body} />
+            </div>
+          </li>
+        ))}
+      </ol>
+      <form className="comment-form" onSubmit={post}>
+        <label htmlFor="comment-body" className="sr-only">
+          Add a comment
+        </label>
+        <textarea
+          id="comment-body"
+          rows={2}
+          maxLength={4000}
+          placeholder="Leave a note for the team: a question, a finding, &quot;picked this up&quot;"
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) post(e);
+          }}
+        />
+        {error && <p className="error">{error}</p>}
+        <div className="row">
+          <button type="submit" className="btn-primary btn-sm" disabled={busy || !body.trim()}>
+            {busy ? "Posting…" : "Comment"}
+          </button>
+          <span className="faint small">Don't paste secrets here.</span>
+        </div>
+      </form>
+    </section>
+  );
+}
+
 type Block = { kind: "msg"; m: Message } | { kind: "tools"; items: Message[] };
 
 /** Consecutive tool lines are folded into one expandable block. */
@@ -100,12 +295,15 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
   const [error, setError] = useState("");
   const [loadingFull, setLoadingFull] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [version, setVersion] = useState(0);
+  const [publishing, setPublishing] = useState(false);
 
   useEffect(() => {
-    setS(null);
+    if (version === 0) setS(null);
     setError("");
     api.get(id, "tail").then(setS, (e) => setError(e.status === 404 ? "This session doesn't exist, was deleted, or isn't shared with you." : e.message));
-  }, [id]);
+  }, [id, version]);
 
   const blocks = useMemo(() => (s ? toBlocks(s.messages) : []), [s]);
 
@@ -125,6 +323,18 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
       setError((e as Error).message);
     } finally {
       setLoadingFull(false);
+    }
+  }
+
+  async function publish() {
+    setPublishing(true);
+    try {
+      await api.update(id, { draft: false, visibility: { team: true, people: [] } });
+      setVersion((v) => v + 1);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setPublishing(false);
     }
   }
 
@@ -149,6 +359,7 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
   if (!s) return <div className="page"><div className="skeleton-list" aria-busy="true" /></div>;
 
   const canDelete = s.author.id === me.user.id || me.role !== "member";
+  const canEdit = canDelete;
   const showingAll = s.message_offset === 0 && s.messages.length === s.message_total;
 
   return (
@@ -159,10 +370,29 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
       <header className="session-head">
         <div className="session-meta-top">
           <ToolBadge tool={s.source.tool} />
-          {!s.visibility.team && (
-            <span className="badge">
-              <Icon name="lock" size={12} /> Private
+          {s.draft ? (
+            <span className="badge badge-draft">Draft</span>
+          ) : (
+            !s.visibility.team && (
+              <span className="badge">
+                <Icon name="lock" size={12} /> Private
+              </span>
+            )
+          )}
+          {s.assigned_to && (
+            <span className={`badge ${s.assigned_to.id === me.user.id ? "badge-accent" : ""}`}>
+              <Icon name="user" size={12} /> {s.assigned_to.id === me.user.id ? "For you" : `For ${s.assigned_to.name}`}
             </span>
+          )}
+          {s.pr_url && (
+            <a className="badge badge-link" href={s.pr_url} target="_blank" rel="noreferrer">
+              <Icon name="pr" size={12} /> {prLabel(s.pr_url)}
+            </a>
+          )}
+          {canEdit && !editing && (
+            <button type="button" className="btn-ghost btn-sm push" onClick={() => setEditing(true)}>
+              <Icon name="edit" size={14} /> Edit
+            </button>
           )}
         </div>
         <h1>{s.title}</h1>
@@ -170,6 +400,7 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
           <Avatar name={s.author.name} size={22} />
           <span>
             <strong>{s.author.name}</strong> shared from {TOOL_NAMES[s.source.tool]} · {ago(s.created_at)}
+            {s.updated_at && <span className="faint"> · edited {ago(s.updated_at)}</span>}
             {s.chain.length > 0 && (
               <>
                 {" · continues "}
@@ -182,6 +413,27 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
 
       <div className="session-grid">
         <div className="session-main">
+          {s.draft && canEdit && (
+            <section className="card draft-banner">
+              <div>
+                <strong>Draft: only you can see this.</strong>
+                <p className="muted small">It was saved automatically when the session ended. Check the summary (Edit), then publish it.</p>
+              </div>
+              <button type="button" className="btn-primary btn-sm" onClick={publish} disabled={publishing}>
+                {publishing ? "Publishing…" : "Publish to team"}
+              </button>
+            </section>
+          )}
+          {editing && (
+            <EditPanel
+              s={s}
+              onCancel={() => setEditing(false)}
+              onSaved={() => {
+                setEditing(false);
+                setVersion((v) => v + 1);
+              }}
+            />
+          )}
           <section className="card summary-card card-goal">
             <h2>Goal</h2>
             <RichText text={s.summary.goal || "Not stated."} />
@@ -222,6 +474,7 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
               )}
             </ol>
           </section>
+          <Comments s={s} me={me} onChange={() => setVersion((v) => v + 1)} />
         </div>
 
         <aside className="session-side">
@@ -253,8 +506,30 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
                   <dd className="mono">{s.commit}</dd>
                 </>
               )}
+              {s.pr_url && (
+                <>
+                  <dt>Pull request</dt>
+                  <dd>
+                    <a href={s.pr_url} target="_blank" rel="noreferrer">
+                      {prLabel(s.pr_url)}
+                    </a>
+                  </dd>
+                </>
+              )}
+              {s.assigned_to && (
+                <>
+                  <dt>For</dt>
+                  <dd>{s.assigned_to.name}</dd>
+                </>
+              )}
               <dt>Shared</dt>
               <dd>{dateTime(s.created_at)}</dd>
+              {s.updated_at && (
+                <>
+                  <dt>Edited</dt>
+                  <dd>{dateTime(s.updated_at)}</dd>
+                </>
+              )}
               {s.expires_at && (
                 <>
                   <dt>Expires</dt>

@@ -3,9 +3,9 @@ import path from "node:path";
 import type { IncludeMode, SourceTool, Summary } from "@session-relay/shared";
 import { ADAPTERS, findSessions, type SessionRef } from "./adapters/index.js";
 import { buildShare, type BuiltShare } from "./build.js";
-import { resolvePeople, type RelayClient } from "./client.js";
+import { resolvePeople, resolvePerson, type RelayClient } from "./client.js";
 import { ApiError } from "./api.js";
-import { repoInfo, type RepoInfo } from "./git.js";
+import { currentPr, repoInfo, type RepoInfo } from "./git.js";
 import { forgetPickup, resolveContinues } from "./pickups.js";
 
 export interface ShareInput {
@@ -22,6 +22,10 @@ export interface ShareInput {
   people?: string[];
   /** Session id this continues, "none", or undefined to use the last pickup in this repo. */
   continues?: string;
+  /** Name, email or id of the member this handoff is for. */
+  assign?: string;
+  /** Pull request URL, "none", or undefined to look up the current branch's PR with gh. */
+  pr?: string;
 }
 
 export interface PreparedShare {
@@ -35,7 +39,7 @@ export interface PreparedShare {
 export async function pickSession(repo: RepoInfo, tool?: SourceTool, id?: string): Promise<SessionRef> {
   const refs = await findSessions(repo.root, tool);
   if (!refs.length) {
-    throw new Error(`No ${tool ?? "Claude Code, OpenCode, Codex or ZCode"} sessions found for ${repo.root}.`);
+    throw new Error(`No ${tool ?? "agent"} sessions found for ${repo.root}.`);
   }
   if (!id) return refs[0]!;
   const hit = refs.find((r) => r.nativeId === id || r.nativeId.startsWith(id));
@@ -62,6 +66,9 @@ export async function prepareShare(client: RelayClient | null, input: ShareInput
   });
   const continues = await resolveContinues(repo.root, input.continues);
   if (continues.id) built.session.continues = continues.id;
+  if (client && input.assign) built.session.assignee = await resolvePerson(client, input.assign);
+  const pr = input.pr === "none" ? undefined : (input.pr ?? (await currentPr(repo.root)));
+  if (pr) built.session.pr_url = pr;
   return { repo, ref, built, continuesAuto: continues.auto };
 }
 

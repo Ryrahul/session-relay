@@ -171,7 +171,7 @@ export function Members({ me }: { me: MeResponse }) {
             </button>
           </form>
           <p id="inv-email-hint" className="hint">
-            The email only identifies them in Session Relay. It doesn't need to match their Claude, OpenCode, Codex or ZCode account; they log in with the token.
+            The email only identifies them in Session Relay. It doesn't need to match their coding-agent accounts; they log in with the token.
           </p>
           {created && (
             <div className="reveal">

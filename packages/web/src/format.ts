@@ -1,4 +1,4 @@
-export const TOOL_NAMES: Record<string, string> = { "claude-code": "Claude Code", opencode: "OpenCode", codex: "Codex", zcode: "ZCode" };
+export const TOOL_NAMES: Record<string, string> = { "claude-code": "Claude Code", opencode: "OpenCode", codex: "Codex", zcode: "ZCode", gemini: "Gemini CLI", copilot: "Copilot CLI", cursor: "Cursor" };
 
 export function ago(iso: string): string {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -41,6 +41,8 @@ export type Route =
   | { page: "join"; secret: string }
   | { page: "device"; code: string }
   | { page: "sessions" }
+  | { page: "activity" }
+  | { page: "stats" }
   | { page: "session"; id: string }
   | { page: "start" }
   | { page: "members" }
@@ -54,7 +56,16 @@ export function parseRoute(hash: string): Route {
   const m = /^#\/s\/([\w-]+)/.exec(hash);
   if (m) return { page: "session", id: m[1]! };
   if (hash.startsWith("#/start")) return { page: "start" };
+  if (hash.startsWith("#/activity")) return { page: "activity" };
+  if (hash.startsWith("#/stats")) return { page: "stats" };
   if (hash.startsWith("#/members")) return { page: "members" };
   if (hash.startsWith("#/settings")) return { page: "settings" };
   return { page: "sessions" };
+}
+
+/** "github.com/acme/api/pull/42" → "acme/api#42"; other URLs → their host and path. */
+export function prLabel(url: string): string {
+  const m = /^https?:\/\/[^/]+\/(.+?)\/(?:pull|merge_requests|pull-requests)\/(\d+)/.exec(url);
+  if (m) return `${m[1]!.split("/").slice(-2).join("/")}#${m[2]}`;
+  return url.replace(/^https?:\/\//, "");
 }

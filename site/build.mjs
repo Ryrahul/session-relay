@@ -171,7 +171,7 @@ retry path. Starting with that now.</pre>
     </div>
     <div>
       <h3>Handoff chains</h3>
-      <p>Pick up a session and share your work later: it's linked automatically. Every session shows the trail, from who started it to who continued it.</p>
+      <p>Pick up a session and share your work later: it's linked automatically. Every session shows the trail. Forget to share? Auto-share keeps a private draft of each session for you to publish.</p>
     </div>
     <div>
       <h3>Easy onboarding</h3>

@@ -43,6 +43,29 @@ interface SetupOpts {
   scope?: "user" | "project";
   /** Point the MCP server at a specific relay config file (testing, several accounts). */
   relayConfig?: string;
+  /** "on" installs the session-end hook that saves drafts, "off" removes it. */
+  autoShare?: string;
+}
+
+const HOOK_MARK = "hook session-end";
+
+/** Adds or removes Claude Code's SessionEnd hook that saves the session as a private draft. */
+export async function setupClaudeAutoShare(on: boolean, cmd: string[], env: Record<string, string>, settingsFile?: string): Promise<string> {
+  const file = settingsFile ?? path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(homedir(), ".claude"), "settings.json");
+  const cfg = await readJson(file);
+  const groups: { matcher?: string; hooks: { type: string; command: string }[] }[] = cfg.hooks?.SessionEnd ?? [];
+  // Drop any relay hook first, so running setup again doesn't duplicate it.
+  const kept = groups
+    .map((g) => ({ ...g, hooks: (g.hooks ?? []).filter((h) => !String(h.command ?? "").includes(HOOK_MARK)) }))
+    .filter((g) => g.hooks.length);
+  const prefix = Object.entries(env).map(([k, v]) => `${k}=${JSON.stringify(v)} `).join("");
+  const command = `${prefix}${cmd.slice(0, -1).map((c) => JSON.stringify(c)).join(" ")} hook session-end --tool claude`;
+  const next = on ? [...kept, { hooks: [{ type: "command", command }] }] : kept;
+  cfg.hooks = { ...cfg.hooks, SessionEnd: next };
+  if (!next.length) delete cfg.hooks.SessionEnd;
+  if (cfg.hooks && !Object.keys(cfg.hooks).length) delete cfg.hooks;
+  await writeText(file, JSON.stringify(cfg, null, 2) + "\n");
+  return on ? `auto-share on: sessions are saved as private drafts when they end (${file})` : `auto-share off (${file})`;
 }
 
 /** How agents should launch `relay mcp`: the installed binary if on PATH, else this script via node. */
@@ -178,6 +201,14 @@ export async function setup(opts: SetupOpts): Promise<void> {
       console.log(`- ${tool}: ${done.join("; ")}`);
     } catch (err) {
       console.log(`- ${tool}: ${(err as Error).message}`);
+    }
+  }
+  if (opts.autoShare) {
+    if (!["on", "off"].includes(opts.autoShare)) throw new Error('--auto-share takes "on" or "off"');
+    if (wanted.includes("claude") && (await has("claude"))) {
+      console.log(`- claude: ${await setupClaudeAutoShare(opts.autoShare === "on", cmd, env)}`);
+    } else {
+      console.log("- auto-share needs Claude Code; skipped");
     }
   }
   console.log(`\nMCP command: ${cmd.join(" ")}\nRestart your agents, then try /share or /pickup.`);

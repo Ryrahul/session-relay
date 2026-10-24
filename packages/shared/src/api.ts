@@ -29,6 +29,7 @@ export const SessionListItem = z.object({
   assignee: z.object({ id: z.string(), name: z.string() }).nullable(),
   pr_url: z.string().nullable(),
   comment_count: z.number().int(),
+  draft: z.boolean(),
   created_at: z.string(),
   updated_at: z.string().nullable(),
 });
@@ -83,6 +84,8 @@ export const SessionPatch = z.object({
   summary: Summary.optional(),
   assignee: z.string().max(40).nullable().optional(),
   pr_url: PrUrl.nullable().optional(),
+  /** false publishes a draft (it can't be turned back into one). */
+  draft: z.literal(false).optional(),
 });
 export type SessionPatch = z.infer<typeof SessionPatch>;
 

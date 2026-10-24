@@ -12,6 +12,7 @@ export function Sessions({ me }: { me: MeResponse }) {
   const [tool, setTool] = useState("");
   const [mine, setMine] = useState(false);
   const [forMe, setForMe] = useState(false);
+  const [drafts, setDrafts] = useState(false);
   const [rows, setRows] = useState<SessionListItem[] | null>(null);
   const [repos, setRepos] = useState<string[]>([]);
   const [error, setError] = useState("");
@@ -26,7 +27,7 @@ export function Sessions({ me }: { me: MeResponse }) {
   useEffect(() => {
     const t = setTimeout(() => {
       api
-        .list({ q, repo, tool, author: mine ? "me" : "", assignee: forMe ? "me" : "", limit: "100" })
+        .list({ q, repo, tool, author: mine || drafts ? "me" : "", assignee: forMe ? "me" : "", drafts: drafts ? "only" : "", limit: "100" })
         .then((r) => {
           setRows(r.sessions);
           setError("");
@@ -34,7 +35,7 @@ export function Sessions({ me }: { me: MeResponse }) {
         .catch((e) => setError(e.message));
     }, q ? 220 : 0);
     return () => clearTimeout(t);
-  }, [q, repo, tool, mine, forMe]);
+  }, [q, repo, tool, mine, forMe, drafts]);
 
   // Search results stay in rank order; otherwise group by day.
   const groups = useMemo(() => {
@@ -49,7 +50,7 @@ export function Sessions({ me }: { me: MeResponse }) {
     return out;
   }, [rows, q]);
 
-  const filtered = Boolean(q || repo || tool || mine || forMe);
+  const filtered = Boolean(q || repo || tool || mine || forMe || drafts);
 
   return (
     <div className="page">
@@ -97,6 +98,9 @@ export function Sessions({ me }: { me: MeResponse }) {
         <button type="button" className={`chip ${mine ? "on" : ""}`} aria-pressed={mine} onClick={() => setMine(!mine)}>
           Shared by me
         </button>
+        <button type="button" className={`chip ${drafts ? "on" : ""}`} aria-pressed={drafts} onClick={() => setDrafts(!drafts)}>
+          My drafts
+        </button>
       </div>
 
       {error && <p className="error">{error}</p>}
@@ -129,6 +133,11 @@ export function Sessions({ me }: { me: MeResponse }) {
                   <div className="row-top">
                     <span className="row-title">{s.title}</span>
                     <span className="row-badges">
+                      {s.draft && (
+                        <span className="badge badge-draft" title="Saved automatically at session end. Only you can see it until you publish it.">
+                          Draft
+                        </span>
+                      )}
                       {s.assignee && (
                         <span className={`badge ${s.assignee.id === me.user.id ? "badge-accent" : ""}`} title={`Handoff for ${s.assignee.name}`}>
                           <Icon name="user" size={12} /> {s.assignee.id === me.user.id ? "For you" : `For ${s.assignee.name}`}

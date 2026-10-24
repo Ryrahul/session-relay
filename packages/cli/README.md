@@ -30,6 +30,7 @@ You need a Session Relay server for your team; see [self-hosting](https://relay.
 | `relay show <id>`, `relay pull <id>` | Read a session, or write `.relay/handoff-<id>.md` for your agent |
 | `relay edit <id>` | Change your share: title, summary, next steps, who it's for, PR |
 | `relay pr-comment <id>` | Post the session on its pull request |
+| `relay setup --auto-share on` | Save each Claude Code session as a private draft when it ends; `relay publish <id>` shares it |
 | `relay digest`, `relay stats` | What the team did lately; team stats |
 | `relay comment <id> "<text>"` | Leave a note on a session (the next agent reads it) |
 | `relay delete <id>` | Delete your share |

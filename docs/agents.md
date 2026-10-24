@@ -12,7 +12,7 @@ Session Relay works with **Claude Code**, **OpenCode**, **Codex** and **ZCode**.
    | `share_current_session` | Shares the session the agent is in, with a summary the agent writes. `for` assigns it to a teammate; the branch's PR is attached |
    | `team_activity` | What the team did in the last day(s): new shares by repo, handoffs for you, pickups, comments |
    | `comment_on_session` | Leaves a note on a session: a question, a finding, "picked this up". `get_session` shows comments before the conversation |
-   | `update_session` | Changes a share: title, summary, extra next steps, who it's for, PR, visibility |
+   | `update_session` | Changes a share: title, summary, extra next steps, who it's for, PR, visibility. `publish` shares a draft |
 
 2. **Two commands**:
    - `/share [instructions]`: write a handoff and share this session. "for Akshat" makes it a handoff for them.
@@ -91,6 +91,16 @@ Prompts go in `~/.codex/prompts/share.md` and `pickup.md`.
 Commands go in `~/.zcode/commands/` or `.zcode/commands/`. `relay setup` finds ZCode through the `zcode` command or the `~/.zcode` folder, so it works for the desktop app too.
 
 The command files `relay setup` writes are in [`packages/cli/src/commands/setup.ts`](../packages/cli/src/commands/setup.ts) (`SHARE_PROMPT`, `PICKUP_PROMPT`). Copy them if you set things up by hand.
+
+## Auto-share drafts (Claude Code)
+
+```sh
+relay setup --auto-share on     # off to remove
+```
+
+This adds a `SessionEnd` hook to `~/.claude/settings.json`. When a session ends, in a git repo, with at least 4 messages, it's saved as a **private draft**: only you can see it, it doesn't count in Activity or Stats, and it follows the org's retention. If you end the same session again, the old draft is replaced; if you already shared it, nothing happens.
+
+Publish a draft when it's ready: **Publish to team** on the session in the web app, `relay publish <id>`, or ask your agent ("publish my last draft"; `update_session` with `publish`). The summary of a draft is the first request and the last answer; edit it before publishing if you like. What the hook did is logged in `hook.log` next to your relay config.
 
 ## Handoff chains
 

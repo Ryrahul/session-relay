@@ -76,6 +76,7 @@ export function buildShare(local: LocalSession, repo: RepoInfo, opts: BuildOptio
     visibility: opts.visibility ?? { team: true, people: [] },
     redactions: 0,
     started_at: local.startedAt,
+    draft: false,
   };
   session.redactions = redact.total();
   return { session, transcript: opts.include === "full" ? all : undefined, redactions: { ...redact.counts } };

@@ -297,6 +297,7 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editing, setEditing] = useState(false);
   const [version, setVersion] = useState(0);
+  const [publishing, setPublishing] = useState(false);
 
   useEffect(() => {
     if (version === 0) setS(null);
@@ -322,6 +323,18 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
       setError((e as Error).message);
     } finally {
       setLoadingFull(false);
+    }
+  }
+
+  async function publish() {
+    setPublishing(true);
+    try {
+      await api.update(id, { draft: false, visibility: { team: true, people: [] } });
+      setVersion((v) => v + 1);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setPublishing(false);
     }
   }
 
@@ -357,10 +370,14 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
       <header className="session-head">
         <div className="session-meta-top">
           <ToolBadge tool={s.source.tool} />
-          {!s.visibility.team && (
-            <span className="badge">
-              <Icon name="lock" size={12} /> Private
-            </span>
+          {s.draft ? (
+            <span className="badge badge-draft">Draft</span>
+          ) : (
+            !s.visibility.team && (
+              <span className="badge">
+                <Icon name="lock" size={12} /> Private
+              </span>
+            )
           )}
           {s.assigned_to && (
             <span className={`badge ${s.assigned_to.id === me.user.id ? "badge-accent" : ""}`}>
@@ -396,6 +413,17 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
 
       <div className="session-grid">
         <div className="session-main">
+          {s.draft && canEdit && (
+            <section className="card draft-banner">
+              <div>
+                <strong>Draft: only you can see this.</strong>
+                <p className="muted small">It was saved automatically when the session ended. Check the summary (Edit), then publish it.</p>
+              </div>
+              <button type="button" className="btn-primary btn-sm" onClick={publish} disabled={publishing}>
+                {publishing ? "Publishing…" : "Publish to team"}
+              </button>
+            </section>
+          )}
           {editing && (
             <EditPanel
               s={s}

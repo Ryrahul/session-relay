@@ -49,6 +49,7 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 | `relay list` | Shared sessions for this repo |
 | `relay list --all` | All repos |
 | `relay list --for-me` | Handoffs assigned to you, from any repo |
+| `relay list --drafts` | Your drafts (saved automatically at session end) |
 | `relay search "<query>"` | Full-text search over titles, summaries and messages. Add `file:<path>` or `branch:<name>` to filter |
 | `relay digest [--days 1]` | What the team did lately: new shares by repo, handoffs for you, pickups, comments |
 | `relay stats [--days 30] [--json]` | Shares, pickups, continued handoffs and comments, by day, person, agent and repo |
@@ -67,6 +68,7 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 
 | Command | |
 |---|---|
+| `relay publish <id> [--people <names>] [--for <name>]` | Share a draft with the whole team (or only some people) |
 | `relay edit <id> …` | Change your share (admins: any share). See below |
 | `relay comment <id> "<text>"` | Leave a note on a session. Without text, list its comments. Secrets are removed first |
 | `relay pr-comment <id> [--pr <url>]` | Comment on the share's pull request with a link and the next steps (uses `gh`) |
@@ -93,4 +95,6 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 | Command | |
 |---|---|
 | `relay setup [--tools claude,opencode,codex,zcode] [--scope user\|project] [--relay-config <file>]` | Install the MCP server and `/share` `/pickup` into your agents |
+| `relay setup --auto-share on\|off` | Claude Code: save each session as a private draft when it ends (a `SessionEnd` hook in `~/.claude/settings.json`). `off` removes the hook |
+| `relay hook session-end --tool claude` | What that hook runs. It never fails the agent; it logs to `hook.log` next to your relay config |
 | `relay mcp` | The MCP server on stdio. Your agent starts it; you don't run it yourself |

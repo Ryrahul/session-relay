@@ -116,6 +116,7 @@ export async function share(opts: ShareOpts): Promise<void> {
 }
 
 interface ListOpts {
+  drafts?: boolean;
   all?: boolean;
   repo?: string;
   branch?: string;
@@ -137,6 +138,7 @@ async function printList(query: Record<string, string | number | undefined>, jso
       s.assignee ? `for ${s.assignee.name}` : "",
       s.pr_url ? `PR #${s.pr_url.split("/").pop()}` : "",
       s.comment_count ? `${s.comment_count} comment${s.comment_count === 1 ? "" : "s"}` : "",
+      s.draft ? "draft" : "",
     ]
       .filter(Boolean)
       .join(", ");
@@ -148,10 +150,19 @@ async function printList(query: Record<string, string | number | undefined>, jso
 
 export async function list(opts: ListOpts): Promise<void> {
   let repo = opts.repo;
-  // Handoffs for you are worth seeing from any repo.
-  if (!repo && !opts.all && !opts.forMe) repo = await repoInfo().then((r) => r.repo).catch(() => undefined);
+  // Handoffs for you and your drafts are worth seeing from any repo.
+  if (!repo && !opts.all && !opts.forMe && !opts.drafts) repo = await repoInfo().then((r) => r.repo).catch(() => undefined);
   await printList(
-    { repo, branch: opts.branch, tool: parseTool(opts.tool), author: opts.author, assignee: opts.forMe ? "me" : undefined, file: opts.file, limit: opts.limit },
+    {
+      repo,
+      branch: opts.branch,
+      tool: parseTool(opts.tool),
+      author: opts.drafts ? "me" : opts.author,
+      assignee: opts.forMe ? "me" : undefined,
+      file: opts.file,
+      drafts: opts.drafts ? "only" : undefined,
+      limit: opts.limit,
+    },
     opts.json,
   );
 }
@@ -205,6 +216,16 @@ export async function edit(id: string, opts: EditOpts): Promise<void> {
   if (!Object.keys(patch).length) throw new Error("Nothing to change. See: relay edit --help");
   await client.update(id, patch);
   console.log(`Updated ${id}.`);
+}
+
+/** relay publish: share a draft with the team (or only some people). */
+export async function publish(id: string, opts: { people?: string; for?: string }): Promise<void> {
+  const client = await RelayClient.fromConfig();
+  const people = opts.people ? await resolvePeople(client, opts.people.split(",").map((p) => p.trim()).filter(Boolean)) : [];
+  const patch: SessionPatch = { draft: false, visibility: { team: people.length === 0, people } };
+  if (opts.for) patch.assignee = await resolvePerson(client, opts.for);
+  await client.update(id, patch);
+  console.log(`Published ${id} to ${people.length ? `${people.length} people` : "the whole team"}.`);
 }
 
 /** relay pr-comment: post a link to the session on its pull request (needs the GitHub CLI). */

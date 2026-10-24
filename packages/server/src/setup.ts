@@ -6,6 +6,7 @@ import type { AppEnv } from "./auth.js";
 import type { Sql } from "./db/client.js";
 import { parseBody } from "./http.js";
 import { createOrgWithOwner } from "./orgs.js";
+import { rateLimit } from "./ratelimit.js";
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const MAX_FAILURES = 10;
@@ -68,7 +69,7 @@ export function setupRoutes(sql: Sql, gate: SetupGate | null) {
 
   app.get("/", async (c) => c.json({ needed: Boolean(gate && !gate.done) && (await setupNeeded(sql)) }));
 
-  app.post("/", async (c) => {
+  app.post("/", rateLimit(sql, "setup", 20, 15 * 60_000), async (c) => {
     if (!gate || gate.done) throw new HTTPException(409, { message: "This server is already set up. Sign in with your token." });
     const body = parseBody(SetupRequest, await c.req.json());
     gate.check(body.code);

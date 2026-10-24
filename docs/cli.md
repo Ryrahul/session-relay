@@ -6,7 +6,8 @@
 
 | Command | |
 |---|---|
-| `relay login --server <url> --token <token>` | Connect this machine to a server. Checks the token before saving it |
+| `relay login --server <url>` | Connect this machine: approve the code in your browser. `--no-browser` prints the link instead of opening it |
+| `relay login --server <url> --token <token>` | Connect with an existing token (scripts, CI, machines without a browser) |
 | `relay whoami` | Show your user, org, role and server |
 
 The config is at `~/.config/session-relay/config.json` (mode `600`). Override it with:
@@ -63,6 +64,7 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 |---|---|
 | `relay delete <id> [-y]` | Delete your share. Admins can delete any share |
 | `relay members` | People in your org |
+| `relay invite --link [--role member\|admin\|owner] [--days 7]` | Admins: create a single-use invite link |
 | `relay invite <email> --name <name> [--role member\|admin\|owner]` | Admins: add someone and print their one-time login command |
 
 ## Agents

@@ -22,7 +22,7 @@ Handing off agent work means copy-pasting chat logs, or the next person starting
 
 | | |
 |---|---|
-| **Self-hosted** · available now | One `docker compose up` on your own server. Your data stays with you. → [Self-hosting guide](docs/self-hosting.md) |
+| **Self-hosted** · available now | One `docker compose up` on your own server → [Self-hosting guide](docs/self-hosting.md). Or on your own Cloudflare account with no server to run → [Deploy to Cloudflare](docs/cloudflare.md). Your data stays with you. |
 | **Cloud** · coming soon | We run it for you: sign in with GitHub, invite your team, no server. → [Roadmap](docs/roadmap.md) |
 
 The CLI is on npm: [`session-relay`](https://www.npmjs.com/package/session-relay).
@@ -57,6 +57,7 @@ Online at **https://relay.rahulweb.online**. Sources are in [`docs/`](docs/).
 
 - [Getting started](docs/getting-started.md): laptop setup, sharing, picking up
 - [Self-hosting](docs/self-hosting.md): Docker, HTTPS, backups, upgrades
+- [Deploy to Cloudflare](docs/cloudflare.md): Workers, Hyperdrive, R2, no server
 - [Agents](docs/agents.md): how each agent connects, manual setup, MCP tools
 - [CLI reference](docs/cli.md)
 - [Security & privacy](docs/security.md): what's uploaded, redaction, permissions

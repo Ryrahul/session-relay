@@ -8,3 +8,5 @@ dist/
 data/
 .DS_Store
 site/dist/
+.wrangler/
+packages/server/wrangler.prod.jsonc

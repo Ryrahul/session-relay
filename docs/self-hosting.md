@@ -2,6 +2,8 @@
 
 Run Session Relay for your team on any machine with Docker. It's one container for the API and web app, plus Postgres. Caddy can provide HTTPS with automatic certificates.
 
+> **Don't want to run a server?** The same app runs on Cloudflare Workers: see [Deploy to Cloudflare](cloudflare.md).
+>
 > **Cloud hosting is coming soon.** We'll run it for you, so you don't need a server. Until then, self-hosting is the way to use Session Relay.
 
 ## Requirements
@@ -88,7 +90,7 @@ It prints the owner token once.
 
 Then:
 
-- **Members → Add a teammate** for each person. Each gets a one-time `relay login ...` command to send them privately.
+- **Members → Invite with a link** for each person: pick the role, send them the link. It works once and expires (1, 7 or 30 days). They choose their name and email and are signed in. (Adding someone directly, with a one-time login command, is still available.)
 - **Settings:** set retention, and optionally an allowlist of repositories (`github.com/your-org/*`) and extra secret patterns.
 
 Everyone then follows [Getting started](getting-started.md).

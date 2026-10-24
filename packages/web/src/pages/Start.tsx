@@ -25,10 +25,11 @@ export function Start({ me }: { me: MeResponse }) {
         <li className="step">
           <div className="step-body">
             <h2>Log in to this server</h2>
-            <p className="muted">
-              Use your personal token. If you don't have one, create one in <a href="#/settings">Settings</a>, or ask an admin.
+            <p className="muted">It opens this site in your browser; approve the code it shows and you're in.</p>
+            <Command>{`relay login --server ${server}`}</Command>
+            <p className="hint">
+              No browser on that machine? Create a token in <a href="#/settings">Settings</a> and add <code>--token srk_…</code>.
             </p>
-            <Command copy={`relay login --server ${server} --token `}>{`relay login --server ${server} --token srk_…`}</Command>
           </div>
         </li>
         <li className="step">

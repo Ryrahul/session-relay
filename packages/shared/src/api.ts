@@ -126,3 +126,43 @@ export const OrgPatch = z.object({
     .optional(),
 });
 export type OrgPatch = z.infer<typeof OrgPatch>;
+
+/** POST /v1/invites (admins) */
+export const CreateInvite = z.object({
+  role: Role.default("member"),
+  expires_days: z.number().int().min(1).max(30).default(7),
+  note: z.string().max(100).optional(),
+});
+export type CreateInvite = z.infer<typeof CreateInvite>;
+
+export const InviteInfo = z.object({
+  id: z.string(),
+  role: Role,
+  note: z.string().nullable(),
+  created_by: z.string().nullable(),
+  expires_at: z.string(),
+  created_at: z.string(),
+  status: z.enum(["pending", "used", "expired", "revoked"]),
+  used_by: z.string().nullable(),
+});
+export type InviteInfo = z.infer<typeof InviteInfo>;
+
+/** GET /v1/join/:secret (public) */
+export const JoinInfo = z.object({ org: z.string(), role: Role, expires_at: z.string() });
+export type JoinInfo = z.infer<typeof JoinInfo>;
+
+export const JoinRequest = z.object({
+  name: z.string().trim().min(1).max(100),
+  email: z.string().trim().toLowerCase().email(),
+});
+export type JoinRequest = z.infer<typeof JoinRequest>;
+
+/** POST /v1/auth/device (public): the CLI starts a browser login. */
+export const DeviceStart = z.object({
+  device_code: z.string(),
+  user_code: z.string(),
+  verification_url: z.string(),
+  interval: z.number().int(),
+  expires_in: z.number().int(),
+});
+export type DeviceStart = z.infer<typeof DeviceStart>;

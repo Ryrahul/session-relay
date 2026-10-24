@@ -11,7 +11,7 @@ You need:
 
 - A Session Relay server for your team. Someone sets this up once; see [Self-hosting](self-hosting.md). Cloud hosting is coming soon.
 - Node.js 20 or newer on your laptop.
-- A personal token. An admin creates it for you (web app → **Members**, or `relay invite`).
+- An invite link from an admin (web app → **Members → Invite with a link**). Opening it creates your account and signs you in.
 
 ## 1. Install the CLI
 
@@ -34,11 +34,12 @@ npm link -w session-relay
 ## 2. Log in
 
 ```sh
-relay login --server https://relay.your-team.com --token srk_...
-relay whoami
+relay login --server https://relay.your-team.com
 ```
 
-The token is saved in `~/.config/session-relay/config.json`, readable only by you.
+It opens the site in your browser and shows a code like `KDQX-7MRA`. Check the browser shows the same code, click **Approve**, and the CLI is signed in. On a machine without a browser, it prints the link to open anywhere you're signed in; or create a token in **Settings** and use `relay login --server … --token srk_…`.
+
+The CLI's token is saved in `~/.config/session-relay/config.json`, readable only by you. It appears in **Settings → Your tokens** as `CLI · you@your-machine`, so you can revoke a lost laptop.
 
 ## 3. Connect your agents
 

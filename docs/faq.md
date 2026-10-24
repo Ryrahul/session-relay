@@ -24,6 +24,9 @@ The web app is for reading. Sharing needs the CLI, because sessions live on your
 **How does Session Relay know my share continues someone else's work?**
 When you `/pickup` or `relay pull` a session, it's remembered for that repo for 7 days. Your next share there links to it. Use `relay share --continues none` if it's unrelated.
 
+**A teammate's invite link says it doesn't work.**
+Links work once and expire. Create a new one in **Members → Invite with a link**. If they already joined, they should sign in with `relay login --server …` instead.
+
 **Where do handoff files go?**
 `.relay/handoff-<id>.md` in the repo. The folder has its own `.gitignore`, so it's never committed.
 

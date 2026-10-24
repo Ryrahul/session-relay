@@ -1,4 +1,4 @@
-import type { Member, MeResponse, OrgInfo, OrgPatch, SessionDetail, SessionListItem } from "@session-relay/shared";
+import type { InviteInfo, JoinInfo, Member, MeResponse, OrgInfo, OrgPatch, SessionDetail, SessionListItem } from "@session-relay/shared";
 
 const KEY = "relay.token";
 
@@ -68,4 +68,14 @@ export const api = {
   tokens: () => call<{ tokens: TokenInfo[] }>("GET", "/v1/tokens"),
   createToken: (name: string) => call<{ id: string; name: string; token: string }>("POST", "/v1/tokens", { name }),
   revokeToken: (id: string) => call<{ ok: true }>("DELETE", `/v1/tokens/${encodeURIComponent(id)}`),
+  invites: () => call<{ invites: InviteInfo[] }>("GET", "/v1/invites"),
+  createInvite: (role: string, expires_days: number) =>
+    call<{ id: string; url: string; role: string; expires_at: string }>("POST", "/v1/invites", { role, expires_days }),
+  revokeInvite: (id: string) => call<{ ok: true }>("DELETE", `/v1/invites/${encodeURIComponent(id)}`),
+  joinInfo: (secret: string) => call<JoinInfo>("GET", `/v1/join/${encodeURIComponent(secret)}`, undefined, ""),
+  join: (secret: string, name: string, email: string) =>
+    call<{ token: string; role: string }>("POST", `/v1/join/${encodeURIComponent(secret)}`, { name, email }, ""),
+  deviceInfo: (code: string) => call<{ client_name: string; expires_at: string }>("GET", `/v1/auth/device/${encodeURIComponent(code)}`),
+  deviceDecide: (code: string, approve: boolean) =>
+    call<{ ok: true; client_name: string }>("POST", `/v1/auth/device/${approve ? "approve" : "deny"}`, { user_code: code }),
 };

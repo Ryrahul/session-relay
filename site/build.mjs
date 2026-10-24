@@ -19,6 +19,7 @@ const SITE_URL = (process.env.SITE_URL ?? "https://relay.rahulweb.online").repla
 const NAV = [
   ["getting-started", "Getting started"],
   ["self-hosting", "Self-hosting"],
+  ["cloudflare", "Deploy to Cloudflare"],
   ["agents", "Agents"],
   ["cli", "CLI reference"],
   ["security", "Security & privacy"],
@@ -168,6 +169,14 @@ retry path. Starting with that now.</pre>
       <p>Organizations, roles, personal tokens, retention, a repo allowlist, your own secret patterns, and an audit log of every share and pull.</p>
     </div>
     <div>
+      <h3>Handoff chains</h3>
+      <p>Pick up a session and share your work later: it's linked automatically. Every session shows the trail, from who started it to who continued it.</p>
+    </div>
+    <div>
+      <h3>Easy onboarding</h3>
+      <p>Invite teammates with a single-use link. <code>relay login</code> signs in by approving a code in the browser, with no tokens to copy around.</p>
+    </div>
+    <div>
       <h3>Small to run</h3>
       <p>One container plus Postgres, with automatic HTTPS. Upgrades are a <code>git pull</code> and a restart.</p>
     </div>
@@ -178,13 +187,14 @@ retry path. Starting with that now.</pre>
     <div class="plans">
       <div class="plan">
         <div class="plan-head"><h3>Self-hosted</h3><span class="pill pill-on">Available now</span></div>
-        <p>Run it on your own server with Docker. Your sessions never leave your infrastructure.</p>
+        <p>Run it on your own server with Docker, or on your own Cloudflare account with no server at all. Your sessions stay in your infrastructure.</p>
         <ul>
           <li>One <code>docker compose up</code>, HTTPS included</li>
+          <li>Or <code>wrangler deploy</code> to Cloudflare Workers</li>
           <li>All features: web app, CLI, agents, roles</li>
           <li>Backups are a single <code>pg_dump</code></li>
         </ul>
-        <a class="btn btn-primary" href="docs/self-hosting.html">Self-hosting guide</a>
+        <div class="row-btns"><a class="btn btn-primary" href="docs/self-hosting.html">Docker guide</a><a class="btn" href="docs/cloudflare.html">Cloudflare guide</a></div>
       </div>
       <div class="plan plan-soon">
         <div class="plan-head"><h3>Cloud</h3><span class="pill">Coming soon</span></div>

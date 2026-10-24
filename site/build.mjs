@@ -163,7 +163,7 @@ retry path. Starting with that now.</pre>
     </div>
     <div>
       <h3>Private by default</h3>
-      <p>Nothing leaves your laptop unless you share it. API keys, tokens, passwords and private keys are removed before upload. Share with the whole team or specific people.</p>
+      <p>Nothing leaves your laptop unless you share it. API keys, tokens, passwords and private keys are removed before upload; test your own patterns in Settings. Share with the whole team or specific people.</p>
     </div>
     <div>
       <h3>Built for teams</h3>

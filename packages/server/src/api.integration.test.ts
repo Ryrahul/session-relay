@@ -11,7 +11,7 @@ import { createApp } from "./app.js";
 import { generateToken, hashToken } from "./auth.js";
 import { createDb, type Sql } from "./db/client.js";
 import { migrate } from "./db/migrate.js";
-import { purgeExpired } from "./routes/sessions.js";
+import { backfillTranscriptSearch, purgeExpired } from "./routes/sessions.js";
 import { LocalDiskStorage } from "./storage/local.js";
 
 const DB = process.env.TEST_DATABASE_URL;
@@ -599,6 +599,27 @@ describe.skipIf(!DB)("API (integration)", () => {
     await call(alice.token, "DELETE", `/v1/sessions/${id}`);
     expect(await storage.get(`${orgA}/${id}.diff.gz`)).toBeNull();
     expect((await call(alice.token, "POST", "/v1/sessions", { session: upload(), diff: "x".repeat(1_000_001) })).status).toBe(400);
+  });
+
+  it("search covers full transcripts (new shares and backfilled old ones)", async () => {
+    const repo = "github.com/acme/fullsearch";
+    const transcript = [
+      { role: "user", text: "early on we discussed the flamingo cache eviction" },
+      ...Array.from({ length: 60 }, (_, i) => ({ role: "assistant", text: `filler ${i}` })),
+    ] as const;
+    // The stored tail (last 40) doesn't include the first message; only the full transcript does.
+    const id = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo, title: "full one", include: "full", messages: transcript.slice(-40) as never }), transcript })).body.id;
+    const hit = (await call(bob.token, "GET", `/v1/sessions?q=flamingo&repo=${repo}`)).body.sessions;
+    expect(hit.map((s: any) => [s.id, s.matched_in])).toEqual([[id, "transcript"]]);
+    expect((await call(bob.token, "GET", `/v1/sessions?q=filler&repo=${repo}`)).body.sessions[0].matched_in).toBeNull();
+    expect((await call(outsider.token, "GET", "/v1/sessions?q=flamingo")).body.sessions).toEqual([]);
+
+    // An older share without the index gets it from the hourly job.
+    await sql`UPDATE sessions SET transcript_search = NULL WHERE id = ${id}`;
+    expect((await call(bob.token, "GET", `/v1/sessions?q=flamingo&repo=${repo}`)).body.sessions).toEqual([]);
+    expect(await backfillTranscriptSearch(sql, storage)).toBeGreaterThanOrEqual(1);
+    expect((await call(bob.token, "GET", `/v1/sessions?q=flamingo&repo=${repo}`)).body.sessions.map((s: any) => s.id)).toEqual([id]);
+    expect(await backfillTranscriptSearch(sql, storage)).toBe(0);
   });
 
   it("records usage and audit events", async () => {

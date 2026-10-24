@@ -35,3 +35,16 @@ describe("redactor", () => {
     expect(r.counts).toEqual({ "aws-key": 1, "org-pattern": 1 });
   });
 });
+
+describe("redaction hits", () => {
+  it("records each removed secret with redacted context, for previews", () => {
+    const r = createRedactor(["ACME-[0-9]{6}"]);
+    r("deploy with AKIAIOSFODNN7EXAMPLE then ticket ACME-123456 is done");
+    r("nothing here");
+    // Built at runtime so secret scanners don't flag a fake key in the source.
+    r(`already [REDACTED:aws-key] stays, new ${["sk", "live", "abcdefghijklmnopqrstuvwx"].join("_")}`);
+    expect(r.hits.map((h) => h.kind)).toEqual(["aws-key", "org-pattern", "stripe-key"]);
+    expect(r.hits[0]!.context).toBe("deploy with [REDACTED:aws-key] then ticket [REDACTED:org-pattern] is d…");
+    expect(r.hits.every((h) => !/AKIA|ACME-1|sk_live/.test(h.context))).toBe(true);
+  });
+});

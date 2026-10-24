@@ -120,7 +120,7 @@ From a terminal:
 ```sh
 relay list                     # shared sessions for this repo
 relay list --for-me            # handoffs for you, any repo
-relay search "idempotency"
+relay search "idempotency"          # also searches full transcripts
 relay search "file:src/webhooks.ts"   # every session that touched a file
 relay pull rs_7KQ2M9XA         # writes .relay/handoff-rs_7KQ2M9XA.md
 ```

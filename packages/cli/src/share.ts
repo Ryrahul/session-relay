@@ -5,7 +5,7 @@ import { ADAPTERS, findSessions, type SessionRef } from "./adapters/index.js";
 import { buildShare, type BuiltShare } from "./build.js";
 import { resolvePeople, resolvePerson, type RelayClient } from "./client.js";
 import { ApiError } from "./api.js";
-import { createRedactor } from "@session-relay/shared";
+import { createRedactor, type RedactionHit } from "@session-relay/shared";
 import { currentPr, repoInfo, workingDiff, type RepoInfo } from "./git.js";
 import { forgetPickup, resolveContinues } from "./pickups.js";
 
@@ -78,6 +78,7 @@ export async function prepareShare(client: RelayClient | null, input: ShareInput
       const redact = createRedactor(me?.settings.redaction_patterns);
       built.diff = redact(diff);
       for (const [k, n] of Object.entries(redact.counts)) built.redactions[k] = (built.redactions[k] ?? 0) + n;
+      built.hits.push(...redact.hits.map((h) => ({ ...h, context: `(diff) ${h.context}` })));
       built.session.redactions += redact.total();
       if (truncated) built.diffTruncated = true;
     }
@@ -117,6 +118,14 @@ export async function writeDryRun(prepared: PreparedShare): Promise<string> {
   const file = path.join(dir, `dry-run-${prepared.ref.tool}-${prepared.ref.nativeId.slice(0, 12)}.json`);
   await writeFile(file, JSON.stringify({ session: prepared.built.session, transcript: prepared.built.transcript }, null, 2) + "\n");
   return file;
+}
+
+/** One line per removed secret, with the text around it (already redacted). */
+export function listRedactions(hits: RedactionHit[], max = 20): string {
+  if (!hits.length) return "";
+  const lines = hits.slice(0, max).map((h) => `  ${h.kind.padEnd(18)} ${h.context}`);
+  if (hits.length > max) lines.push(`  …and ${hits.length - max} more`);
+  return lines.join("\n");
 }
 
 export function describeRedactions(counts: Record<string, number>): string {

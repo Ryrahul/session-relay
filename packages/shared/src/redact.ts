@@ -10,6 +10,7 @@ interface Rule {
 }
 
 const tag = (kind: string) => `[REDACTED:${kind}]`;
+const TAG_RE = /\[REDACTED:([a-z-]+)\]/g;
 
 const RULES: Rule[] = [
   { kind: "private-key", re: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g },
@@ -46,10 +47,21 @@ const RULES: Rule[] = [
   },
 ];
 
+export interface RedactionHit {
+  kind: string;
+  /** The redacted text around the hit (the secret is already replaced), for previews. */
+  context: string;
+}
+
+const MAX_HITS = 500;
+const CONTEXT = 40;
+
 export interface Redactor {
   (text: string): string;
   /** Count per kind, across every call so far. */
   counts: Record<string, number>;
+  /** Where secrets were removed (first 500), with surrounding text. */
+  hits: RedactionHit[];
   total(): number;
 }
 
@@ -64,6 +76,7 @@ export function createRedactor(extra: string[] = []): Redactor {
     }
   }
   const counts: Record<string, number> = {};
+  const hits: RedactionHit[] = [];
   const redact = ((text: string) => {
     let out = text;
     for (const rule of rules) {
@@ -76,9 +89,21 @@ export function createRedactor(extra: string[] = []): Redactor {
         return rule.replace ? rule.replace(m, tag(rule.kind)) : tag(rule.kind);
       });
     }
+    if (out !== text && hits.length < MAX_HITS) {
+      const before = new Set(text.match(TAG_RE) ?? []).size ? text : "";
+      for (const m of out.matchAll(TAG_RE)) {
+        if (hits.length >= MAX_HITS) break;
+        // Tags that were already in the input aren't new hits.
+        if (before && before.includes(out.slice(Math.max(0, m.index! - 10), m.index! + m[0].length + 10))) continue;
+        const start = Math.max(0, m.index! - CONTEXT);
+        const end = Math.min(out.length, m.index! + m[0].length + CONTEXT);
+        hits.push({ kind: m[1]!, context: `${start > 0 ? "…" : ""}${out.slice(start, end).replace(/\s+/g, " ")}${end < out.length ? "…" : ""}` });
+      }
+    }
     return out;
   }) as Redactor;
   redact.counts = counts;
+  redact.hits = hits;
   redact.total = () => Object.values(counts).reduce((a, b) => a + b, 0);
   return redact;
 }

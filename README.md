@@ -25,7 +25,8 @@ Handing off agent work means copy-pasting chat logs, or the next person starting
 - **Web app**: browse, search and read everything your team has shared, plus an **Activity** digest and team **Stats**.
 - **Export and audit**: download any session as Markdown or JSON; admins see an audit log of everything.
 - **Easy onboarding**: invite links, and `relay login` signs in through the browser.
-- **Private by default**: nothing is uploaded unless you share it, secrets are removed on your laptop first, and shares can be limited to specific people.
+- **Search everything**: titles, summaries and full transcripts; filter by file, branch, agent, person.
+- **Private by default**: nothing is uploaded unless you share it, secrets are removed on your laptop first (test your own patterns in Settings), and shares can be limited to specific people.
 
 All of it: [Features](docs/features.md).
 

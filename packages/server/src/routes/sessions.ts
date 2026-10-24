@@ -29,6 +29,18 @@ const MAX_LIST = 100;
 const MAX_CHAIN = 20;
 const FULL_PAGE = 200;
 const MAX_COMMENTS = 100;
+/** Text indexed per full transcript; Postgres caps a tsvector at 1 MB. */
+const SEARCH_CHARS = 300_000;
+
+/** Indexes a full transcript for search. Best effort: a failure leaves the share unsearchable, not broken. */
+async function indexTranscript(sql: Sql, sessionId: string, messages: Message[]): Promise<void> {
+  const text = messages.map((m) => m.text).join("\n").slice(0, SEARCH_CHARS);
+  try {
+    await sql`UPDATE sessions SET transcript_search = strip(to_tsvector('english', ${text})) WHERE id = ${sessionId}`;
+  } catch {
+    // e.g. an unusual transcript that still exceeds the tsvector limit
+  }
+}
 
 /** Rows the caller may see: same org, live, and either team-visible, theirs, for them, or shared with them. */
 export function visible(sql: Sql, auth: AuthContext) {
@@ -141,6 +153,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       throw err;
     }
 
+    if (wantFull) await indexTranscript(sql, id, transcript!);
     const bytes = Buffer.byteLength(JSON.stringify(messages)) + (blob?.byteLength ?? 0) + (patch?.byteLength ?? 0);
     await recordUsage(sql, auth, "session.share", bytes);
     if (s.draft) await audit(sql, auth, "session.draft", id, { repo: s.repo });
@@ -165,7 +178,13 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
              s.visibility_team, s.continues_session_id, s.pr_url, s.draft, s.diff_key IS NOT NULL AS has_diff, s.created_at, s.updated_at,
              u.id AS author_id, u.name AS author_name, a.id AS assignee_id, a.name AS assignee_name,
              (SELECT count(*)::int FROM session_comments c WHERE c.session_id = s.id AND c.deleted_at IS NULL) AS comment_count
-             ${text ? sql`, ts_rank(s.search, websearch_to_tsquery('english', ${text})) AS rank` : sql``}
+             ${
+               text
+                 ? sql`, ts_rank(s.search, websearch_to_tsquery('english', ${text}))
+                        + 0.1 * coalesce(ts_rank(s.transcript_search, websearch_to_tsquery('english', ${text})), 0) AS rank,
+                      NOT (s.search @@ websearch_to_tsquery('english', ${text}) OR s.title ILIKE ${"%" + text + "%"}) AS transcript_only`
+                 : sql``
+             }
       FROM sessions s JOIN users u ON u.id = s.author_id LEFT JOIN users a ON a.id = s.assignee_id
       WHERE ${visible(sql, auth)}
         ${q.repo ? sql`AND s.repo = ${q.repo}` : sql``}
@@ -175,7 +194,12 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
         ${assignee ? sql`AND s.assignee_id = ${assignee}` : sql``}
         ${file ? sql`AND EXISTS (SELECT 1 FROM unnest(s.files_touched) f WHERE f ILIKE ${"%" + file.replace(/[\\%_]/g, (ch) => "\\" + ch) + "%"})` : sql``}
         ${q.pr ? sql`AND s.pr_url = ${q.pr}` : sql``}
-        ${text ? sql`AND (s.search @@ websearch_to_tsquery('english', ${text}) OR s.title ILIKE ${"%" + text + "%"})` : sql``}
+        ${
+          text
+            ? sql`AND (s.search @@ websearch_to_tsquery('english', ${text}) OR s.title ILIKE ${"%" + text + "%"}
+                   OR s.transcript_search @@ websearch_to_tsquery('english', ${text}))`
+            : sql``
+        }
         ${q.before ? sql`AND s.created_at < ${q.before}` : sql``}
         ${q.since ? sql`AND s.created_at >= ${q.since}` : sql``}
         ${q.native_id ? sql`AND s.native_id = ${q.native_id}` : sql``}
@@ -201,6 +225,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       comment_count: r.comment_count,
       draft: r.draft,
       has_diff: r.has_diff,
+      matched_in: r.transcript_only ? "transcript" : null,
       created_at: r.created_at.toISOString(),
       updated_at: iso(r.updated_at),
     }));
@@ -474,6 +499,23 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
   return app;
 }
 
+/** Indexes full transcripts shared before search covered them, a few per run. */
+export async function backfillTranscriptSearch(sql: Sql, storage: BlobStorage, limit = 25): Promise<number> {
+  const rows = await sql`
+    SELECT id, transcript_key FROM sessions
+    WHERE deleted_at IS NULL AND transcript_key IS NOT NULL AND transcript_search IS NULL
+    ORDER BY created_at DESC LIMIT ${limit}
+  `;
+  for (const r of rows) {
+    const blob = await storage.get(r.transcript_key).catch(() => null);
+    const messages: Message[] = blob ? JSON.parse(gunzipSync(blob).toString("utf8")) : [];
+    await indexTranscript(sql, r.id, messages);
+    // Mark unreadable ones as done so they aren't retried every hour.
+    await sql`UPDATE sessions SET transcript_search = coalesce(transcript_search, ''::tsvector) WHERE id = ${r.id}`;
+  }
+  return rows.length;
+}
+
 /** Live comments on a session, oldest first (the most recent `limit`). */
 async function listComments(sql: Sql, sessionId: string, limit: number): Promise<Comment[]> {
   const rows = await sql`
@@ -504,6 +546,7 @@ export async function purgeExpired(sql: Sql, storage: BlobStorage): Promise<numb
     if (r.old_diff) await storage.delete(r.old_diff);
   }
   await sql`DELETE FROM session_comments c USING sessions s WHERE c.session_id = s.id AND s.deleted_at IS NOT NULL`;
+  await backfillTranscriptSearch(sql, storage);
   await purgeRateLimits(sql);
   return rows.length;
 }

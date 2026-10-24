@@ -43,7 +43,7 @@ function formatList(rows: Awaited<ReturnType<RelayClient["list"]>>["sessions"]):
     .map(
       (s) =>
         `- ${s.id} · "${s.title}" · ${s.author.name} · ${s.tool} · ${s.branch ?? "-"} · ${ago(s.created_at)}` +
-        `${s.assignee ? ` · for ${s.assignee.name}` : ""}${s.pr_url ? ` · ${s.pr_url}` : ""}${s.comment_count ? ` · ${s.comment_count} comments` : ""}` +
+        `${s.assignee ? ` · for ${s.assignee.name}` : ""}${s.pr_url ? ` · ${s.pr_url}` : ""}${s.comment_count ? ` · ${s.comment_count} comments` : ""}${s.matched_in === "transcript" ? " · matched in the full transcript (get_session mode full)" : ""}` +
         `\n  goal: ${s.goal.slice(0, 200)}`,
     )
     .join("\n");

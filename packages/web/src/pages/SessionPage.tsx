@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ChainLink, Member, MeResponse, Message, SessionDetail } from "@session-relay/shared";
+import { matchTemplate, type ChainLink, type Member, type MeResponse, type Message, type SessionDetail, type SummarySection } from "@session-relay/shared";
 import { api, download } from "../api";
 import { ago, dateTime, prLabel, shortRepo, TOOL_NAMES } from "../format";
 import { RichText } from "../text";
@@ -86,7 +86,18 @@ function ItemsField({ id, label, items, onChange }: { id: string; label: string;
 const clean = (items: string[]) => items.map((i) => i.trim()).filter(Boolean);
 
 /** Edit a share in place: title, summary, who it's for and the PR. Author or admin. */
-function EditPanel({ s, onSaved, onCancel }: { s: SessionDetail; onSaved: () => void; onCancel: () => void }) {
+function EditPanel({ s, me, onSaved, onCancel }: { s: SessionDetail; me: MeResponse; onSaved: () => void; onCancel: () => void }) {
+  // The share's own sections, plus empty ones the repo's template asks for.
+  const template = matchTemplate(me.settings.share_templates ?? [], s.repo);
+  const [sections, setSections] = useState<SummarySection[]>(() => {
+    const own = (s.summary.sections ?? []).map((x) => ({ ...x, items: [...x.items] }));
+    for (const t of template?.sections ?? []) {
+      // Required ones start with a box to type in.
+      if (!own.some((o) => o.title.toLowerCase() === t.title.toLowerCase())) own.push({ title: t.title, items: t.required ? [""] : [] });
+    }
+    return own;
+  });
+  const hintFor = (title: string) => template?.sections.find((t) => t.title.toLowerCase() === title.toLowerCase());
   const [title, setTitle] = useState(s.title);
   const [goal, setGoal] = useState(s.summary.goal);
   const [next, setNext] = useState(s.summary.next);
@@ -110,7 +121,14 @@ function EditPanel({ s, onSaved, onCancel }: { s: SessionDetail; onSaved: () => 
     try {
       await api.update(s.id, {
         title: title.trim() || s.title,
-        summary: { goal: goal.trim(), next: clean(next), decisions: clean(decisions), done: clean(done), open_questions: clean(questions) },
+        summary: {
+          goal: goal.trim(),
+          next: clean(next),
+          decisions: clean(decisions),
+          done: clean(done),
+          open_questions: clean(questions),
+          sections: sections.map((x) => ({ title: x.title, items: clean(x.items) })).filter((x) => x.items.length),
+        },
         assignee: assignee || null,
         pr_url: pr.trim() || null,
       });
@@ -139,6 +157,20 @@ function EditPanel({ s, onSaved, onCancel }: { s: SessionDetail; onSaved: () => 
       <ItemsField id="edit-decisions" label="Decisions" items={decisions} onChange={setDecisions} />
       <ItemsField id="edit-done" label="Done" items={done} onChange={setDone} />
       <ItemsField id="edit-questions" label="Open questions" items={questions} onChange={setQuestions} />
+      {sections.map((sec, i) => {
+        const t = hintFor(sec.title);
+        return (
+          <div key={sec.title} className="template-section">
+            <ItemsField
+              id={`edit-section-${i}`}
+              label={sec.title + (t?.required ? " (required)" : "")}
+              items={sec.items}
+              onChange={(items) => setSections(sections.map((x, n) => (n === i ? { ...x, items } : x)))}
+            />
+            {t?.hint && <p className="faint small">{t.hint}</p>}
+          </div>
+        );
+      })}
       <div className="edit-row">
         <div className="field">
           <label htmlFor="edit-assignee">For</label>
@@ -427,6 +459,7 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
           {editing && (
             <EditPanel
               s={s}
+              me={me}
               onCancel={() => setEditing(false)}
               onSaved={() => {
                 setEditing(false);
@@ -442,6 +475,21 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
           <Section title="Decisions" items={s.summary.decisions} />
           <Section title="Done" items={s.summary.done} />
           <Section title="Open questions" items={s.summary.open_questions} />
+          {(s.summary.sections ?? []).map((sec) => (
+            <Section key={sec.title} title={sec.title} items={sec.items} />
+          ))}
+          {s.missing_sections.length > 0 && (
+            <section className="card missing-banner" role="note">
+              <div>
+                <strong>Missing from this repo's handoff template:</strong> {s.missing_sections.join(", ")}
+              </div>
+              {canEdit && !editing && (
+                <button type="button" className="btn-ghost btn-sm" onClick={() => setEditing(true)}>
+                  <Icon name="edit" size={14} /> Add them
+                </button>
+              )}
+            </section>
+          )}
 
           <section className="conversation">
             <div className="conversation-head">

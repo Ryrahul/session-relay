@@ -33,6 +33,8 @@ export function renderHandoff(s: SessionDetail): string {
     list("Done", s.summary.done) +
     list("Next steps", s.summary.next) +
     list("Open questions", s.summary.open_questions) +
+    (s.summary.sections ?? []).map((sec) => list(sec.title, sec.items)).join("") +
+    (s.missing_sections?.length ? `\n> Missing from this repo's handoff template: ${s.missing_sections.join(", ")}\n` : "") +
     list("Files touched", s.files_touched.map((f) => `\`${f}\``));
 
   // Teammates' notes come before the conversation: they are often the latest word on the work.

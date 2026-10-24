@@ -35,7 +35,7 @@ The config is at `~/.config/session-relay/config.json` (mode `600`). Override it
 | `--for <name>` | Teammate this handoff is for (name or email). It's first in their `/pickup` and visible to them even if private |
 | `--pr <url>` | Pull request it belongs to. Default: the current branch's open PR, found with the GitHub CLI (`gh`). `none` to leave it out |
 | `--continues <id>` | Shared session this work continues. Default: the one you last picked up in this repo (within 7 days). `none` to unlink |
-| `--summary-file <file>` | JSON `{goal, decisions, done, next, open_questions}`. Without it, the summary is the first request and the last answer |
+| `--summary-file <file>` | JSON `{goal, decisions, done, next, open_questions, sections: [{title, items}]}`. Without it, the summary is the first request and the last answer. If the repo has a handoff template with required sections, `relay share` prints a note when they're missing |
 | `--dry-run` | Write what would be uploaded to `.relay/dry-run-*.json` and stop |
 | `-y, --yes` | Don't ask questions |
 | `--json` | Print `{id, title, redactions, continues, pr_url}` |
@@ -51,6 +51,7 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 | `relay list --for-me` | Handoffs assigned to you, from any repo |
 | `relay list --drafts` | Your drafts (saved automatically at session end) |
 | `relay search "<query>"` | Full-text search over titles, summaries and messages. Add `file:<path>` or `branch:<name>` to filter |
+| `relay template [--repo <repo>]` | The handoff template for this repo: sections a share should include |
 | `relay export <id> [--format md\|json] [-o file]` | Download a session, full transcript included |
 | `relay export [--repo <repo>\|--all] [--since YYYY-MM-DD] [--full] [-o file]` | Every session of this repo (or all repos) you can see, as NDJSON |
 | `relay digest [--days 1]` | What the team did lately: new shares by repo, handoffs for you, pickups, comments |
@@ -88,7 +89,8 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 | `--goal <text>` | Replace the goal |
 | `--add-next <text>` | Add a next step; repeat for more. `--clear-next` removes the old ones first |
 | `--add-done`, `--add-decision`, `--add-question <text>` | Add to those lists (repeatable) |
-| `--summary-file <file>` | Replace the whole summary with JSON `{goal, decisions, done, next, open_questions}` |
+| `--section "<title>=<item>"` | Add an item to a section (e.g. one the repo's template asks for); creates the section if needed. Repeatable |
+| `--summary-file <file>` | Replace the whole summary with JSON `{goal, decisions, done, next, open_questions, sections}` |
 | `--for <name>` | Who it's for; `none` to clear |
 | `--pr <url>` | Pull request; `none` to clear |
 | `--team` / `--people <names>` | Visible to the whole team, or only these people |

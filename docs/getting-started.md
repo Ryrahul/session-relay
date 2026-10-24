@@ -80,6 +80,8 @@ You can add instructions:
 /share title: payment retry, half done
 ```
 
+Some repos have a **handoff template** (set by an admin) asking for extra sections, like "Tests run". `/share` fills them in; `relay template` shows what's asked.
+
 If your branch has an open pull request (and the GitHub CLI `gh` is installed), the share links to it.
 
 Or share from a terminal, inside the repo:

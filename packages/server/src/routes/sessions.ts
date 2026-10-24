@@ -4,6 +4,8 @@ import { HTTPException } from "hono/http-exception";
 import {
   createRedactor,
   DetailMode,
+  matchTemplate,
+  missingSections,
   newId,
   NewComment,
   type Comment,
@@ -278,6 +280,8 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       ORDER BY s.created_at
     `;
     const comments = await listComments(sql, id, MAX_COMMENTS);
+    const [settings] = await sql`SELECT share_templates FROM org_settings WHERE org_id = ${auth.orgId}`;
+    const missing = missingSections(matchTemplate(settings?.share_templates ?? [], r.repo), r.summary);
     const link = (x: (typeof chain)[number]): ChainLink => ({
       id: x.id,
       title: x.title,
@@ -316,6 +320,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       continued_by: children.map(link),
       assigned_to: r.assignee_id ? { id: r.assignee_id, name: r.assignee_name } : null,
       comments,
+      missing_sections: missing,
     };
     return body;
   }

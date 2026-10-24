@@ -13,12 +13,15 @@ description: Share this session with your team (Session Relay)
 ---
 Share this session with the team using the relay MCP tool \`share_current_session\`.
 
-First write a handoff for a teammate who will continue this work, based on this conversation:
+First call the relay MCP tool \`share_template\`: this repo may ask for extra sections.
+
+Then write a handoff for a teammate who will continue this work, based on this conversation:
 - goal: what we are trying to achieve, in one or two sentences
 - decisions: key decisions made and why
 - done: what is finished
 - next: concrete next steps
 - open_questions: anything unresolved
+- sections: the template's sections, if it has any
 Never include secrets, tokens or passwords.
 
 Then call \`share_current_session\` with those fields. If the user says who it's for ("for Akshat"), pass \`for\`. If this session continued a teammate's shared session you loaded earlier, it is linked automatically; if the work is unrelated, pass \`continues: "none"\`. Extra instructions from the user (title, who should see it, "full transcript"): $ARGUMENTS

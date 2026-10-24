@@ -238,7 +238,7 @@ describe.skipIf(!DB)("API (integration)", () => {
     expect(ok.status).toBe(200);
     const after = await call(alice.token, "GET", "/v1/me");
     expect(after.body.org.name).toBe("Team A Renamed");
-    expect(after.body.settings).toEqual({ retention_days: 30, repo_allowlist: ["github.com/acme/*"], redaction_patterns: ["ACME-[0-9]{6}"] });
+    expect(after.body.settings).toEqual({ retention_days: 30, repo_allowlist: ["github.com/acme/*"], redaction_patterns: ["ACME-[0-9]{6}"], share_templates: [] });
     expect((await call(outsider.token, "GET", "/v1/org")).body.id).toBe(orgB);
     await call(owner.token, "PATCH", "/v1/org", { retention_days: 90, repo_allowlist: [], redaction_patterns: [] });
   });
@@ -549,6 +549,34 @@ describe.skipIf(!DB)("API (integration)", () => {
     expect(shares[0].user.name).toBe("Alice");
     expect(shares.some((e: any) => e.session_title)).toBe(true);
     expect((await call(outsider.token, "GET", "/v1/audit?action=session.share")).body.entries.every((e: any) => e.user?.name !== "Alice")).toBe(true);
+  });
+
+  it("handoff templates: admins set them, members read the match, sessions report missing sections", async () => {
+    const templates = [
+      { repo: "github.com/acme/*", instructions: "Mention flags.", sections: [{ title: "Tests run", hint: "commands", required: true }, { title: "Risks", required: false }] },
+      { repo: "*", sections: [] },
+    ];
+    expect((await call(alice.token, "PATCH", "/v1/org", { share_templates: templates })).status).toBe(403);
+    expect((await call(owner.token, "PATCH", "/v1/org", { share_templates: [{ repo: "", sections: [] }] })).status).toBe(400);
+    expect((await call(owner.token, "PATCH", "/v1/org", { share_templates: templates })).status).toBe(200);
+    expect((await call(alice.token, "GET", "/v1/me")).body.settings.share_templates).toHaveLength(2);
+    const got = (await call(alice.token, "GET", "/v1/org/template?repo=github.com/acme/tpl")).body.template;
+    expect(got).toMatchObject({ repo: "github.com/acme/*", sections: [{ title: "Tests run", required: true, hint: "commands" }, { title: "Risks", required: false, hint: "" }] });
+    expect((await call(alice.token, "GET", "/v1/org/template?repo=gitlab.com/x")).body.template.repo).toBe("*");
+
+    const id = (await call(alice.token, "POST", "/v1/sessions", { session: upload({ repo: "github.com/acme/tpl" }) })).body.id;
+    expect((await call(bob.token, "GET", `/v1/sessions/${id}?mode=summary`)).body.missing_sections).toEqual(["Tests run"]);
+    const sections = [{ title: "tests run", items: ["npm test: 15 passed"] }];
+    const cur = (await call(alice.token, "GET", `/v1/sessions/${id}?mode=summary`)).body.summary;
+    await call(alice.token, "PATCH", `/v1/sessions/${id}`, { summary: { ...cur, sections } });
+    const after = (await call(bob.token, "GET", `/v1/sessions/${id}?mode=summary`)).body;
+    expect(after.missing_sections).toEqual([]);
+    expect(after.summary.sections).toEqual(sections);
+    // Search covers section text too (it's part of the summary).
+    expect((await call(bob.token, "GET", "/v1/sessions?q=passed&repo=github.com/acme/tpl")).body.sessions.map((x: any) => x.id)).toContain(id);
+    const [log] = (await call(owner.token, "GET", "/v1/audit?action=org.update&limit=1")).body.entries;
+    expect(log.meta.share_templates).toBe(2);
+    await call(owner.token, "PATCH", "/v1/org", { share_templates: [] });
   });
 
   it("records usage and audit events", async () => {

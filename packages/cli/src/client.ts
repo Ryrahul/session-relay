@@ -9,6 +9,7 @@ import type {
   SessionDetail,
   SessionListItem,
   SessionPatch,
+  ShareTemplate,
   ShareRequest,
 } from "@session-relay/shared";
 import { api, apiText } from "./api.js";
@@ -72,6 +73,9 @@ export class RelayClient {
   }
   remove(id: string) {
     return api<{ ok: true }>(this.config, "DELETE", `v1/sessions/${encodeURIComponent(id)}`);
+  }
+  template(repo: string) {
+    return api<{ template: ShareTemplate | null }>(this.config, "GET", `v1/org/template?repo=${encodeURIComponent(repo)}`);
   }
   activity(days = 1) {
     return api<Activity>(this.config, "GET", `v1/activity?days=${days}`);

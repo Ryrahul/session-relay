@@ -38,6 +38,7 @@ export function fallbackSummary(messages: Message[]): Summary {
     done: lastAnswer ? [lastAnswer.slice(0, 500)] : [],
     next: [],
     open_questions: [],
+    sections: [],
   };
 }
 
@@ -61,6 +62,7 @@ export function buildShare(local: LocalSession, repo: RepoInfo, opts: BuildOptio
     done: raw.done.map(clean),
     next: raw.next.map(clean),
     open_questions: raw.open_questions.map(clean),
+    sections: (raw.sections ?? []).map((s) => ({ title: clean(s.title).slice(0, 60), items: s.items.map(clean) })),
   };
 
   const session: SessionUpload = {

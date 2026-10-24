@@ -443,3 +443,9 @@ a.badge-link:hover { color: var(--accent); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .diff-count .add, :root:not([data-theme="light"]) .diff-card .muted .add { color: #5fd08b; } :root:not([data-theme="light"]) .diff-count .del, :root:not([data-theme="light"]) .diff-card .muted .del { color: #ff8b7e; } }
 :root[data-theme="dark"] .diff-count .add, :root[data-theme="dark"] .diff-card .muted .add { color: #5fd08b; }
 :root[data-theme="dark"] .diff-count .del, :root[data-theme="dark"] .diff-card .muted .del { color: #ff8b7e; }
+
+/* Redaction preview */
+.redaction-preview { display: grid; gap: 6px; margin-top: 8px; padding: 12px; border: 1px dashed var(--line-strong); border-radius: var(--radius); }
+.redaction-out { margin: 0; padding: 10px 12px; background: var(--surface-2); border-radius: 8px; font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.redaction-out mark { background: var(--accent-soft); color: var(--accent); font-weight: 600; border-radius: 4px; padding: 0 2px; }
+.row-match { margin: 2px 0 0; }

@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from "react";
-import type { MeResponse, OrgInfo, ShareTemplate } from "@session-relay/shared";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { createRedactor, type MeResponse, type OrgInfo, type ShareTemplate } from "@session-relay/shared";
 import { api, download, type TokenInfo } from "../api";
 import { ago, bytes } from "../format";
 import { Command, Icon } from "../ui";
@@ -99,6 +99,7 @@ function OrgSettings({ me, onOrgChanged }: { me: MeResponse; onOrgChanged: () =>
             <p className="hint">
               Regular expressions, one per line. Matches are removed on each laptop before upload, in addition to the built-in rules.
             </p>
+            <RedactionPreview patterns={lines(patterns)} />
           </div>
           {isAdmin && (
             <div className="row">
@@ -192,6 +193,54 @@ function Tokens() {
         ))}
       </ul>
     </section>
+  );
+}
+
+const SAMPLE = `Deployed with AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY to staging.
+curl -H "Authorization: Bearer abcdefghijklmnop1234567890" https://api.example.com
+Ticket ACME-123456 is fixed; db at postgres://app:hunter2secret@db.internal:5432/app`;
+
+/** Try the built-in rules plus the (unsaved) org patterns on sample text, right in the browser. */
+function RedactionPreview({ patterns }: { patterns: string[] }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(SAMPLE);
+  const result = useMemo(() => {
+    const bad = patterns.filter((p) => {
+      try {
+        new RegExp(p);
+        return false;
+      } catch {
+        return true;
+      }
+    });
+    const r = createRedactor(patterns);
+    return { out: r(text), counts: r.counts, total: r.total(), bad };
+  }, [patterns, text]);
+  if (!open) {
+    return (
+      <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(true)}>
+        Test patterns on sample text
+      </button>
+    );
+  }
+  return (
+    <div className="redaction-preview">
+      <label htmlFor="redaction-sample">Sample text</label>
+      <textarea id="redaction-sample" rows={4} className="mono" value={text} onChange={(e) => setText(e.target.value)} />
+      <p className="small" role="status">
+        {result.total ? `${result.total} removed: ${Object.entries(result.counts).map(([k, n]) => `${n} ${k}`).join(", ")}` : "Nothing would be removed."}
+        {result.bad.length > 0 && <span className="error"> Invalid: {result.bad.join(", ")}</span>}
+      </p>
+      <pre className="redaction-out" aria-label="What would be uploaded">
+        {result.out.split(/(\[REDACTED:[a-z-]+\])/).map((part, i) =>
+          part.startsWith("[REDACTED:") ? (
+            <mark key={i}>{part}</mark>
+          ) : (
+            <span key={i}>{part}</span>
+          ),
+        )}
+      </pre>
+    </div>
   );
 }
 

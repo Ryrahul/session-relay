@@ -35,6 +35,8 @@ export const SessionListItem = z.object({
   comment_count: z.number().int(),
   draft: z.boolean(),
   has_diff: z.boolean(),
+  /** "transcript" when a search matched only inside the full transcript. */
+  matched_in: z.literal("transcript").nullable(),
   created_at: z.string(),
   updated_at: z.string().nullable(),
 });

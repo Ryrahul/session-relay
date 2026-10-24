@@ -166,6 +166,7 @@ export function Sessions({ me }: { me: MeResponse }) {
                     </span>
                   </div>
                   {s.goal && s.goal !== s.title && <p className="row-goal">{s.goal}</p>}
+                  {s.matched_in === "transcript" && <p className="faint small row-match">Matched in the full transcript</p>}
                   <div className="row-meta">
                     <ToolBadge tool={s.tool} />
                     <span className="who">

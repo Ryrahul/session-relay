@@ -22,6 +22,8 @@
 - **Search by file and branch**: `file:` and `branch:` in any search, `--file` in the CLI.
 - **Comments** on sessions, in the web app, the CLI and from agents; the next agent reads them.
 - **Activity digest** and **stats**: web pages, `relay digest`, `relay stats`, and the `team_activity` MCP tool.
+- **Search across full transcripts**, with existing shares indexed by the hourly job.
+- **Redaction preview**: test secret patterns on sample text in Settings; `--dry-run` lists every redaction.
 - **Diff snapshots**: uncommitted changes attached to a share, viewable in the web app and `git apply`-able after `relay pull`.
 - **Handoff templates**: per-repo sections and instructions that `/share` follows; missing sections flagged.
 - **Audit log page** (admins) and `relay audit`; **export** of a session (Markdown/JSON) or many (NDJSON).
@@ -50,6 +52,8 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 
 | Version | Date | |
 |---|---|---|
+| CLI `0.5.0` on npm | 2026-10-24 | `relay share --diff`, `relay template`, `relay edit --section`, `relay export`, `relay audit`; dry-run lists redactions; MCP `share_template`, `get_session_diff` |
+| Server and web app | 2026-10-24 | Handoff templates, diff snapshots, audit log page, export, full-transcript search, redaction preview (migrations 0010–0012) |
 | CLI `0.4.0` on npm | 2026-10-24 | Gemini CLI, Copilot CLI and Cursor (experimental); `relay edit`, `publish`, `comment`, `pr-comment`, `digest`, `stats`; `setup --auto-share`; `--for`, `--pr`, `--for-me`, `--file`, `--drafts`; MCP `update_session`, `comment_on_session`, `team_activity` |
 | Server and web app | 2026-10-24 | Edit after sharing, handoffs for someone, PR links, file and branch search, comments, Activity and Stats pages, drafts, new agents (migrations 0006–0009) |
 | CLI `0.3.0` on npm | 2026-10-24 | ZCode support |

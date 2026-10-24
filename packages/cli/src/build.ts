@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { IncludeMode, Message, SessionUpload, Summary, Visibility } from "@session-relay/shared";
+import type { IncludeMode, Message, SessionUpload, Summary, Visibility, RedactionHit } from "@session-relay/shared";
 import type { LocalSession } from "./adapters/types.js";
 import type { RepoInfo } from "./git.js";
 import { createRedactor } from "@session-relay/shared";
@@ -22,6 +22,8 @@ export interface BuiltShare {
   /** Uncommitted changes, redacted (only when asked for). */
   diff?: string;
   diffTruncated?: boolean;
+  /** Where secrets were removed, with redacted context (first 500). */
+  hits: RedactionHit[];
   redactions: Record<string, number>;
 }
 
@@ -84,5 +86,5 @@ export function buildShare(local: LocalSession, repo: RepoInfo, opts: BuildOptio
     draft: false,
   };
   session.redactions = redact.total();
-  return { session, transcript: opts.include === "full" ? all : undefined, redactions: { ...redact.counts } };
+  return { session, transcript: opts.include === "full" ? all : undefined, redactions: { ...redact.counts }, hits: redact.hits };
 }

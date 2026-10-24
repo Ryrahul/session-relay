@@ -9,7 +9,7 @@ import { repoInfo } from "../git.js";
 import { renderDigest } from "../digest.js";
 import { renderHandoff } from "@session-relay/shared";
 import { recordPickup } from "../pickups.js";
-import { describeRedactions, prepareShare, relayDir, uploadShare, writeDryRun } from "../share.js";
+import { describeRedactions, listRedactions, prepareShare, relayDir, uploadShare, writeDryRun } from "../share.js";
 import { ago, ask, choose, confirm, interactive, toolLabel } from "../ui.js";
 
 interface ShareOpts {
@@ -96,14 +96,16 @@ export async function share(opts: ShareOpts): Promise<void> {
   const { session } = prepared.built;
   const redactNote = describeRedactions(prepared.built.redactions);
 
+  const hitList = listRedactions(prepared.built.hits);
   if (opts.dryRun) {
     const file = await writeDryRun(prepared);
-    console.log(`${redactNote}\nDry run: nothing was uploaded. Review ${path.relative(process.cwd(), file) || file}`);
+    console.log(`${redactNote}${hitList ? `\n${hitList}` : ""}\nDry run: nothing was uploaded. Review ${path.relative(process.cwd(), file) || file}`);
     return;
   }
   if (!opts.json) {
     console.log(`\n"${session.title}" · ${toolLabel(prepared.ref.tool).trim()} · ${session.include} · ${session.messages.length} messages · ${session.visibility.team ? "whole team" : `${session.visibility.people.length} people`}`);
     console.log(redactNote);
+    if (hitList && ask_) console.log(hitList);
     if (session.continues) console.log(`Continues ${session.continues}${prepared.continuesAuto ? " (the session you picked up here)" : ""}. Use --continues none to unlink.`);
     if (opts.for) console.log(`For ${opts.for}.`);
     if (opts.diff) {
@@ -150,6 +152,7 @@ async function printList(query: Record<string, string | number | undefined>, jso
       s.pr_url ? `PR #${s.pr_url.split("/").pop()}` : "",
       s.comment_count ? `${s.comment_count} comment${s.comment_count === 1 ? "" : "s"}` : "",
       s.draft ? "draft" : "",
+      s.matched_in === "transcript" ? "matched in full transcript" : "",
     ]
       .filter(Boolean)
       .join(", ");

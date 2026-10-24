@@ -1,6 +1,6 @@
 # session-relay
 
-Share coding-agent sessions with your team across **Claude Code**, **OpenCode**, **Codex** and **ZCode**. Run `/share` in one agent; a teammate runs `/pickup` in whichever agent they use and carries on with the goal, decisions, next steps and recent conversation.
+Share coding-agent sessions with your team across **Claude Code**, **Codex**, **OpenCode**, **Gemini CLI**, **Copilot CLI**, **Cursor** and **ZCode**. Run `/share` in one agent; a teammate runs `/pickup` in whichever agent they use and carries on with the goal, decisions, next steps and recent conversation.
 
 ```sh
 npm install -g session-relay
@@ -30,12 +30,12 @@ You need a Session Relay server for your team; see [self-hosting](https://relay.
 | `relay show <id>`, `relay pull <id>` | Read a session, or write `.relay/handoff-<id>.md` for your agent |
 | `relay edit <id>` | Change your share: title, summary, next steps, who it's for, PR |
 | `relay pr-comment <id>` | Post the session on its pull request |
-| `relay setup --auto-share on` | Save each Claude Code session as a private draft when it ends; `relay publish <id>` shares it |
+| `relay setup --auto-share on` | Save each Claude Code, Gemini CLI and Copilot CLI session as a private draft when it ends; `relay publish <id>` shares it |
 | `relay digest`, `relay stats` | What the team did lately; team stats |
 | `relay comment <id> "<text>"` | Leave a note on a session (the next agent reads it) |
 | `relay delete <id>` | Delete your share |
 | `relay members`, `relay invite --link` | Your team; invite links (admins) |
-| `relay setup` | Connect Claude Code, OpenCode, Codex and ZCode |
+| `relay setup` | Connect every agent you have installed |
 | `relay mcp` | The MCP server your agents start |
 
 Full reference: [CLI docs](https://relay.rahulweb.online/docs/cli.html).

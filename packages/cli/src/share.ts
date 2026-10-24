@@ -39,7 +39,7 @@ export interface PreparedShare {
 export async function pickSession(repo: RepoInfo, tool?: SourceTool, id?: string): Promise<SessionRef> {
   const refs = await findSessions(repo.root, tool);
   if (!refs.length) {
-    throw new Error(`No ${tool ?? "Claude Code, OpenCode, Codex or ZCode"} sessions found for ${repo.root}.`);
+    throw new Error(`No ${tool ?? "agent"} sessions found for ${repo.root}.`);
   }
   if (!id) return refs[0]!;
   const hit = refs.find((r) => r.nativeId === id || r.nativeId.startsWith(id));

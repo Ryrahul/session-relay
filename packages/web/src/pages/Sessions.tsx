@@ -114,7 +114,7 @@ export function Sessions({ me }: { me: MeResponse }) {
         ) : (
           <Empty title="Nothing shared yet">
             <p className="muted">
-              In Claude Code, OpenCode, Codex or ZCode, run <code>/share</code> at the end of a session. It will show up here for{" "}
+              In your coding agent (Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor or ZCode), run <code>/share</code> at the end of a session. It will show up here for{" "}
               {me.org.name}.
             </p>
             <a className="btn-primary" href="#/start">
@@ -153,7 +153,7 @@ export function Sessions({ me }: { me: MeResponse }) {
                           <Icon name="chain" size={12} /> Continues
                         </span>
                       )}
-                      {!s.visibility_team && (
+                      {!s.visibility_team && !s.draft && (
                         <span className="badge" title="Only visible to selected people">
                           <Icon name="lock" size={12} /> Private
                         </span>

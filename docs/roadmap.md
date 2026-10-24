@@ -4,7 +4,7 @@
 
 **Self-hosted Session Relay**, open source under [AGPL-3.0](https://github.com/Ryrahul/session-relay/blob/main/LICENSE):
 
-- Share and pick up sessions across **Claude Code**, **OpenCode**, **Codex** and **ZCode**:
+- Share and pick up sessions across **Claude Code**, **Codex**, **OpenCode**, **Gemini CLI**, **Copilot CLI**, **Cursor** and **ZCode**:
   - `/share` and `/pickup` in each agent, through the relay MCP server
   - the `relay` CLI, installed with `npm install -g session-relay`
 - Local secret redaction, plus per-org patterns.
@@ -22,11 +22,12 @@
 - **Search by file and branch**: `file:` and `branch:` in any search, `--file` in the CLI.
 - **Comments** on sessions, in the web app, the CLI and from agents; the next agent reads them.
 - **Activity digest** and **stats**: web pages, `relay digest`, `relay stats`, and the `team_activity` MCP tool.
-- **Auto-share drafts** (opt-in, Claude Code): sessions saved as private drafts at session end; publish when ready.
+- **Gemini CLI, Copilot CLI and Cursor** (experimental) adapters, with `relay setup` for each.
+- **Auto-share drafts** (opt-in; Claude Code, Gemini CLI, Copilot CLI): sessions saved as private drafts at session end; publish when ready.
 
 ## Next
 
-- **More agents**: Gemini CLI and GitHub Copilot CLI, then Cursor.
+- Live runs of Gemini CLI, Copilot CLI and Cursor with real sessions; Cursor editor chats.
 - Prebuilt public Docker image, so self-hosting needs no build.
 - Full live test of Codex with a real session fixture.
 - S3 / Cloudflare R2 storage for full transcripts.
@@ -47,8 +48,8 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 
 | Version | Date | |
 |---|---|---|
-| CLI `0.4.0` on npm | 2026-10-24 | `relay edit`, `relay pr-comment`, `relay comment`, `relay digest`, `relay stats`, `relay publish`, `relay setup --auto-share`, `--for`, `--pr`, `--for-me`, `--file`; MCP `update_session`, `comment_on_session`, `team_activity` |
-| Server and web app | 2026-10-24 | Edit after sharing, handoffs for someone, PR links, file and branch search, comments, Activity and Stats pages, drafts (migrations 0006, 0007, 0008) |
+| CLI `0.4.0` on npm | 2026-10-24 | Gemini CLI, Copilot CLI and Cursor (experimental); `relay edit`, `publish`, `comment`, `pr-comment`, `digest`, `stats`; `setup --auto-share`; `--for`, `--pr`, `--for-me`, `--file`, `--drafts`; MCP `update_session`, `comment_on_session`, `team_activity` |
+| Server and web app | 2026-10-24 | Edit after sharing, handoffs for someone, PR links, file and branch search, comments, Activity and Stats pages, drafts, new agents (migrations 0006–0009) |
 | CLI `0.3.0` on npm | 2026-10-24 | ZCode support |
 | CLI `0.2.0` on npm | 2026-10-24 | Handoff chains (`--continues`), browser login, `relay invite --link` |
 | Server and web app | 2026-10-24 | Handoff chains, invite links, browser login (migrations 0002, 0003) |
@@ -59,7 +60,7 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 
 | Area | Status |
 |---|---|
-| Adapters (Claude Code, OpenCode, Codex, ZCode) | Done; Claude Code and OpenCode tested on real sessions |
+| Adapters (Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor, ZCode) | Done; Claude Code and OpenCode tested on real sessions, the others on format fixtures |
 | Redaction | Done |
 | API, auth, roles, visibility, retention, audit | Done; integration-tested against Postgres, including org isolation |
 | CLI (npm `session-relay`) and MCP server | Done; published, end-to-end tested with three users |

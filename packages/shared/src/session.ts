@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /** Agent tools we can read sessions from. */
-export const SourceTool = z.enum(["claude-code", "codex", "opencode", "zcode"]);
+export const SourceTool = z.enum(["claude-code", "codex", "opencode", "zcode", "gemini", "copilot", "cursor"]);
 export type SourceTool = z.infer<typeof SourceTool>;
 
 /** How much of a session a share carries. */

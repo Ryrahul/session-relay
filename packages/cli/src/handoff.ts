@@ -1,6 +1,6 @@
 import type { SessionDetail } from "@session-relay/shared";
 
-const TOOL_NAMES = { "claude-code": "Claude Code", codex: "Codex", opencode: "OpenCode", zcode: "ZCode" } as const;
+const TOOL_NAMES = { "claude-code": "Claude Code", codex: "Codex", opencode: "OpenCode", zcode: "ZCode", gemini: "Gemini CLI", copilot: "Copilot CLI", cursor: "Cursor" } as const;
 
 function list(title: string, items: string[]): string {
   return items.length ? `\n## ${title}\n${items.map((i) => `- ${i}`).join("\n")}\n` : "";

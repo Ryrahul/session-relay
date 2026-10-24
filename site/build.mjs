@@ -97,7 +97,7 @@ ${body}
 <footer class="foot">
   <div class="foot-inner">
     <span>Session Relay</span>
-    <span class="faint">Share coding-agent sessions across Claude Code, OpenCode, Codex and ZCode.</span>
+    <span class="faint">Share coding-agent sessions across Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor and ZCode.</span>
     <a href="${REPO}">GitHub</a>
   </div>
 </footer>
@@ -110,7 +110,7 @@ function landing() {
   const body = `
 <main class="landing">
   <section class="hero">
-    <p class="eyebrow">For teams using Claude Code, OpenCode, Codex and ZCode</p>
+    <p class="eyebrow">For teams using Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor and ZCode</p>
     <h1>Pick up where your teammate left off.</h1>
     <p class="lede">Share a coding-agent session with one command. Your teammate continues it in whichever agent they use, with the goal, the decisions, the next steps and the recent conversation.</p>
     <div class="cta">
@@ -159,7 +159,7 @@ retry path. Starting with that now.</pre>
   <section class="features">
     <div>
       <h3>Works across agents</h3>
-      <p>Start in Claude Code, finish in OpenCode, Codex or ZCode. Each tool's sessions are read in its own format and turned into one handoff any agent understands.</p>
+      <p>Start in Claude Code, finish in Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor or ZCode. Each tool's sessions are read in its own format and turned into one handoff any agent understands.</p>
     </div>
     <div>
       <h3>Private by default</h3>
@@ -245,7 +245,7 @@ relay setup                           <span class="faint"># adds /share and /pic
 </main>`;
   return page({
     title: "Session Relay: share coding-agent sessions with your team",
-    description: "Share Claude Code, OpenCode, Codex and ZCode sessions with your team. /share in one agent, /pickup in another. Self-hosted now, cloud coming soon.",
+    description: "Share Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor and ZCode sessions with your team. /share in one agent, /pickup in another. Self-hosted now, cloud coming soon.",
     body,
     depth: 0,
   });

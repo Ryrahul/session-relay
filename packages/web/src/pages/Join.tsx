@@ -108,7 +108,7 @@ export function Join({ secret, onDone }: { secret: string; onDone: (me: MeRespon
         <input id="join-name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required maxLength={100} />
         <label htmlFor="join-email">Your email</label>
         <input id="join-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        <p className="hint">Only used to show teammates who shared what. It doesn't need to match your Claude, OpenCode, Codex or ZCode account.</p>
+        <p className="hint">Only used to show teammates who shared what. It doesn't need to match any of your coding-agent accounts.</p>
         {error && <p className="error">{error}</p>}
         <button type="submit" className="btn-primary" disabled={busy}>
           {busy ? "Joining…" : `Join ${info.org}`}

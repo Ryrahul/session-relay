@@ -56,16 +56,18 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
   server.registerTool(
     "list_sessions",
     {
+      title: "List shared sessions",
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "List sessions teammates have shared. Defaults to the current repo; pass all_repos to see everything. for_me lists handoffs assigned to you (from any repo).",
       inputSchema: {
         author: z.string().optional().describe('Name, email or "me"'),
-        tool: SourceTool.optional(),
-        branch: z.string().optional(),
+        tool: SourceTool.optional().describe("Only sessions from this coding agent"),
+        branch: z.string().optional().describe("Only sessions shared from this git branch"),
         file: z.string().optional().describe("Only sessions that touched this file (part of the path is fine)"),
         for_me: z.boolean().optional().describe("Only handoffs assigned to you"),
-        all_repos: z.boolean().optional(),
-        limit: z.number().int().min(1).max(50).optional(),
+        all_repos: z.boolean().optional().describe("List sessions from every repo, not just the current one"),
+        limit: z.number().int().min(1).max(50).optional().describe("How many to return, newest first (default 10)"),
       },
     },
     async ({ author, tool, branch, file, for_me, all_repos, limit }) => {
@@ -84,12 +86,14 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
   server.registerTool(
     "search_sessions",
     {
+      title: "Search shared sessions",
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         'Full-text search over shared sessions (titles, summaries, messages). The query can include "file:<path>" and "branch:<name>" filters.',
       inputSchema: {
-        query: z.string().min(1),
+        query: z.string().min(1).describe('Words to look for, e.g. "invoice rounding" or "file:billing.ts retry"'),
         this_repo_only: z.boolean().optional().describe("Limit to the current repo (default false)"),
-        author: z.string().optional(),
+        author: z.string().optional().describe('Only sessions shared by this person: name, email or "me"'),
       },
     },
     async ({ query, this_repo_only, author }) => {
@@ -107,13 +111,15 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
   server.registerTool(
     "get_session",
     {
+      title: "Load a shared session",
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         'Load a shared session as a handoff: summary, decisions, next steps, files and conversation. mode "tail" (default) = summary + recent messages; "summary" = summary only; "full" = full transcript, paged with offset.',
       inputSchema: {
-        id: z.string(),
-        mode: z.enum(["summary", "tail", "full"]).optional(),
-        tail: z.number().int().min(1).max(500).optional(),
-        offset: z.number().int().min(0).optional(),
+        id: z.string().describe("Session id from list_sessions or search_sessions"),
+        mode: z.enum(["summary", "tail", "full"]).optional().describe('How much to load (default "tail")'),
+        tail: z.number().int().min(1).max(500).optional().describe('With mode "tail": only this many of the most recent messages (default: all that were shared)'),
+        offset: z.number().int().min(0).optional().describe('With mode "full": message to start from, for paging'),
       },
     },
     async ({ id, mode, tail, offset }) => {
@@ -137,16 +143,18 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
   server.registerTool(
     "share_current_session",
     {
+      title: "Share this session",
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
         "Share the session you are in right now with the team. Write the summary yourself from the conversation: it is what teammates read first. Never include secrets.",
       inputSchema: {
         goal: z.string().describe("What this session is trying to achieve"),
         decisions: z.array(z.string()).optional().describe("Key decisions and why"),
-        done: z.array(z.string()).optional(),
+        done: z.array(z.string()).optional().describe("What was finished in this session"),
         next: z.array(z.string()).optional().describe("Concrete next steps for whoever continues"),
-        open_questions: z.array(z.string()).optional(),
-        title: z.string().max(200).optional(),
-        include: z.enum(["summary", "summary+tail", "full"]).optional().describe('Default "summary+tail"'),
+        open_questions: z.array(z.string()).optional().describe("Unresolved questions the next person should know about"),
+        title: z.string().max(200).optional().describe("Short title; defaults to the first prompt"),
+        include: z.enum(["summary", "summary+tail", "full"]).optional().describe('What to upload besides your summary: nothing, the last 30 messages, or the whole transcript. Default "summary+tail"'),
         people: z.array(z.string()).optional().describe("Names or emails who can see it; omit for the whole team"),
         continues: z
           .string()
@@ -206,9 +214,14 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
   server.registerTool(
     "get_session_diff",
     {
+      title: "Get a session's code changes",
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description:
         "The uncommitted changes a teammate attached to a shared session, as a unified diff. Use it to see exact code state; to apply it, write it to a file and run `git apply`.",
-      inputSchema: { id: z.string(), max_chars: z.number().int().min(1000).max(500000).optional() },
+      inputSchema: {
+        id: z.string().describe("Session id"),
+        max_chars: z.number().int().min(1000).max(500000).optional().describe("Cut the diff at this many characters (default 100000)"),
+      },
     },
     async ({ id, max_chars }) => {
       try {
@@ -225,6 +238,8 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
   server.registerTool(
     "share_template",
     {
+      title: "Get the repo's handoff template",
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description: "The handoff template for the current repo: extra sections (some required) and instructions to follow when sharing. Call it before share_current_session.",
       inputSchema: {},
     },
@@ -244,6 +259,8 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
   server.registerTool(
     "team_activity",
     {
+      title: "Team activity",
+      annotations: { readOnlyHint: true, openWorldHint: true },
       description: "What the team did recently: new shares by repo, handoffs for you, who picked up what, and new comments.",
       inputSchema: { days: z.number().int().min(1).max(30).optional().describe("Look back this many days (default 1)") },
     },
@@ -260,9 +277,14 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
   server.registerTool(
     "comment_on_session",
     {
+      title: "Comment on a session",
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
         "Leave a short note on a shared session for the team: a question, a finding, or that you picked it up. Never include secrets.",
-      inputSchema: { id: z.string(), body: z.string().min(1).max(4000) },
+      inputSchema: {
+        id: z.string().describe("Session id"),
+        body: z.string().min(1).max(4000).describe("The note, in plain text or Markdown"),
+      },
     },
     async ({ id, body }) => {
       try {
@@ -278,17 +300,19 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
   server.registerTool(
     "update_session",
     {
+      title: "Edit a shared session",
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
       description:
         "Change a share you made (or any share, if you're an admin): title, summary fields, who it's for, the PR link or visibility. Summary lists you pass replace the old ones; use add_next to append next steps.",
       inputSchema: {
-        id: z.string(),
-        title: z.string().max(200).optional(),
-        goal: z.string().optional(),
-        decisions: z.array(z.string()).optional(),
-        done: z.array(z.string()).optional(),
-        next: z.array(z.string()).optional(),
+        id: z.string().describe("Id of the session to change"),
+        title: z.string().max(200).optional().describe("New title"),
+        goal: z.string().optional().describe("New goal"),
+        decisions: z.array(z.string()).optional().describe("Replaces the decisions"),
+        done: z.array(z.string()).optional().describe("Replaces what was done"),
+        next: z.array(z.string()).optional().describe("Replaces the next steps"),
         add_next: z.array(z.string()).optional().describe("Next steps to append to the existing ones"),
-        open_questions: z.array(z.string()).optional(),
+        open_questions: z.array(z.string()).optional().describe("Replaces the open questions"),
         sections: z.array(z.object({ title: z.string(), items: z.array(z.string()) })).optional().describe("Replaces the extra sections"),
         for: z.string().optional().describe('Teammate name or email, or "none"'),
         pr_url: z.string().optional().describe('Pull request URL, or "none"'),

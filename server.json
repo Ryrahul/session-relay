@@ -1,0 +1,38 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Ryrahul/session-relay",
+  "title": "Session Relay",
+  "description": "Share coding-agent sessions with your team: /share in one agent, /pickup in another.",
+  "websiteUrl": "https://relay.rahulweb.online/",
+  "repository": {
+    "url": "https://github.com/Ryrahul/session-relay",
+    "source": "github",
+    "subfolder": "packages/cli"
+  },
+  "version": "0.5.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "session-relay",
+      "version": "0.5.1",
+      "transport": { "type": "stdio" },
+      "packageArguments": [{ "type": "positional", "value": "mcp" }],
+      "environmentVariables": [
+        {
+          "name": "RELAY_SERVER",
+          "description": "URL of your team's Session Relay server. Optional if you ran relay login.",
+          "isRequired": false,
+          "format": "string"
+        },
+        {
+          "name": "RELAY_TOKEN",
+          "description": "Personal access token (srk_...) from Settings → Tokens. Optional if you ran relay login.",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

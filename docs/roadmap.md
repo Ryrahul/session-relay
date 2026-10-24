@@ -52,6 +52,7 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 
 | Version | Date | |
 |---|---|---|
+| CLI `0.5.1` on npm | 2026-10-24 | Listed in the official MCP Registry (`io.github.Ryrahul/session-relay`) and on Glama; MCP tools have titles, read-only/destructive hints and a description for every input |
 | Web app | 2026-10-24 | Easier to use: Settings in tabs; a guided handoff-template editor (examples, one-click sections, required switches, reorder, preview, unsaved-changes bar, which repos it applies to); All / For me / Shared by me / My drafts views; plain-words audit log; session list fixed on phones |
 | CLI `0.5.0` on npm | 2026-10-24 | `relay share --diff`, `relay template`, `relay edit --section`, `relay export`, `relay audit`; dry-run lists redactions; MCP `share_template`, `get_session_diff` |
 | Server and web app | 2026-10-24 | Handoff templates, diff snapshots, audit log page, export, full-transcript search, redaction preview (migrations 0010–0012) |

@@ -136,3 +136,9 @@ pre.code .faint { color: var(--term-faint); }
 .prose tr:last-child td { border-bottom: 0; }
 .prose img { max-width: 100%; border-radius: 10px; border: 1px solid var(--line); }
 .edit { margin-top: 40px !important; font-size: 14px; }
+
+.features-wrap { display: grid; gap: 22px; }
+.faq-home { display: grid; gap: 10px; }
+.faq-home details { border-top: 1px solid var(--line); padding: 12px 0 0; }
+.faq-home summary { cursor: pointer; font-weight: 600; font-size: 16px; }
+.faq-home details p { margin: 8px 0 0; color: var(--muted); max-width: 70ch; }

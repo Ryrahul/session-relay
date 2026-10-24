@@ -134,11 +134,15 @@ The command files `relay setup` writes are in [`packages/cli/src/commands/setup.
 
 ## Handoff templates
 
-Admins can ask for more than the standard summary in some repos: **Settings → Handoff templates** in the web app. A template has:
+Admins can ask for more than the standard summary in some repos: **Settings → Handoff templates** in the web app.
 
-- **Repositories**: `github.com/acme/api`, `github.com/acme/*` (a prefix), or `*` (all). The most specific match wins.
-- **Sections**: a title, a hint for the agent, and whether it's required, e.g. *Tests run (required): commands you ran and their results*.
-- **Instructions** (optional), e.g. "Mention any feature flags you touched".
+1. Click **Start from an example** (Tests run, required, and Rollout notes) or **Blank template**.
+2. **Applies to**: `github.com/acme/api` (one repo), `github.com/acme/*` (everything from an owner), or `*` (all). Click a suggestion under the box to fill it in. The editor lists which of your repos the template is used for; the most specific match wins.
+3. **Sections**: a name, an optional hint for the agent ("what to write"), and a **Required** switch. Add ready-made ones with one click (Tests run, Rollout notes, Migration notes, Risks, How to verify, Follow-up tickets), and reorder with the arrows.
+4. **Extra instructions** (optional), e.g. "Mention any feature flags you touched".
+5. Open **Preview what the agent is told** to check the wording, then **Save templates** in the bar at the bottom (or **Discard**). Saving is blocked, with a message, if two templates use the same repos or a section appears twice.
+
+Members see the templates read-only on the same tab.
 
 `/share` calls `share_template` first and fills the sections in. If a required one is empty, the agent is told what's missing and tries again (it can pass `ignore_template` when a section doesn't apply). `relay share` from a terminal shares anyway and prints a note; add sections later with `relay edit <id> --section "Tests run=npm test passes"` or **Edit** in the web app, which flags shares that are missing required sections. `relay template` shows the template for the current repo.
 

@@ -39,9 +39,12 @@ DATABASE_URL="postgres://user:password@host/db?sslmode=require" \
 
 ```sh
 cd packages/server
-npx wrangler hyperdrive create session-relay --connection-string="postgres://user:password@host/db?sslmode=require"
+npx wrangler hyperdrive create session-relay --caching-disabled \
+  --connection-string="postgres://user:password@host/db?sslmode=require"
 npx wrangler r2 bucket create session-relay-transcripts
 ```
+
+`--caching-disabled` matters: Hyperdrive caches query results for 60 seconds by default, so an edit, a new comment or a settings change could look like it didn't save. Session Relay needs every read to be current. Already created one with caching? `npx wrangler hyperdrive update <id> --caching-disabled`.
 
 ## 4. Configure
 
@@ -117,4 +120,5 @@ Migrations are additive, so the running version keeps working while they apply. 
 | The setup page doesn't appear on a new install | `SETUP_CODE` isn't set; run `npx wrangler secret put SETUP_CODE` and reload |
 | `relation "…" does not exist` | Migrations didn't run against this database (step 2) |
 | Custom domain doesn't work | The domain's DNS has to be on Cloudflare; until then use the `workers.dev` address |
+| Changes take up to a minute to show (edits, comments, settings) | Hyperdrive query caching is on: `npx wrangler hyperdrive update <id> --caching-disabled` |
 | `429 Too many requests` | Public endpoints (invites, browser login, setup) are rate-limited per IP; wait a minute |

@@ -14,7 +14,7 @@ Everything Session Relay does today. Each item links to where it's explained in 
 | **Edit after sharing** | Fix the title, goal, next steps, decisions or who it's for, in the web app (**Edit**), with `relay edit`, or by asking your agent (`update_session`). Only the author or an admin can edit. |
 | **Diff snapshot** (opt-in) | `relay share --diff` or "/share with the diff" attaches your uncommitted changes (tracked changes and new files, redacted, up to 500 KB). The web app shows them file by file; `relay pull` writes a `.patch` your teammate can `git apply`; agents fetch it with `get_session_diff`. |
 | **Pull request links** | `relay share` attaches the current branch's open PR (found with the GitHub CLI), or pass `--pr <url>`. The session shows the PR, and `relay pr-comment <id>` posts a link to the session on the PR. |
-| **Handoff templates** | Admins decide what a handoff must include, per repo (`github.com/acme/*`, an exact repo, or `*`): extra sections like "Tests run" or "Migration notes", each with a hint and optionally required, plus instructions for the agent. `/share` follows it (the agent can't share until required sections are filled, unless they don't apply); the CLI warns; the web app flags missing sections and lets you fill them in. **Settings → Handoff templates**, `relay template`. |
+| **Handoff templates** | Admins decide what a handoff must include, per repo (`github.com/acme/*`, an exact repo, or `*`): extra sections like "Tests run" or "Migration notes", each with a hint and optionally required, plus instructions for the agent. `/share` follows it (the agent can't share until required sections are filled, unless they don't apply); the CLI warns; the web app flags missing sections and lets you fill them in. Set up in **Settings → Handoff templates**: start from an example, pick repos, add ready-made sections with one click, preview what the agent is told. `relay template` shows a repo's template. [How](agents.md#handoff-templates) |
 | **Comments** | Leave a note on any session you can see: in the web app, with `relay comment <id> "…"`, or from your agent (`comment_on_session`). The agent that picks the session up reads them first. Secrets are removed from comments too. |
 | **Auto-share drafts** (opt-in) | `relay setup --auto-share on` saves every Claude Code, Gemini CLI and Copilot CLI session as a **private draft** when it ends (in a git repo, 4+ messages). Only you see drafts (**My drafts**, `relay list --drafts`). Publish one when it's ready: **Publish to team** in the web app, `relay publish <id>`, or ask your agent. Sessions you already shared are skipped. |
 | **Without MCP** | `relay pull <id>` writes a handoff file any agent can read. |
@@ -28,14 +28,14 @@ Everything Session Relay does today. Each item links to where it's explained in 
 | **Activity (digest)** | What the team did in the last day, week or month: new shares by repo, handoffs for you, who picked up what, and new comments. In the web app (**Activity**), with `relay digest`, or ask your agent ("what did the team do today?" → `team_activity`). |
 | **Stats** | Shares, pickups, continued handoffs, comments and active people per period; shares per day; by person, agent and repo. **Stats** in the web app, or `relay stats`. |
 | **Export** | Download a session as Markdown or JSON (full transcript included) from its page or with `relay export <id>`. Export a repo or everything you can see as NDJSON from **Settings → Export** or `relay export [--all] [--full]`. |
-| **Web app** | Browse by day, read the full conversation with tool calls folded, copy the `/pickup` command. Light and dark mode, works on phones. |
+| **Web app** | Browse by day with **All / For me / Shared by me / My drafts** views, read the full conversation with tool calls folded, copy the `/pickup` command. Settings in tabs (General, Privacy, Handoff templates, Tokens, Export). Light and dark mode, works on phones. |
 
 ## Privacy and control
 
 | Feature | What it does |
 |---|---|
 | **Nothing uploads unless you share** | Sessions stay on your laptop until you run `/share` or `relay share`. |
-| **Secret redaction on your laptop** | API keys, tokens, passwords and private keys are removed before upload. Admins can add their own patterns and **test them on sample text** in Settings before saving. `relay share --dry-run` lists every redaction with the text around it, and writes exactly what would be sent. [Security](security.md) |
+| **Secret redaction on your laptop** | API keys, tokens, passwords and private keys are removed before upload. Admins can add their own patterns and **test them on sample text** in **Settings → Privacy** before saving. `relay share --dry-run` lists every redaction with the text around it, and writes exactly what would be sent. [Security](security.md) |
 | **Visibility** | The whole team, or only the people you choose. |
 | **Retention** | Shares expire after the org's retention period (default 90 days) and are deleted, transcripts included. |
 | **Repo allowlist** | Admins can limit which repositories can be shared. |
@@ -49,7 +49,7 @@ Everything Session Relay does today. Each item links to where it's explained in 
 | **First-run setup** | A fresh server shows a setup page: enter the one-time code and create your organization. [Self-hosting](self-hosting.md) |
 | **Invite links** | Single-use, expiring, revocable links. The new member picks their name and is signed in. |
 | **Browser login** | `relay login --server …` opens the browser; approve the code and the CLI is signed in. |
-| **Personal tokens** | One per laptop or script, each revocable in **Settings**. |
+| **Personal tokens** | One per laptop or script, each revocable in **Settings → Tokens**. |
 
 ## Running it
 

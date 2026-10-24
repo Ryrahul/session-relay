@@ -59,7 +59,7 @@ export function Join({ secret, onDone }: { secret: string; onDone: (me: MeRespon
         <Command>{`npm install -g session-relay\nrelay login --server ${location.origin}\nrelay setup`}</Command>
         <details className="token-details">
           <summary>Show my token (for scripts, or logging in without a browser)</summary>
-          <p className="hint">Shown only once. You can always create new tokens in Settings.</p>
+          <p className="hint">Shown only once. You can always create new tokens in Settings → Tokens.</p>
           <Command>{done.token}</Command>
         </details>
         <label className="check">

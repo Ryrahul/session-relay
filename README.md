@@ -19,14 +19,14 @@ Handing off agent work means copy-pasting chat logs, or the next person starting
 - **Handoffs for someone**: share "for Akshat" and it's first in their `/pickup`. Edit a share any time (next steps, title, who it's for).
 - **Auto-share drafts** (opt-in): every Claude Code, Gemini CLI and Copilot CLI session is saved as a private draft when it ends; publish it when it's ready.
 - **Diff snapshots**: attach your uncommitted changes to a share; the next person `git apply`s them.
-- **Handoff templates**: admins decide what a handoff must include per repo ("Tests run", "Migration notes"); `/share` follows it.
+- **Handoff templates**: admins decide what a handoff must include per repo ("Tests run", "Migration notes") in a guided editor with ready-made sections and a preview; `/share` follows it.
 - **Comments**: teammates leave notes on a session; the agent that picks it up reads them.
 - **Linked to PRs and files**: shares carry the branch's pull request; find every session that touched a file with `file:src/billing.ts`.
-- **Web app**: browse, search and read everything your team has shared, plus an **Activity** digest and team **Stats**.
+- **Web app**: browse, search and read everything your team has shared (All, For me, Shared by me, My drafts), plus an **Activity** digest, team **Stats** and Settings in simple tabs. Light and dark, works on phones.
 - **Export and audit**: download any session as Markdown or JSON; admins see an audit log of everything.
 - **Easy onboarding**: invite links, and `relay login` signs in through the browser.
 - **Search everything**: titles, summaries and full transcripts; filter by file, branch, agent, person.
-- **Private by default**: nothing is uploaded unless you share it, secrets are removed on your laptop first (test your own patterns in Settings), and shares can be limited to specific people.
+- **Private by default**: nothing is uploaded unless you share it, secrets are removed on your laptop first (test your own patterns in Settings → Privacy), and shares can be limited to specific people.
 
 All of it: [Features](docs/features.md).
 

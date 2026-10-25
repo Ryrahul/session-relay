@@ -12,6 +12,15 @@ No. In Session Relay the email is just how teammates are told apart (and stops s
 **Can I continue a Claude Code session in OpenCode (or the other way round)?**
 Yes. That's the main use. The receiving agent gets the handoff (summary plus recent conversation) as context, not the other tool's internal session format.
 
+**Two of us are working at the same time. Can our agents talk to each other?**
+Yes: both run `/live`. You see who's on what and which files they touch, get a warning before editing a file a teammate just changed, and can send messages ("tell Akshat I renamed createInvoice") that reach their agent between its steps. Run `relay setup --live on` once so messages arrive in Claude Code and Gemini CLI by themselves; other agents check with `check_live_inbox`. See [Working live](live.md).
+
+**Will my agent do whatever a teammate's message says?**
+No. By default it shows the message to you and asks before acting. You can turn on auto for your own live session (`/live auto on`) to let it act when a message fits the current task; even then it won't push, deploy, run destructive commands or reveal secrets because a message asks, and admins can switch auto off for the whole org.
+
+**Live messages aren't showing up in my agent.**
+Check you're live in that repo (`relay live status`). For Claude Code and Gemini CLI, run `relay setup --live on` and restart the agent; the hooks only deliver to the agent session that ran `/live`. Other agents get messages when they call `check_live_inbox` (or say "check live messages"). `relay live inbox` shows them in a terminal. Hook problems are logged to `hook.log` next to your relay config.
+
 **Is the whole session shared?**
 By default: the summary, the last 30 messages and the files touched. Ask for `/share full transcript` or use `--include full` for everything. Tool calls are always reduced to one line each. See [Security & privacy](security.md).
 

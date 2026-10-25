@@ -42,6 +42,19 @@ describe("buildShare", () => {
     });
     expect(session.summary.decisions).toEqual(["backoff 2^n"]);
   });
+  it("leaves the typed prompts out of messages, transcript, title and goal", () => {
+    const built = buildShare({ ...local, title: "fix /home/dev/app/packages/api/src/hook.ts" }, repo, { include: "full", hidePrompts: true });
+    const all = JSON.stringify(built);
+    expect(all).not.toContain("hook.ts, key");
+    expect(built.session.title).toBe("Session on main");
+    expect(built.session.summary.goal).toBe("");
+    expect(built.transcript![0]).toEqual({ role: "user", text: "(prompt not shared)" });
+    expect(built.transcript).toHaveLength(51);
+    expect(built.promptsHidden).toBe(true);
+    const withSummary = buildShare(local, repo, { include: "summary", hidePrompts: true, summary: { goal: "Make webhook retries safe", decisions: [], done: [], next: [], open_questions: [], sections: [] } });
+    expect(withSummary.session.title).toBe("Make webhook retries safe");
+    expect(buildShare(local, repo, { include: "summary", hidePrompts: true, title: "mine" }).session.title).toBe("mine");
+  });
 });
 
 describe("normaliseRemote", () => {

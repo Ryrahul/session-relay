@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { hostname, userInfo } from "node:os";
 import type { DeviceStart } from "@session-relay/shared";
 import { api, ApiError } from "../api.js";
-import { configPath, writeConfig } from "../config.js";
+import { configPath, readConfig, writeConfig } from "../config.js";
 
 interface Me {
   user: { name: string; email: string };
@@ -65,7 +65,8 @@ export async function login(opts: { server: string; token?: string; browser?: bo
   const config = { server, token };
   try {
     const me = await api<Me>(config, "GET", "v1/me");
-    await writeConfig(config);
+    // Logging in again keeps your other settings (like hide_prompts).
+    await writeConfig({ ...(await readConfig().catch(() => null)), ...config });
     console.log(`Logged in as ${me.user.name} <${me.user.email}> (${me.role}) in ${me.org.name}.`);
     console.log(`Saved to ${configPath()}`);
   } catch (err) {

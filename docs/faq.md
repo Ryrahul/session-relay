@@ -6,6 +6,9 @@
 **Can I get my sessions out?**
 Yes. Download one from its page (Markdown or JSON, full transcript included) or `relay export <id>`. Export many with **Settings → Export** or `relay export` in a repo (`--all` for every repo, `--full` for full transcripts): one JSON object per line.
 
+**Can I share a session without my own messages?**
+Yes. `/share without my prompts` or `relay share --no-prompts` replaces everything you typed with "(prompt not shared)" before it leaves your laptop; teammates still see what the agent did, its replies, the files and the summary. To make that your default: `relay config prompts hide`. For a session that's already shared, `relay export <id> --no-prompts` downloads it without the prompts.
+
 **Does my email have to match my coding-agent accounts?**
 No. In Session Relay the email is just how teammates are told apart (and stops someone being added twice). It isn't linked to any agent account. You log in with your token, never your email.
 

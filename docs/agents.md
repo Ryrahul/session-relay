@@ -9,7 +9,7 @@ Session Relay works with **Claude Code**, **Codex**, **OpenCode**, **Gemini CLI*
    | `list_sessions` | Shared sessions for the current repo (or all repos), newest first. `for_me` lists handoffs assigned to you; `file` filters by touched file |
    | `search_sessions` | Full-text search over titles, summaries and conversations. The query can include `file:` and `branch:` |
    | `get_session` | A session as a handoff: goal, decisions, done, next steps, open questions, files, conversation. `mode`: `tail` (default), `summary`, or `full` (paged) |
-   | `share_current_session` | Shares the session the agent is in, with a summary the agent writes (plus the template's `sections`). Refuses while required template sections are empty, unless `ignore_template`. `include_diff` attaches uncommitted changes. `for` assigns it to a teammate; the branch's PR is attached |
+   | `share_current_session` | Shares the session the agent is in, with a summary the agent writes (plus the template's `sections`). Refuses while required template sections are empty, unless `ignore_template`. `include_diff` attaches uncommitted changes. `hide_prompts` leaves the user's typed prompts out ("/share without my prompts"; defaults to `relay config prompts`). `for` assigns it to a teammate; the branch's PR is attached |
    | `get_session_diff` | The uncommitted changes attached to a session, as a patch |
    | `share_template` | The repo's handoff template: extra sections and instructions. `/share` calls it first |
    | `team_activity` | What the team did in the last day(s): new shares by repo, handoffs for you, pickups, comments |

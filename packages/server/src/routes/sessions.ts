@@ -17,6 +17,7 @@ import {
   type SessionListItem,
   type ChainLink,
   renderHandoff,
+  hidePrompts,
 } from "@session-relay/shared";
 import type { AppEnv, AuthContext } from "../auth.js";
 import { audit, recordUsage } from "../audit.js";
@@ -98,6 +99,20 @@ export function parseQuery(q: string): { text: string; file?: string; branch?: s
 
 export function repoAllowed(allowlist: string[], repo: string): boolean {
   return allowlist.length === 0 || allowlist.some((a) => repo === a || (a.endsWith("/*") && repo.startsWith(a.slice(0, -1))));
+}
+
+/** An export without the authors' typed prompts (`prompts=0`): a marker takes their place. */
+export function withoutPrompts(d: SessionDetail): SessionDetail {
+  const messages = hidePrompts(d.messages);
+  // Without an agent-written summary, the title and goal were cut from the first prompt.
+  const prompts = d.messages.filter((m) => m.role === "user").map((m) => m.text.replace(/\s+/g, " ").trim());
+  const fromPrompt = (s: string) => {
+    const t = s.replace(/\s*…$/, "").replace(/\s+/g, " ").trim();
+    return t.length > 0 && prompts.some((p) => p.startsWith(t));
+  };
+  const title = fromPrompt(d.title) ? "Shared session" : d.title;
+  const summary = fromPrompt(d.summary.goal) ? { ...d.summary, goal: "" } : d.summary;
+  return { ...d, title, summary, messages, message_total: messages.length, message_offset: 0 };
 }
 
 export function sessionRoutes(sql: Sql, storage: BlobStorage) {
@@ -249,13 +264,14 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       ORDER BY s.created_at DESC LIMIT 1000
     `;
     const full = q.full === "1";
-    await audit(sql, auth, "session.export", null, { bulk: true, count: rows.length, repo: q.repo ?? null, full });
+    const noPrompts = q.prompts === "0";
+    await audit(sql, auth, "session.export", null, { bulk: true, count: rows.length, repo: q.repo ?? null, full, prompts: !noPrompts });
     c.header("content-type", "application/x-ndjson; charset=utf-8");
     c.header("content-disposition", `attachment; filename="sessions${q.repo ? "-" + q.repo.split("/").slice(-1)[0] : ""}.ndjson"`);
     const lines: string[] = [];
     for (const r of rows) {
       const d = await loadDetail(auth, r.id, full ? "full" : "tail", { all: full });
-      if (d) lines.push(JSON.stringify(d));
+      if (d) lines.push(JSON.stringify(noPrompts ? withoutPrompts(d) : d));
     }
     return c.body(lines.join("\n") + (lines.length ? "\n" : ""));
   });
@@ -393,9 +409,11 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
     const auth = c.get("auth");
     const id = c.req.param("id");
     const format = c.req.query("format") === "json" ? "json" : "md";
-    const body = await loadDetail(auth, id, "full", { all: true });
-    if (!body) throw new HTTPException(404, { message: "Session not found" });
-    await audit(sql, auth, "session.export", id, { format });
+    const noPrompts = c.req.query("prompts") === "0";
+    const detail = await loadDetail(auth, id, "full", { all: true });
+    if (!detail) throw new HTTPException(404, { message: "Session not found" });
+    const body = noPrompts ? withoutPrompts(detail) : detail;
+    await audit(sql, auth, "session.export", id, { format, prompts: !noPrompts });
     const name = `${body.id}-${body.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "session"}`;
     if (format === "json") {
       c.header("content-disposition", `attachment; filename="${name}.json"`);

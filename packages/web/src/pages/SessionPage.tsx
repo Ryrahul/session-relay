@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { matchTemplate, splitDiff, type DiffFile, type ChainLink, type Member, type MeResponse, type Message, type SessionDetail, type SummarySection } from "@session-relay/shared";
+import { HIDDEN_PROMPT, matchTemplate, splitDiff, type DiffFile, type ChainLink, type Member, type MeResponse, type Message, type SessionDetail, type SummarySection } from "@session-relay/shared";
 import { api, download } from "../api";
 import { ago, dateTime, prLabel, shortRepo, TOOL_NAMES } from "../format";
 import { RichText } from "../text";
@@ -396,6 +396,7 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
   const [editing, setEditing] = useState(false);
   const [version, setVersion] = useState(0);
   const [publishing, setPublishing] = useState(false);
+  const [noPrompts, setNoPrompts] = useState(false);
 
   useEffect(() => {
     if (version === 0) setS(null);
@@ -583,7 +584,7 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
                 ) : (
                   <li key={i} className={`tl tl-${b.m.role}`}>
                     <div className="tl-who">{b.m.role === "user" ? s.author.name : TOOL_NAMES[s.source.tool]}</div>
-                    <RichText text={b.m.text} />
+                    {b.m.role === "user" && b.m.text === HIDDEN_PROMPT ? <p className="muted small">Prompt not shared</p> : <RichText text={b.m.text} />}
                   </li>
                 ),
               )}
@@ -667,13 +668,16 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
             <h2>Download</h2>
             <p className="muted small">The whole session{s.has_full_transcript ? ", full transcript included" : ""}.</p>
             <div className="row">
-              <button type="button" className="btn-ghost btn-sm" onClick={() => download(`/v1/sessions/${s.id}/export?format=md`, `${s.id}.md`).catch((e) => setError(e.message))}>
+              <button type="button" className="btn-ghost btn-sm" onClick={() => download(`/v1/sessions/${s.id}/export?format=md${noPrompts ? "&prompts=0" : ""}`, `${s.id}.md`).catch((e) => setError(e.message))}>
                 <Icon name="download" size={14} /> Markdown
               </button>
-              <button type="button" className="btn-ghost btn-sm" onClick={() => download(`/v1/sessions/${s.id}/export?format=json`, `${s.id}.json`).catch((e) => setError(e.message))}>
+              <button type="button" className="btn-ghost btn-sm" onClick={() => download(`/v1/sessions/${s.id}/export?format=json${noPrompts ? "&prompts=0" : ""}`, `${s.id}.json`).catch((e) => setError(e.message))}>
                 <Icon name="download" size={14} /> JSON
               </button>
             </div>
+            <label className="check small">
+              <input type="checkbox" checked={noPrompts} onChange={(e) => setNoPrompts(e.target.checked)} /> Without the author's prompts
+            </label>
           </section>
 
           {s.files_touched.length > 0 && (

@@ -1,5 +1,6 @@
 import path from "node:path";
 import type { IncludeMode, Message, SessionUpload, Summary, Visibility, RedactionHit } from "@session-relay/shared";
+import { hidePrompts } from "@session-relay/shared";
 import type { LocalSession } from "./adapters/types.js";
 import type { RepoInfo } from "./git.js";
 import { createRedactor } from "@session-relay/shared";
@@ -14,6 +15,8 @@ export interface BuildOptions {
   title?: string;
   visibility?: Visibility;
   redactionPatterns?: string[];
+  /** Leave the user's typed prompts out: a marker takes their place, and no title or goal is taken from them. */
+  hidePrompts?: boolean;
 }
 
 export interface BuiltShare {
@@ -25,6 +28,8 @@ export interface BuiltShare {
   /** Where secrets were removed, with redacted context (first 500). */
   hits: RedactionHit[];
   redactions: Record<string, number>;
+  /** The user's typed prompts were left out. */
+  promptsHidden: boolean;
 }
 
 function relativeTo(root: string, p: string): string {
@@ -47,6 +52,13 @@ export function fallbackSummary(messages: Message[]): Summary {
   };
 }
 
+/** A title that doesn't come from the prompts: the agent's goal, else the branch. */
+function untitled(goal: string | undefined, branch: string | undefined): string {
+  const g = goal?.trim().split("\n")[0];
+  if (g) return g.length > 80 ? g.slice(0, 79) + "…" : g;
+  return branch ? `Session on ${branch}` : "Shared session";
+}
+
 /** Turns a local session into a redacted upload. Nothing here touches the network. */
 export function buildShare(local: LocalSession, repo: RepoInfo, opts: BuildOptions): BuiltShare {
   const redact = createRedactor(opts.redactionPatterns);
@@ -59,8 +71,12 @@ export function buildShare(local: LocalSession, repo: RepoInfo, opts: BuildOptio
     if (out.length > MAX_MESSAGE_CHARS) out = out.slice(0, MAX_MESSAGE_CHARS) + " …[truncated]";
     return redact(out);
   };
-  const all = local.messages.map((m) => ({ ...m, text: clean(m.text) }));
-  const raw = opts.summary ?? fallbackSummary(local.messages);
+  const kept = opts.hidePrompts ? hidePrompts(local.messages) : local.messages;
+  const all = kept.map((m) => ({ ...m, text: clean(m.text) }));
+  const raw = opts.summary ?? fallbackSummary(kept);
+  if (opts.hidePrompts && !opts.summary) raw.goal = "";
+  // Most agents title a session with its first prompt.
+  const title = opts.title ?? (opts.hidePrompts ? untitled(opts.summary?.goal, local.branch ?? repo.branch) : local.title);
   const summary: Summary = {
     goal: clean(raw.goal),
     decisions: raw.decisions.map(clean),
@@ -75,7 +91,7 @@ export function buildShare(local: LocalSession, repo: RepoInfo, opts: BuildOptio
     repo: repo.repo,
     branch: repo.branch ?? local.branch,
     commit: repo.commit,
-    title: clean(opts.title ?? local.title).slice(0, 200),
+    title: clean(title).slice(0, 200),
     summary,
     files_touched: [...new Set(local.filesTouched.map((f) => relativeTo(repo.root, f)))].sort(),
     messages: opts.include === "summary" ? [] : all.slice(-tail),
@@ -86,5 +102,5 @@ export function buildShare(local: LocalSession, repo: RepoInfo, opts: BuildOptio
     draft: false,
   };
   session.redactions = redact.total();
-  return { session, transcript: opts.include === "full" ? all : undefined, redactions: { ...redact.counts }, hits: redact.hits };
+  return { session, transcript: opts.include === "full" ? all : undefined, redactions: { ...redact.counts }, hits: redact.hits, promptsHidden: Boolean(opts.hidePrompts) };
 }

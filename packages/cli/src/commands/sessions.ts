@@ -7,6 +7,7 @@ import { findSessions } from "../adapters/index.js";
 import { RelayClient, resolvePeople, resolvePerson } from "../client.js";
 import { repoInfo } from "../git.js";
 import { renderDigest } from "../digest.js";
+import { configPath, readConfig, updateConfig } from "../config.js";
 import { renderHandoff } from "@session-relay/shared";
 import { recordPickup } from "../pickups.js";
 import { describeRedactions, listRedactions, prepareShare, relayDir, uploadShare, writeDryRun } from "../share.js";
@@ -28,6 +29,7 @@ interface ShareOpts {
   for?: string;
   pr?: string;
   diff?: boolean;
+  prompts?: boolean;
 }
 
 function parseTool(t?: string): SourceTool | undefined {
@@ -92,6 +94,7 @@ export async function share(opts: ShareOpts): Promise<void> {
     assign: opts.for,
     pr: opts.pr,
     diff: opts.diff,
+    hidePrompts: opts.prompts === undefined ? undefined : !opts.prompts,
   });
   const { session } = prepared.built;
   const redactNote = describeRedactions(prepared.built.redactions);
@@ -105,6 +108,7 @@ export async function share(opts: ShareOpts): Promise<void> {
   if (!opts.json) {
     console.log(`\n"${session.title}" · ${toolLabel(prepared.ref.tool).trim()} · ${session.include} · ${session.messages.length} messages · ${session.visibility.team ? "whole team" : `${session.visibility.people.length} people`}`);
     console.log(redactNote);
+    if (prepared.built.promptsHidden) console.log(`Your prompts are left out${opts.prompts === false ? "" : " (relay config prompts hide); --prompts to include them this time"}.`);
     if (hitList && ask_) console.log(hitList);
     if (session.continues) console.log(`Continues ${session.continues}${prepared.continuesAuto ? " (the session you picked up here)" : ""}. Use --continues none to unlink.`);
     if (opts.for) console.log(`For ${opts.for}.`);
@@ -331,12 +335,12 @@ export async function pull(id: string, opts: { full?: boolean; summaryOnly?: boo
 /** relay export: one session as Markdown/JSON, or (with no id) every session of a repo as NDJSON. */
 export async function exportCmd(
   id: string | undefined,
-  opts: { format?: string; out?: string; repo?: string; all?: boolean; full?: boolean; since?: string },
+  opts: { format?: string; out?: string; repo?: string; all?: boolean; full?: boolean; since?: string; prompts?: boolean },
 ): Promise<void> {
   const client = await RelayClient.fromConfig();
   if (id) {
     const format = opts.format === "json" ? "json" : "md";
-    const body = await client.export(id, format);
+    const body = await client.export(id, format, { prompts: opts.prompts !== false });
     if (!opts.out) return void process.stdout.write(body);
     await writeFile(opts.out, body);
     return console.log(`Wrote ${opts.out}`);
@@ -344,11 +348,30 @@ export async function exportCmd(
   let repo = opts.repo;
   if (!repo && !opts.all) repo = await repoInfo().then((r) => r.repo).catch(() => undefined);
   if (!repo && !opts.all) throw new Error("Run inside a repo, or pass --repo <repo> or --all.");
-  const body = await client.exportAll({ repo, since: opts.since, full: opts.full });
+  const body = await client.exportAll({ repo, since: opts.since, full: opts.full, prompts: opts.prompts === false ? "0" : undefined });
   const count = body.trim() ? body.trim().split("\n").length : 0;
   const out = opts.out ?? `sessions-${(repo ?? "all").split("/").pop()}.ndjson`;
   await writeFile(out, body);
   console.log(`Wrote ${count} session${count === 1 ? "" : "s"} to ${out} (one JSON object per line${opts.full ? ", full transcripts" : ""}).`);
+}
+
+/** relay config: settings kept in the CLI config file (the token is never printed). */
+export async function configCmd(key: string | undefined, value: string | undefined): Promise<void> {
+  const cfg = await readConfig();
+  if (!cfg) throw new Error("Not logged in. Run: relay login --server <url>");
+  if (!key) {
+    console.log(`server   ${cfg.server}\nprompts  ${cfg.hide_prompts ? "hide" : "share"}   (your typed prompts in what you share)\nfile     ${configPath()}`);
+    return;
+  }
+  if (key !== "prompts") throw new Error(`Unknown setting "${key}". Settings: prompts`);
+  if (!value) return console.log(cfg.hide_prompts ? "hide" : "share");
+  if (!["hide", "share"].includes(value)) throw new Error("Usage: relay config prompts hide|share");
+  await updateConfig({ hide_prompts: value === "hide" });
+  console.log(
+    value === "hide"
+      ? "Your typed prompts will be left out of everything you share (/share, relay share, auto-share drafts). Your agent's replies, tool steps and the summary still go. Include them once with: relay share --prompts"
+      : "Your typed prompts are shared again (leave them out once with: relay share --no-prompts).",
+  );
 }
 
 /** relay audit: the org's audit log (admins). */

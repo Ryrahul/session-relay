@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { login } from "./commands/login.js";
-import { auditCmd, comment, digest, edit, exportCmd, template, invite, list, localSessions, members, prComment, publish, pull, remove, search, share, show, stats } from "./commands/sessions.js";
+import { auditCmd, comment, configCmd, digest, edit, exportCmd, template, invite, list, localSessions, members, prComment, publish, pull, remove, search, share, show, stats } from "./commands/sessions.js";
 import { hook } from "./commands/hook.js";
 import { liveCommand } from "./commands/live.js";
 import { setup } from "./commands/setup.js";
@@ -45,6 +45,8 @@ program
   .option("--json", "print the result as JSON")
   .option("--continues <id>", 'shared session this continues (default: the one you last picked up here; "none" to unlink)')
   .option("--for <name>", "teammate this handoff is for; it shows first in their /pickup")
+  .option("--prompts", "include your typed prompts (when relay config prompts is hide)")
+  .option("--no-prompts", "leave your typed prompts out; the agent's replies and tool steps are kept")
   .option("--diff", "attach your uncommitted changes (git diff plus new files), redacted")
   .option("--pr <url>", 'pull request it belongs to (default: this branch\'s open PR via gh; "none" to leave out)')
   .action(share);
@@ -131,7 +133,13 @@ program
   .option("--all", "every repo")
   .option("--since <date>", "only sessions shared since this date (YYYY-MM-DD)")
   .option("--full", "include full transcripts (bulk export)")
+  .option("--no-prompts", "replace the authors' typed prompts with a marker")
   .action(exportCmd);
+
+program
+  .command("config [key] [value]")
+  .description('CLI settings. "relay config prompts hide" leaves your typed prompts out of everything you share')
+  .action(configCmd);
 
 program
   .command("audit")

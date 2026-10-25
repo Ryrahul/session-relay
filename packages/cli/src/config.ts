@@ -9,6 +9,8 @@ import path from "node:path";
 export interface CliConfig {
   server: string;
   token: string;
+  /** Leave your typed prompts out of everything you share (relay config prompts hide). */
+  hide_prompts?: boolean;
 }
 
 export function configPath(env: NodeJS.ProcessEnv = process.env): string {
@@ -30,6 +32,15 @@ export async function writeConfig(config: CliConfig, file = configPath()): Promi
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
   await chmod(file, 0o600);
+}
+
+/** Changes some settings and keeps the rest. */
+export async function updateConfig(patch: Partial<CliConfig>, file = configPath()): Promise<CliConfig> {
+  const current = await readConfig(file);
+  if (!current) throw new Error("Not logged in. Run: relay login --server <url>");
+  const next = { ...current, ...patch };
+  await writeConfig(next, file);
+  return next;
 }
 
 /** Env vars win over the file, which is handy in CI and for testing. */

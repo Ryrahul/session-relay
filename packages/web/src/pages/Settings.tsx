@@ -724,13 +724,14 @@ function ExportCard() {
   const repos = useKnownRepos();
   const [repo, setRepo] = useState("");
   const [full, setFull] = useState(false);
+  const [noPrompts, setNoPrompts] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function run() {
     setBusy(true);
     setError("");
     try {
-      await download(`/v1/sessions/export?${new URLSearchParams({ ...(repo ? { repo } : {}), ...(full ? { full: "1" } : {}) })}`, "sessions.ndjson");
+      await download(`/v1/sessions/export?${new URLSearchParams({ ...(repo ? { repo } : {}), ...(full ? { full: "1" } : {}), ...(noPrompts ? { prompts: "0" } : {}) })}`, "sessions.ndjson");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -758,6 +759,9 @@ function ExportCard() {
         </div>
         <label className="check">
           <input type="checkbox" checked={full} onChange={(e) => setFull(e.target.checked)} /> Include full transcripts
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={noPrompts} onChange={(e) => setNoPrompts(e.target.checked)} /> Without the authors' prompts
         </label>
         <button type="button" className="btn-primary" onClick={run} disabled={busy}>
           <Icon name="download" size={14} /> {busy ? "Preparing…" : "Download"}

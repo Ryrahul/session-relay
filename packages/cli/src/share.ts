@@ -8,6 +8,7 @@ import { ApiError } from "./api.js";
 import { createRedactor, type RedactionHit } from "@session-relay/shared";
 import { currentPr, repoInfo, workingDiff, type RepoInfo } from "./git.js";
 import { forgetPickup, resolveContinues } from "./pickups.js";
+import { readConfig } from "./config.js";
 
 export interface ShareInput {
   cwd?: string;
@@ -29,6 +30,8 @@ export interface ShareInput {
   pr?: string;
   /** Attach uncommitted changes (`git diff HEAD` plus new files), redacted. */
   diff?: boolean;
+  /** Leave your typed prompts out. Defaults to hide_prompts in the CLI config. */
+  hidePrompts?: boolean;
 }
 
 export interface PreparedShare {
@@ -66,6 +69,7 @@ export async function prepareShare(client: RelayClient | null, input: ShareInput
     title: input.title,
     visibility: { team: people.length === 0, people },
     redactionPatterns: me?.settings.redaction_patterns,
+    hidePrompts: input.hidePrompts ?? (await readConfig().catch(() => null))?.hide_prompts ?? false,
   });
   const continues = await resolveContinues(repo.root, input.continues);
   if (continues.id) built.session.continues = continues.id;

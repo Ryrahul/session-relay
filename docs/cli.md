@@ -32,6 +32,7 @@ The config is at `~/.config/session-relay/config.json` (mode `600`). Override it
 | `--tail <n>` | Messages to keep with `summary+tail` (default 30) |
 | `--title <title>` | Title teammates see |
 | `--people <names>` | Comma-separated names or emails. Default: the whole team |
+| `--no-prompts` | Leave your typed prompts out. Each becomes `(prompt not shared)`; the agent's replies, tool steps, files and summary are kept, and the title isn't taken from your first prompt. `--prompts` includes them when your default is hide |
 | `--diff` | Attach your uncommitted changes: `git diff HEAD` plus new untracked files (respecting `.gitignore`), redacted, up to 500 KB |
 | `--for <name>` | Teammate this handoff is for (name or email). It's first in their `/pickup` and visible to them even if private |
 | `--pr <url>` | Pull request it belongs to. Default: the current branch's open PR, found with the GitHub CLI (`gh`). `none` to leave it out |
@@ -43,6 +44,16 @@ The config is at `~/.config/session-relay/config.json` (mode `600`). Override it
 
 Example for scripts: `relay share --tool claude --latest --yes --json`.
 
+### Keep your prompts to yourself
+
+```sh
+relay config prompts hide    # from now on, leave your typed prompts out of everything you share
+relay config prompts share   # back to sharing them
+relay config                 # show your settings
+```
+
+With `hide`, `/share`, `relay share` and auto-share drafts all leave your prompts out; `relay share --prompts` includes them once. In an agent you can also say `/share without my prompts`. The prompts are removed on your laptop, so they never reach the server. Your agent's replies can still mention what you asked; `/share` tells it not to quote you in the summary.
+
 ## Reading
 
 | Command | |
@@ -53,8 +64,8 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 | `relay list --drafts` | Your drafts (saved automatically at session end) |
 | `relay search "<query>"` | Full-text search over titles, summaries, messages and full transcripts. Add `file:<path>` or `branch:<name>` to filter |
 | `relay template [--repo <repo>]` | The handoff template for this repo: sections a share should include |
-| `relay export <id> [--format md\|json] [-o file]` | Download a session, full transcript included |
-| `relay export [--repo <repo>\|--all] [--since YYYY-MM-DD] [--full] [-o file]` | Every session of this repo (or all repos) you can see, as NDJSON |
+| `relay export <id> [--format md\|json] [-o file] [--no-prompts]` | Download a session, full transcript included. `--no-prompts` replaces the authors' typed prompts with a marker |
+| `relay export [--repo <repo>\|--all] [--since YYYY-MM-DD] [--full] [--no-prompts] [-o file]` | Every session of this repo (or all repos) you can see, as NDJSON |
 | `relay digest [--days 1]` | What the team did lately: new shares by repo, handoffs for you, pickups, comments |
 | `relay stats [--days 30] [--json]` | Shares, pickups, continued handoffs and comments, by day, person, agent and repo |
 | `relay show <id>` | Print a session as a handoff |

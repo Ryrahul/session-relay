@@ -24,7 +24,9 @@ Then write a handoff for a teammate who will continue this work, based on this c
 - sections: the template's sections, if it has any
 Never include secrets, tokens or passwords.
 
-Then call \`share_current_session\` with those fields. If the user says who it's for ("for Akshat"), pass \`for\`. If this session continued a teammate's shared session you loaded earlier, it is linked automatically; if the work is unrelated, pass \`continues: "none"\`. Extra instructions from the user (title, who should see it, "full transcript", "with the diff" → include_diff): $ARGUMENTS
+Then call \`share_current_session\` with those fields. If the user says who it's for ("for Akshat"), pass \`for\`. If this session continued a teammate's shared session you loaded earlier, it is linked automatically; if the work is unrelated, pass \`continues: "none"\`. Extra instructions from the user (title, who should see it, "full transcript", "with the diff" → include_diff, "without my prompts"/"no prompts" → hide_prompts): $ARGUMENTS
+
+If the user's prompts are left out, don't quote or closely paraphrase them in the summary or title either: describe the work, not what they typed.
 
 Reply with the share id and title only.
 `;

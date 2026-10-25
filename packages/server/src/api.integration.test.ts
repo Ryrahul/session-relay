@@ -532,6 +532,27 @@ describe.skipIf(!DB)("API (integration)", () => {
     expect(lines.find((l) => l.id === id).messages).toHaveLength(40); // stored tail without full=1
     const ndFull = await app.request(`/v1/sessions/export?repo=${repo}&full=1`, { headers: { authorization: `Bearer ${bob.token}` } });
     expect((await ndFull.text()).trim().split("\n").map((l) => JSON.parse(l)).find((l) => l.id === id).messages).toHaveLength(300);
+
+    // Without the typed prompts: each becomes a marker, the agent's side stays.
+    const bare = (await call(bob.token, "GET", `/v1/sessions/${id}/export?format=json&prompts=0`)).body;
+    expect(bare.messages).toHaveLength(300);
+    expect(bare.messages.filter((m: { role: string; text: string }) => m.role === "user").every((m: { text: string }) => m.text === "(prompt not shared)")).toBe(true);
+    expect(bare.messages[1].text).toBe("full message 1");
+    expect(bare.title).toBe("Export me!"); // not taken from a prompt
+    const auto = (
+      await call(alice.token, "POST", "/v1/sessions", {
+        session: upload({ repo, title: "please refactor the billing module so that …", summary: { goal: "please refactor the billing module so that invoices round half-even", decisions: [], done: [], next: [], open_questions: [], sections: [] }, messages: [{ role: "user", text: "please refactor the billing module so that invoices round half-even" }, { role: "assistant", text: "done" }] }),
+      })
+    ).body.id;
+    const autoBare = (await call(bob.token, "GET", `/v1/sessions/${auto}/export?format=json&prompts=0`)).body;
+    expect(JSON.stringify(autoBare)).not.toContain("refactor the billing");
+    expect(autoBare.title).toBe("Shared session");
+    const bareMd = await (await app.request(`/v1/sessions/${id}/export?prompts=0`, { headers: { authorization: `Bearer ${bob.token}` } })).text();
+    expect(bareMd).not.toContain("full message 0");
+    expect(bareMd).toContain("full message 1");
+    const bareNd = await (await app.request(`/v1/sessions/export?repo=${repo}&full=1&prompts=0`, { headers: { authorization: `Bearer ${bob.token}` } })).text();
+    expect(bareNd).not.toContain("full message 298");
+    expect(bareNd).toContain("full message 299");
   });
 
   it("audit log: admins only, newest first, filters and paging", async () => {

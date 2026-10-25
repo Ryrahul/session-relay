@@ -11,7 +11,7 @@ export function orgRoutes(sql: Sql) {
   app.get("/", async (c) => {
     const { orgId } = c.get("auth");
     const [r] = await sql`
-      SELECT o.id, o.name, o.slug, s.retention_days, s.repo_allowlist, s.redaction_patterns, s.share_templates,
+      SELECT o.id, o.name, o.slug, s.retention_days, s.repo_allowlist, s.redaction_patterns, s.share_templates, s.live_autonomy,
         (SELECT count(*)::int FROM memberships m WHERE m.org_id = o.id) AS members,
         (SELECT count(*)::int FROM sessions x WHERE x.org_id = o.id AND x.deleted_at IS NULL) AS sessions,
         (SELECT coalesce(sum(coalesce(x.transcript_bytes, 0) + octet_length(x.messages::text)), 0)::bigint
@@ -28,6 +28,7 @@ export function orgRoutes(sql: Sql) {
         repo_allowlist: r!.repo_allowlist,
         redaction_patterns: r!.redaction_patterns,
         share_templates: r!.share_templates,
+        live_autonomy: r!.live_autonomy,
       },
       stats: { members: r!.members, sessions: r!.sessions, storage_bytes: Number(r!.storage_bytes) },
     };
@@ -55,6 +56,11 @@ export function orgRoutes(sql: Sql) {
       }
       if (patch.share_templates) {
         await tx`UPDATE org_settings SET share_templates = ${tx.json(patch.share_templates)} WHERE org_id = ${auth.orgId}`;
+      }
+      if (patch.live_autonomy !== undefined) {
+        await tx`UPDATE org_settings SET live_autonomy = ${patch.live_autonomy} WHERE org_id = ${auth.orgId}`;
+        // Turning it off takes effect at once, for live sessions already running too.
+        if (!patch.live_autonomy) await tx`UPDATE live_sessions SET autonomy = false WHERE org_id = ${auth.orgId} AND autonomy`;
       }
       if (patch.redaction_patterns) {
         await tx`UPDATE org_settings SET redaction_patterns = ${patch.redaction_patterns} WHERE org_id = ${auth.orgId}`;

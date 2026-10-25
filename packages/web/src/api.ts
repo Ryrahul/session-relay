@@ -1,4 +1,4 @@
-import type { Activity, AuditEntry, Stats, InviteInfo, JoinInfo, Member, MeResponse, OrgInfo, OrgPatch, SessionDetail, SessionListItem, SessionPatch } from "@session-relay/shared";
+import type { Activity, AuditEntry, LiveDetail, LivePatch, LiveSession, Stats, InviteInfo, JoinInfo, Member, MeResponse, OrgInfo, OrgPatch, SessionDetail, SessionListItem, SessionPatch } from "@session-relay/shared";
 
 const KEY = "relay.token";
 
@@ -84,6 +84,13 @@ export const api = {
     return res.text();
   },
   update: (id: string, patch: SessionPatch) => call<{ ok: true }>("PATCH", `/v1/sessions/${encodeURIComponent(id)}`, patch),
+  liveList: () => call<{ live: LiveSession[] }>("GET", "/v1/live"),
+  liveGet: (id: string) => call<LiveDetail>("GET", `/v1/live/${encodeURIComponent(id)}`),
+  liveUpdate: (id: string, patch: LivePatch) => call<{ ok: true }>("PATCH", `/v1/live/${encodeURIComponent(id)}`, patch),
+  liveEnd: (id: string) => call<{ ok: true }>("POST", `/v1/live/${encodeURIComponent(id)}/end`, {}),
+  liveRead: (id: string) => call<{ ok: true }>("POST", `/v1/live/${encodeURIComponent(id)}/read`, {}),
+  liveSend: (body: { from_live?: string; to_live?: string; to_user?: string; body: string; kind: string; reply_to?: number }) =>
+    call<{ ids: number[]; people: string[] }>("POST", "/v1/live/messages", body),
   members: () => call<{ members: Member[] }>("GET", "/v1/members"),
   audit: (params: Record<string, string>) => {
     const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v));

@@ -2,6 +2,11 @@ import type {
   Activity,
   AuditEntry,
   Comment,
+  LiveDetail,
+  LivePatch,
+  LivePollResult,
+  LiveSession,
+  LiveStart,
   Stats,
   DetailMode,
   Member,
@@ -98,6 +103,31 @@ export class RelayClient {
     const params = new URLSearchParams();
     for (const [k, v] of Object.entries(query)) if (v !== undefined && v !== "") params.set(k, String(v));
     return api<{ entries: AuditEntry[]; next: number | null }>(this.config, "GET", `v1/audit?${params}`);
+  }
+  liveList(withEnded = false) {
+    return api<{ live: LiveSession[] }>(this.config, "GET", `v1/live${withEnded ? "?ended=1" : ""}`);
+  }
+  liveStart(body: Partial<LiveStart> & { repo: string }) {
+    return api<{ id: string }>(this.config, "POST", "v1/live", body);
+  }
+  liveGet(id: string) {
+    return api<LiveDetail>(this.config, "GET", `v1/live/${encodeURIComponent(id)}`);
+  }
+  liveUpdate(id: string, patch: LivePatch) {
+    return api<{ ok: true }>(this.config, "PATCH", `v1/live/${encodeURIComponent(id)}`, patch);
+  }
+  liveEnd(id: string) {
+    return api<{ ok: true }>(this.config, "POST", `v1/live/${encodeURIComponent(id)}/end`, {});
+  }
+  livePoll(id: string, body: { files?: string[]; status?: string; ack?: boolean } = {}, timeoutMs?: number) {
+    return api<LivePollResult>(this.config, "POST", `v1/live/${encodeURIComponent(id)}/poll`, body, timeoutMs);
+  }
+  /** Secrets are removed before the message leaves the machine, like shares. */
+  liveSend(body: { from_live?: string; to_live?: string; to_user?: string; to_repo?: string; body: string; kind?: string; reply_to?: number; from_agent?: boolean }) {
+    return api<{ ids: number[]; delivered_to: number; people: string[]; skipped: string[] }>(this.config, "POST", "v1/live/messages", {
+      ...body,
+      body: createRedactor()(body.body),
+    });
   }
   members() {
     return api<{ members: Member[] }>(this.config, "GET", "v1/members");

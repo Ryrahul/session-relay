@@ -517,3 +517,38 @@ a.badge-link:hover { color: var(--accent); }
 @media (max-width: 640px) { .toolbar-filters { grid-template-columns: 1fr 1fr; } }
 .head-actions { margin-left: auto; display: inline-flex; gap: 6px; flex-wrap: wrap; }
 .head-actions button { margin-left: 0; }
+
+/* Live */
+.nav-count { margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 11px; font-weight: 700; display: inline-grid; place-items: center; }
+.live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); vertical-align: 1px; margin-right: 3px; }
+.live-dot-live { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 22%, transparent); }
+.live-dot-away { background: var(--faint); }
+.live-repo { display: grid; gap: 8px; }
+.live-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.live-card { color: inherit; gap: 10px; height: 100%; transition: border-color 0.15s; }
+.live-card:hover { border-color: var(--line-strong); text-decoration: none; }
+.live-card-head { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.live-card-who { display: grid; min-width: 0; }
+.live-card-who strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-card-badges { margin-left: auto; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.live-card-what { display: grid; gap: 2px; min-width: 0; }
+.live-title { font-weight: 600; overflow-wrap: anywhere; }
+.live-card-meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.live-files { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.live-files code { font-size: 12px; background: var(--surface-2); border-radius: 6px; padding: 1px 6px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-how { display: grid; gap: 10px; justify-items: stretch; text-align: left; max-width: 60ch; }
+.live-help summary { cursor: pointer; font-weight: 600; }
+.live-head { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.live-head h1 { overflow-wrap: anywhere; }
+.live-autonomy { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; }
+.live-autonomy .switch { flex: none; margin-top: 2px; }
+.live-autonomy > span:last-child { display: grid; gap: 2px; }
+.live-file-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.live-file-list code { overflow-wrap: anywhere; }
+.live-msg-out .comment-body { background: var(--surface-2); }
+.live-ask { display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+.live-send-row { flex-wrap: wrap; }
+.live-thread-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.live-msg .comment-head { flex-wrap: wrap; row-gap: 2px; }
+.live-msg .comment-head > * { white-space: nowrap; }
+.live-autonomy .hint { font-weight: 400; }

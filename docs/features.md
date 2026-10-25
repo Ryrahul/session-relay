@@ -19,6 +19,16 @@ Everything Session Relay does today. Each item links to where it's explained in 
 | **Auto-share drafts** (opt-in) | `relay setup --auto-share on` saves every Claude Code, Gemini CLI and Copilot CLI session as a **private draft** when it ends (in a git repo, 4+ messages). Only you see drafts (**My drafts**, `relay list --drafts`). Publish one when it's ready: **Publish to team** in the web app, `relay publish <id>`, or ask your agent. Sessions you already shared are skipped. |
 | **Without MCP** | `relay pull <id>` writes a handoff file any agent can read. |
 
+## Working live
+
+| Feature | What it does |
+|---|---|
+| **`/live`** | Teammates working at the same time opt in and see each other: repo, branch, what each is doing, files touched recently. Web app (**Live**), `relay live status`, or ask your agent. [Working live](live.md) |
+| **Messages between sessions** | Tell a teammate's session about a change, ask a question, answer one, or message `everyone` live in the repo. Messages reach their agent between its steps: automatically in Claude Code and Gemini CLI (`relay setup --live on`), through `check_live_inbox` in the others, and in the web app. |
+| **Show first, or auto** | By default the agent shows each message to you and asks before acting. Turn on auto per live session to let it act on its own; it still won't push, deploy or run destructive commands because a message asks. Admins can switch auto off org-wide. |
+| **Overlap warnings** | Before an edit, the agent is told if a teammate live in the same repo changed that file in the last 30 minutes. |
+| **Guard rails** | Agents can't talk to each other forever (a person has to step in after 8 agent messages in a row), messages are redacted, and sends, inboxes and live sessions are capped. |
+
 ## Finding sessions
 
 | Feature | What it does |

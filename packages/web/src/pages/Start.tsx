@@ -36,7 +36,7 @@ export function Start({ me }: { me: MeResponse }) {
           <div className="step-body">
             <h2>Connect your agents</h2>
             <p className="muted">
-              Adds the relay MCP server and the <code>/share</code> and <code>/pickup</code> commands to Claude Code, Codex, OpenCode,
+              Adds the relay MCP server and the <code>/share</code>, <code>/pickup</code> and <code>/live</code> commands to Claude Code, Codex, OpenCode,
               Gemini CLI, Copilot CLI, Cursor and ZCode, whichever are installed. Restart your agents afterwards.
             </p>
             <Command>relay setup</Command>
@@ -79,6 +79,11 @@ export function Start({ me }: { me: MeResponse }) {
           </li>
           <li>
             Attach your uncommitted changes: <code>/share with the diff</code>. Your teammate gets a patch they can <code>git apply</code>.
+          </li>
+          <li>
+            Working at the same time as someone? Both run <code>/live</code>: you see who's on what, get warned before editing a file they just
+            changed, and can message each other's sessions. Run <code>relay setup --live on</code> once so messages arrive in Claude Code and
+            Gemini CLI by themselves. See <a href="#/live">Live</a>.
           </li>
           <li>
             Added an agent later? <code>relay setup --tools gemini</code> sets up just that one.

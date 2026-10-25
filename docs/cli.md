@@ -96,6 +96,21 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 | `--pr <url>` | Pull request; `none` to clear |
 | `--team` / `--people <names>` | Visible to the whole team, or only these people |
 
+## Working live
+
+See [Working live](live.md).
+
+| Command | |
+|---|---|
+| `relay live start [--title <text>] [--auto] [--tool <agent>]` | Go live in this repo. `--auto` lets your agent act on teammates' messages without asking |
+| `relay live status [--json]` | Who's live, where, on which files (also `relay live who`) |
+| `relay live send <name\|everyone\|lv_id> <text> [--question]` | Message a teammate's live session, or everyone live in this repo |
+| `relay live reply <number> <text>` | Answer a message |
+| `relay live inbox` | Take new messages yourself |
+| `relay live watch` | Print messages as they arrive (your agent still gets them) |
+| `relay live auto on\|off` | Let your agent act on messages without asking, or not |
+| `relay live stop [--all]` | Stop being live (`--all`: every live session on this machine) |
+
 ## Agents
 
 | Command | |
@@ -103,5 +118,7 @@ Example for scripts: `relay share --tool claude --latest --yes --json`.
 | `relay setup [--tools claude,codex,opencode,gemini,copilot,cursor,zcode] [--scope user\|project] [--relay-config <file>]` | Install the MCP server and `/share` `/pickup` into your agents |
 | `relay setup --auto-share on\|off` | Save each Claude Code, Gemini CLI and Copilot CLI session as a private draft when it ends (a session-end hook). `off` removes the hooks |
 | `relay hook session-end --tool <agent>` | What that hook runs. It never fails the agent; it logs to `hook.log` next to your relay config |
+| `relay setup --live on\|off` | Hooks that bring teammates' live messages and file overlap warnings into Claude Code and Gemini CLI between steps ([Working live](live.md)) |
+| `relay hook live <prompt\|pre-edit\|post-tool\|stop\|end> --tool <agent>` | What those hooks run. They do nothing unless you're live, and never fail the agent |
 | `relay setup --tools <agent>` | Connect one agent you installed later, e.g. `--tools gemini` |
 | `relay mcp` | The MCP server on stdio. Your agent starts it; you don't run it yourself |

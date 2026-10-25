@@ -2,7 +2,7 @@
 
 Session Relay works with **Claude Code**, **Codex**, **OpenCode**, **Gemini CLI**, **Copilot CLI**, **Cursor** and **ZCode** (Cursor is experimental). Each one gets the same two things:
 
-1. **The relay MCP server** (`relay mcp`), which gives the agent nine tools:
+1. **The relay MCP server** (`relay mcp`), which gives the agent fifteen tools:
 
    | Tool | What it does |
    |---|---|
@@ -15,12 +15,14 @@ Session Relay works with **Claude Code**, **Codex**, **OpenCode**, **Gemini CLI*
    | `team_activity` | What the team did in the last day(s): new shares by repo, handoffs for you, pickups, comments |
    | `comment_on_session` | Leaves a note on a session: a question, a finding, "picked this up". `get_session` shows comments before the conversation |
    | `update_session` | Changes a share: title, summary, extra next steps, who it's for, PR, visibility. `publish` shares a draft |
+   | `start_live`, `live_status`, `send_live_message`, `check_live_inbox`, `update_live`, `stop_live` | [Working live](live.md): go live, see who else is, message their sessions, take messages |
 
-2. **Two commands**:
+2. **Three commands**:
    - `/share [instructions]`: write a handoff and share this session. "for Akshat" makes it a handoff for them.
    - `/pickup [what or whose]`: find a shared session, read it, check the code and continue. With nothing after it, handoffs for you come first.
+   - `/live [with someone | who | stop | auto on]`: work live with teammates at the same time; their messages reach your agent between steps ([Working live](live.md)).
 
-`relay setup` installs both for every agent it finds. Restart your agents afterwards.
+`relay setup` installs all of these for every agent it finds. Restart your agents afterwards. Add `--live on` for the hooks that bring live messages into Claude Code and Gemini CLI automatically.
 
 ```sh
 relay setup                         # all installed agents, for your user

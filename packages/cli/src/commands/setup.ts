@@ -39,6 +39,21 @@ Read the goal, decisions, next steps and recent conversation. Check the current 
 Then say in a few lines where things stand and continue with the first next step.
 `;
 
+export const LIVE_PROMPT = `---
+description: Work live with teammates: see who else is working, send messages, get theirs between steps (Session Relay)
+---
+Use the relay MCP tools for working live with teammates. Request: $ARGUMENTS
+
+- Empty or "start": call \`start_live\` with a short title for what this session is working on. Then tell the user who else is live in this repo and which files they're touching (the result lists them).
+- "with <name>", or a message for someone ("tell Akshat …", "ask Akshat …"): \`start_live\` first if this session isn't live, then \`send_live_message\` (kind "question" for questions; to "everyone" for everyone live in this repo).
+- "who" or "status": \`live_status\`.
+- "inbox": \`check_live_inbox\`.
+- "auto on": \`update_live\` with autonomy true, only because the user asked for it here. "auto off": autonomy false.
+- "stop" or "end": \`stop_live\`.
+
+Teammates' messages arrive between your steps. Unless the user turned on auto, show them to the user and ask before acting on them. Never put secrets in messages.
+`;
+
 type ToolName = "claude" | "opencode" | "codex" | "zcode" | "gemini" | "copilot" | "cursor";
 const ALL_TOOLS = "claude,opencode,codex,zcode,gemini,copilot,cursor";
 
@@ -49,13 +64,75 @@ interface SetupOpts {
   relayConfig?: string;
   /** "on" installs the session-end hook that saves drafts, "off" removes it. */
   autoShare?: string;
+  /** "on" installs the live hooks (Claude Code, Gemini CLI), "off" removes them. */
+  live?: string;
 }
 
 const HOOK_MARK = "hook session-end";
+const LIVE_MARK = "hook live ";
 
-function hookCommand(cmd: string[], env: Record<string, string>, tool: string): string {
+function hookCommand(cmd: string[], env: Record<string, string>, tool: string, event = "session-end"): string {
   const prefix = Object.entries(env).map(([k, v]) => `${k}=${JSON.stringify(v)} `).join("");
-  return `${prefix}${cmd.slice(0, -1).map((c) => JSON.stringify(c)).join(" ")} hook session-end --tool ${tool}`;
+  return `${prefix}${cmd.slice(0, -1).map((c) => JSON.stringify(c)).join(" ")} hook ${event} --tool ${tool}`;
+}
+
+type HookGroup = { matcher?: string; hooks: { type: string; command: string; timeout?: number }[] };
+
+/**
+ * Sets relay's hooks in a Claude Code or Gemini CLI settings.json (same shape): removes every hook
+ * whose command contains `mark`, then adds `add` (event → groups). Other hooks are left alone.
+ */
+async function setHooks(file: string, mark: string, add: Record<string, HookGroup[]>): Promise<void> {
+  const cfg = await readJson(file);
+  const hooks: Record<string, HookGroup[]> = { ...cfg.hooks };
+  for (const [event, groups] of Object.entries(hooks)) {
+    const kept = (groups ?? [])
+      .map((g) => ({ ...g, hooks: (g.hooks ?? []).filter((h) => !String(h.command ?? "").includes(mark)) }))
+      .filter((g) => g.hooks.length);
+    if (kept.length) hooks[event] = kept;
+    else delete hooks[event];
+  }
+  for (const [event, groups] of Object.entries(add)) hooks[event] = [...(hooks[event] ?? []), ...groups];
+  cfg.hooks = hooks;
+  if (!Object.keys(cfg.hooks).length) delete cfg.hooks;
+  await writeText(file, JSON.stringify(cfg, null, 2) + "\n");
+}
+
+const claudeSettings = () => path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(homedir(), ".claude"), "settings.json");
+
+/**
+ * Live hooks: messages from teammates and file overlap warnings reach the agent between steps.
+ * Claude Code: before each prompt, before edits, after tools, at stop. Gemini CLI: before each
+ * turn, after tools, after the reply. Both also end the live session when the agent session ends.
+ */
+export async function setupLiveHooks(on: boolean, cmd: string[], env: Record<string, string>, tool: "claude" | "gemini", settingsFile?: string): Promise<string> {
+  const file = settingsFile ?? (tool === "claude" ? claudeSettings() : path.join(geminiHome(), "settings.json"));
+  const h = (event: string, extra: { matcher?: string } = {}): HookGroup[] => [
+    { ...extra, hooks: [{ type: "command", command: hookCommand(cmd, env, tool, `live ${event}`), timeout: tool === "claude" ? 10 : 10_000 }] },
+  ];
+  const add: Record<string, HookGroup[]> = !on
+    ? {}
+    : tool === "claude"
+      ? {
+          UserPromptSubmit: h("prompt"),
+          PreToolUse: h("pre-edit", { matcher: "Edit|Write|MultiEdit|NotebookEdit" }),
+          PostToolUse: h("post-tool"),
+          Stop: h("stop"),
+          SessionEnd: h("end"),
+        }
+      : { BeforeAgent: h("prompt"), AfterTool: h("post-tool"), AfterAgent: h("stop"), SessionEnd: h("end") };
+  await setHooks(file, LIVE_MARK, add);
+  return on ? `live hooks on: teammates' messages and file overlap warnings arrive between steps (${file})` : `live hooks off (${file})`;
+}
+
+/** Agents with live hooks installed. */
+export async function liveHooksInstalled(): Promise<string[]> {
+  const out: string[] = [];
+  for (const [name, file] of [["Claude Code", claudeSettings()], ["Gemini CLI", path.join(geminiHome(), "settings.json")]] as const) {
+    const text = await readFile(file, "utf8").catch(() => "");
+    if (text.includes(LIVE_MARK)) out.push(name);
+  }
+  return out;
 }
 
 /**
@@ -69,19 +146,9 @@ export async function setupClaudeAutoShare(
   settingsFile?: string,
   tool: "claude" | "gemini" = "claude",
 ): Promise<string> {
-  const file = settingsFile ?? path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(homedir(), ".claude"), "settings.json");
-  const cfg = await readJson(file);
-  const groups: { matcher?: string; hooks: { type: string; command: string }[] }[] = cfg.hooks?.SessionEnd ?? [];
-  // Drop any relay hook first, so running setup again doesn't duplicate it.
-  const kept = groups
-    .map((g) => ({ ...g, hooks: (g.hooks ?? []).filter((h) => !String(h.command ?? "").includes(HOOK_MARK)) }))
-    .filter((g) => g.hooks.length);
-  const command = hookCommand(cmd, env, tool);
-  const next = on ? [...kept, { hooks: [{ type: "command", command }] }] : kept;
-  cfg.hooks = { ...cfg.hooks, SessionEnd: next };
-  if (!next.length) delete cfg.hooks.SessionEnd;
-  if (cfg.hooks && !Object.keys(cfg.hooks).length) delete cfg.hooks;
-  await writeText(file, JSON.stringify(cfg, null, 2) + "\n");
+  const file = settingsFile ?? claudeSettings();
+  // Drops any relay auto-share hook first, so running setup again doesn't duplicate it.
+  await setHooks(file, HOOK_MARK, on ? { SessionEnd: [{ hooks: [{ type: "command", command: hookCommand(cmd, env, tool) }] }] } : {});
   return on ? `auto-share on: sessions are saved as private drafts when they end (${file})` : `auto-share off (${file})`;
 }
 
@@ -125,7 +192,8 @@ async function setupGemini(scope: "user" | "project", root: string, cmd: string[
     `description = ${JSON.stringify(description(prompt))}\nprompt = """\n${promptBody(prompt, "{{args}}").replace(/"""/g, '\\"""')}"""\n`;
   await writeText(path.join(dir, "share.toml"), toml(SHARE_PROMPT));
   await writeText(path.join(dir, "pickup.toml"), toml(PICKUP_PROMPT));
-  return [`MCP server in ${file}`, `/share and /pickup in ${dir}`];
+  await writeText(path.join(dir, "live.toml"), toml(LIVE_PROMPT));
+  return [`MCP server in ${file}`, `/share, /pickup and /live in ${dir}`];
 }
 
 async function setupCopilot(scope: "user" | "project", root: string, cmd: string[], env: Record<string, string>): Promise<string[]> {
@@ -137,7 +205,8 @@ async function setupCopilot(scope: "user" | "project", root: string, cmd: string
     `---\nname: ${name}\ndescription: ${description(prompt)}\n---\n${promptBody(prompt, "whatever the user wrote after the command, if anything")}`;
   await writeText(path.join(dir, "share", "SKILL.md"), skill("share", SHARE_PROMPT));
   await writeText(path.join(dir, "pickup", "SKILL.md"), skill("pickup", PICKUP_PROMPT));
-  return [`MCP server in ${file}`, `/share and /pickup skills in ${dir}`];
+  await writeText(path.join(dir, "live", "SKILL.md"), skill("live", LIVE_PROMPT));
+  return [`MCP server in ${file}`, `/share, /pickup and /live skills in ${dir}`];
 }
 
 async function setupCursor(scope: "user" | "project", root: string, cmd: string[], env: Record<string, string>): Promise<string[]> {
@@ -148,7 +217,8 @@ async function setupCursor(scope: "user" | "project", root: string, cmd: string[
   const args = "whatever the user wrote after the command, if anything";
   await writeText(path.join(dir, "share.md"), promptBody(SHARE_PROMPT, args));
   await writeText(path.join(dir, "pickup.md"), promptBody(PICKUP_PROMPT, args));
-  return [`MCP server in ${file}`, `/share and /pickup in ${dir}`];
+  await writeText(path.join(dir, "live.md"), promptBody(LIVE_PROMPT, args));
+  return [`MCP server in ${file}`, `/share, /pickup and /live in ${dir}`];
 }
 
 /** Whether an agent is installed: its command, or (for desktop apps) its data folder. */
@@ -219,7 +289,8 @@ async function setupClaude(scope: "user" | "project", root: string, cmd: string[
   const dir = scope === "project" ? path.join(root, ".claude", "commands") : path.join(homedir(), ".claude", "commands");
   await writeText(path.join(dir, "share.md"), SHARE_PROMPT);
   await writeText(path.join(dir, "pickup.md"), PICKUP_PROMPT);
-  done.push(`/share and /pickup in ${dir}`);
+  await writeText(path.join(dir, "live.md"), LIVE_PROMPT);
+  done.push(`/share, /pickup and /live in ${dir}`);
   return done;
 }
 
@@ -236,7 +307,8 @@ async function setupOpenCode(scope: "user" | "project", root: string, cmd: strin
   const dir = scope === "project" ? path.join(root, ".opencode", "commands") : path.join(configDir, "commands");
   await writeText(path.join(dir, "share.md"), SHARE_PROMPT);
   await writeText(path.join(dir, "pickup.md"), PICKUP_PROMPT);
-  return [`MCP server in ${file}`, `/share and /pickup in ${dir}`];
+  await writeText(path.join(dir, "live.md"), LIVE_PROMPT);
+  return [`MCP server in ${file}`, `/share, /pickup and /live in ${dir}`];
 }
 
 async function setupCodex(cmd: string[], env: Record<string, string>): Promise<string[]> {
@@ -256,7 +328,8 @@ async function setupCodex(cmd: string[], env: Record<string, string>): Promise<s
   // Codex custom prompts are user-level only.
   await writeText(path.join(home, "prompts", "share.md"), SHARE_PROMPT);
   await writeText(path.join(home, "prompts", "pickup.md"), PICKUP_PROMPT);
-  done.push(`/share and /pickup in ${path.join(home, "prompts")}`);
+  await writeText(path.join(home, "prompts", "live.md"), LIVE_PROMPT);
+  done.push(`/share, /pickup and /live in ${path.join(home, "prompts")}`);
   return done;
 }
 
@@ -270,7 +343,8 @@ async function setupZCode(scope: "user" | "project", root: string, cmd: string[]
   const dir = path.join(base, "commands");
   await writeText(path.join(dir, "share.md"), SHARE_PROMPT);
   await writeText(path.join(dir, "pickup.md"), PICKUP_PROMPT);
-  return [`MCP server in ${file}`, `/share and /pickup in ${dir}`];
+  await writeText(path.join(dir, "live.md"), LIVE_PROMPT);
+  return [`MCP server in ${file}`, `/share, /pickup and /live in ${dir}`];
 }
 
 export async function setup(opts: SetupOpts): Promise<void> {
@@ -323,5 +397,17 @@ export async function setup(opts: SetupOpts): Promise<void> {
     }
     if (!any) console.log("- auto-share works with Claude Code, Gemini CLI and Copilot CLI; none found");
   }
-  console.log(`\nMCP command: ${cmd.join(" ")}\nRestart your agents, then try /share or /pickup.`);
+  if (opts.live) {
+    if (!["on", "off"].includes(opts.live)) throw new Error('--live takes "on" or "off"');
+    const on = opts.live === "on";
+    let any = false;
+    for (const t of ["claude", "gemini"] as const) {
+      if (wanted.includes(t) && (await installed(t))) {
+        console.log(`- ${t}: ${await setupLiveHooks(on, cmd, env, t)}`);
+        any = true;
+      }
+    }
+    if (!any) console.log("- live hooks work with Claude Code and Gemini CLI; none found. Other agents get messages with check_live_inbox.");
+  }
+  console.log(`\nMCP command: ${cmd.join(" ")}\nRestart your agents, then try /share, /pickup or /live.`);
 }

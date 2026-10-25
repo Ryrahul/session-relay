@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { login } from "./commands/login.js";
 import { auditCmd, comment, digest, edit, exportCmd, template, invite, list, localSessions, members, prComment, publish, pull, remove, search, share, show, stats } from "./commands/sessions.js";
 import { hook } from "./commands/hook.js";
+import { liveCommand } from "./commands/live.js";
 import { setup } from "./commands/setup.js";
 import { whoami } from "./commands/whoami.js";
 import { runMcp } from "./mcp.js";
@@ -178,11 +179,35 @@ program
   .option("--scope <scope>", "user (default) or project", "user")
   .option("--relay-config <file>", "relay config file the MCP server should use")
   .option("--auto-share <on|off>", "save each session as a private draft when it ends (Claude Code, Gemini CLI, Copilot CLI)")
+  .option("--live <on|off>", "hooks that bring teammates' live messages into Claude Code and Gemini CLI between steps")
   .action(setup);
 
 program
-  .command("hook <event>")
-  .description("Run by agent hooks (session-end); not for direct use")
+  .command("live [action] [args...]")
+  .description("Work live with teammates: start | status | send <name|everyone> <text> | reply <#> <text> | inbox | watch | auto on|off | stop")
+  .option("--title <title>", "start: what you're working on")
+  .option("--auto", "start: let your agent act on teammates' messages without asking you first")
+  .option("--tool <tool>", "start: the agent this live session is for (claude, opencode, codex, zcode, gemini, copilot, cursor)")
+  .option("--question", "send: ask a question (the other agent is asked to answer)")
+  .option("--all", "stop: end all your live sessions on this machine")
+  .option("--json", "status: print JSON")
+  .addHelpText(
+    "after",
+    `
+Examples:
+  relay live start --title "billing refactor"
+  relay live status
+  relay live send akshat "I renamed createInvoice to buildInvoice, update your caller"
+  relay live send everyone --question "is anyone touching migrations?"
+  relay live reply 42 "yes, done in 10 minutes"
+  relay live watch
+  relay live stop`,
+  )
+  .action((action, args, opts) => liveCommand(action, args, opts));
+
+program
+  .command("hook <event> [sub]")
+  .description("Run by agent hooks (session-end, live <event>); not for direct use")
   .requiredOption("--tool <tool>", "agent that ran the hook")
   .action(hook);
 

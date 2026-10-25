@@ -5,7 +5,7 @@ Share coding-agent sessions with your team across **Claude Code**, **Codex**, **
 ```sh
 npm install -g session-relay
 relay login --server https://relay.your-team.com   # approve in the browser
-relay setup     # adds the relay MCP server and /share, /pickup to your agents
+relay setup     # adds the relay MCP server and /share, /pickup, /live to your agents
 ```
 
 Then, in your agent:
@@ -15,6 +15,7 @@ Then, in your agent:
 /share for bob
 /pickup
 /pickup alice's webhook retry work
+/live                      # working at the same time: see who's on what, message their session
 ```
 
 You need a Session Relay server for your team; see [self-hosting](https://relay.rahulweb.online/docs/self-hosting.html). Cloud hosting is coming soon.
@@ -32,6 +33,9 @@ You need a Session Relay server for your team; see [self-hosting](https://relay.
 | `relay edit <id>` | Change your share: title, summary, next steps, who it's for, PR |
 | `relay pr-comment <id>` | Post the session on its pull request |
 | `relay setup --auto-share on` | Save each Claude Code, Gemini CLI and Copilot CLI session as a private draft when it ends; `relay publish <id>` shares it |
+| `relay live start`, `relay live status` | Work live with teammates: who's on what and which files |
+| `relay live send <name\|everyone> "<text>"` | Message a teammate's live session; it reaches their agent between steps (also `reply`, `inbox`, `watch`, `auto on\|off`, `stop`) |
+| `relay setup --live on` | Hooks so live messages and file overlap warnings arrive in Claude Code and Gemini CLI by themselves |
 | `relay template` | The handoff template for this repo |
 | `relay export <id>`, `relay export --all` | Download a session (Markdown/JSON) or many (NDJSON) |
 | `relay setup --tools gemini` | Connect one agent you installed later |

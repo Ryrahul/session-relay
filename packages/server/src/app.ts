@@ -11,6 +11,7 @@ import { auditRoutes } from "./routes/audit.js";
 import { orgRoutes } from "./routes/org.js";
 import { memberRoutes, tokenRoutes } from "./routes/members.js";
 import { sessionRoutes } from "./routes/sessions.js";
+import { liveRoutes } from "./routes/live.js";
 import { deviceRoutes } from "./routes/device.js";
 import { inviteRoutes, joinRoutes } from "./routes/invites.js";
 import { setupRoutes, type SetupGate } from "./setup.js";
@@ -48,6 +49,7 @@ export function createApp({ sql, storage, setup = null, publicUrl = "http://loca
   v1.route("/tokens", tokenRoutes(sql));
   v1.route("/invites", inviteRoutes(sql, publicUrl));
   v1.route("/sessions", sessionRoutes(sql, storage));
+  v1.route("/live", liveRoutes(sql));
   v1.route("/", activityRoutes(sql));
   v1.route("/audit", auditRoutes(sql));
   app.route("/v1", v1);

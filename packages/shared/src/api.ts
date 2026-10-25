@@ -122,6 +122,8 @@ export const OrgSettings = z.object({
   repo_allowlist: z.array(z.string()),
   redaction_patterns: z.array(z.string()),
   share_templates: z.array(ShareTemplate).default([]),
+  /** Whether people may let their agent act on teammates' live messages without asking. */
+  live_autonomy: z.boolean().default(true),
 });
 export type OrgSettings = z.infer<typeof OrgSettings>;
 
@@ -182,6 +184,7 @@ export const OrgPatch = z.object({
     .max(50)
     .optional(),
   share_templates: z.array(ShareTemplate).max(50).optional(),
+  live_autonomy: z.boolean().optional(),
 });
 export type OrgPatch = z.infer<typeof OrgPatch>;
 

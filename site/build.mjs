@@ -22,6 +22,7 @@ const NAV = [
   ["self-hosting", "Self-hosting"],
   ["cloudflare", "Deploy to Cloudflare"],
   ["agents", "Agents"],
+  ["live", "Working live"],
   ["cli", "CLI reference"],
   ["security", "Security & privacy"],
   ["faq", "FAQ"],
@@ -116,6 +117,7 @@ ${body}
 const FEATURES = [
   ["Works across agents", "Start in Claude Code, finish in Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor or ZCode. Each tool's sessions are read in its own format and turned into one handoff any agent understands."],
   ["Private by default", "Nothing leaves your laptop unless you share it. API keys, tokens, passwords and private keys are removed before upload; add your own patterns and test them on sample text. Share with the whole team or specific people."],
+  ["Work live together", "Working at the same time? Both run <code>/live</code>: see who's on what and which files they touch, get a warning before editing a file a teammate just changed, and send messages that reach each other's agent between steps. Agents show them to you first, unless you let them act on their own."],
   ["Handoffs for someone", "Share \"for Akshat\" and it shows up as <b>For you</b> in their list; <code>/pickup</code> checks their handoffs first."],
   ["Handoff templates", "Decide what every handoff in a repo must include, like \"Tests run\" or \"Rollout notes\". <code>/share</code> fills them in; missing ones are flagged. Set up in a guided editor with ready-made sections."],
   ["Diff snapshots", "Attach your uncommitted changes with <code>/share with the diff</code>. Your teammate sees them file by file and can <code>git apply</code> the patch."],
@@ -135,6 +137,7 @@ const FAQ = [
   ["Is it free?", "Yes. It's open source under AGPL-3.0 and you host it yourself, on a small server with Docker or on your own Cloudflare account. A hosted version is planned."],
   ["Can I hand a Claude Code session to someone using Codex or Cursor?", "Yes. Session Relay reads each agent's own session format and turns it into one handoff that every supported agent can read through MCP."],
   ["Does it upload my code or secrets?", "Only what you share: a summary, the recent conversation (or the full transcript if you ask), the files touched, and optionally your uncommitted diff. Secrets are removed on your laptop before upload."],
+  ["Can two people work at the same time?", "Yes. Both run <code>/live</code> in their agent. You see what each other is working on and which files you touch, get warned before editing a file a teammate just changed, and can send messages (\"tell Akshat I renamed createInvoice\") that reach their agent between its steps. By default the agent shows a message to its user and asks before acting on it."],
   ["How is it different from copying a chat log?", "The agent writes a structured handoff (goal, decisions, done, next steps, open questions), it's searchable by the whole team, it can be addressed to a person, and the next agent loads it directly with <code>/pickup</code> and checks the current code before continuing."],
 ];
 
@@ -252,7 +255,7 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 <span class="faint"># on each laptop</span>
 npm install -g session-relay
 relay login --server https://relay.your-team.com   <span class="faint"># approve in the browser</span>
-relay setup                           <span class="faint"># adds /share and /pickup to your agents</span></code></pre>
+relay setup                           <span class="faint"># adds /share, /pickup and /live to your agents</span></code></pre>
     <p><a href="docs/getting-started.html">Full getting-started guide →</a></p>
   </section>
 

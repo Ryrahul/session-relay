@@ -238,7 +238,7 @@ describe.skipIf(!DB)("API (integration)", () => {
     expect(ok.status).toBe(200);
     const after = await call(alice.token, "GET", "/v1/me");
     expect(after.body.org.name).toBe("Team A Renamed");
-    expect(after.body.settings).toEqual({ retention_days: 30, repo_allowlist: ["github.com/acme/*"], redaction_patterns: ["ACME-[0-9]{6}"], share_templates: [] });
+    expect(after.body.settings).toEqual({ retention_days: 30, repo_allowlist: ["github.com/acme/*"], redaction_patterns: ["ACME-[0-9]{6}"], share_templates: [], live_autonomy: true });
     expect((await call(outsider.token, "GET", "/v1/org")).body.id).toBe(orgB);
     await call(owner.token, "PATCH", "/v1/org", { retention_days: 90, repo_allowlist: [], redaction_patterns: [] });
   });
@@ -620,6 +620,147 @@ describe.skipIf(!DB)("API (integration)", () => {
     expect(await backfillTranscriptSearch(sql, storage)).toBeGreaterThanOrEqual(1);
     expect((await call(bob.token, "GET", `/v1/sessions?q=flamingo&repo=${repo}`)).body.sessions.map((s: any) => s.id)).toEqual([id]);
     expect(await backfillTranscriptSearch(sql, storage)).toBe(0);
+  });
+
+  describe("live sessions", () => {
+    const repo = "github.com/acme/live";
+    let aLive: string, bLive: string;
+
+    it("starts live sessions, lists them, and keeps other orgs out", async () => {
+      aLive = (await call(alice.token, "POST", "/v1/live", { repo, branch: "feat/a", tool: "claude-code", title: "billing" })).body.id;
+      bLive = (await call(bob.token, "POST", "/v1/live", { repo, branch: "feat/b", tool: "opencode" })).body.id;
+      expect(aLive).toMatch(/^lv_/);
+      const list = (await call(bob.token, "GET", "/v1/live")).body.live;
+      expect(list.map((l: any) => l.id).sort()).toEqual([aLive, bLive].sort());
+      expect(list.find((l: any) => l.id === aLive)).toMatchObject({ owner: { id: alice.userId, name: "Alice" }, state: "live", autonomy: false, unread: 0 });
+      expect((await call(outsider.token, "GET", "/v1/live")).body.live).toEqual([]);
+      expect((await call(outsider.token, "GET", `/v1/live/${aLive}`)).status).toBe(404);
+      expect((await call(alice.token, "POST", "/v1/live", { repo: "" })).status).toBe(400);
+    });
+
+    it("delivers messages to a person's live session in the same repo, marks them read on poll", async () => {
+      // Built at runtime so secret scanners don't flag the test itself.
+      const fakeKey = ["sk", "live", "abcdefghijklmnopqrstuvwx"].join("_");
+      const sent = await call(alice.token, "POST", "/v1/live/messages", {
+        from_live: aLive, to_user: bob.userId, body: `I changed createInvoice to return cents; key ${fakeKey}`, from_agent: true,
+      });
+      expect(sent.status).toBe(201);
+      expect(sent.body).toMatchObject({ delivered_to: 1, people: ["Bob"] });
+      expect((await call(bob.token, "GET", "/v1/live")).body.live.find((l: any) => l.id === bLive).unread).toBe(1);
+
+      // Only the owner can poll; a look without ack leaves it unread.
+      expect((await call(alice.token, "POST", `/v1/live/${bLive}/poll`, {})).status).toBe(403);
+      const peek = (await call(bob.token, "POST", `/v1/live/${bLive}/poll`, { ack: false })).body;
+      expect(peek.messages).toHaveLength(1);
+      expect(peek.messages[0]).toMatchObject({ from: { name: "Alice" }, from_agent: true, kind: "message", read: false });
+      expect(peek.messages[0].body).not.toContain(fakeKey);
+      const taken = (await call(bob.token, "POST", `/v1/live/${bLive}/poll`, {})).body;
+      expect(taken.messages).toHaveLength(1);
+      expect((await call(bob.token, "POST", `/v1/live/${bLive}/poll`, {})).body.messages).toEqual([]);
+
+      // Answer it; Alice gets it on her next poll.
+      const q = sent.body.ids[0];
+      expect((await call(bob.token, "POST", "/v1/live/messages", { from_live: bLive, to_live: aLive, body: "ok, updating the caller", kind: "answer", reply_to: q })).status).toBe(201);
+      const forAlice = (await call(alice.token, "POST", `/v1/live/${aLive}/poll`, {})).body;
+      expect(forAlice.messages.map((m: any) => [m.kind, m.reply_to, m.from.name, m.from_agent])).toEqual([["answer", q, "Bob", false]]);
+
+      // The thread shows both directions to the two people, and nothing to a third.
+      const thread = (await call(alice.token, "GET", `/v1/live/${aLive}`)).body.messages;
+      expect(thread.map((m: any) => m.body.slice(0, 7))).toEqual(["I chang", "ok, upd"]);
+      expect((await call(owner.token, "GET", `/v1/live/${aLive}`)).body.messages).toEqual([]);
+    });
+
+    it("explains when someone isn't live, rejects bad targets", async () => {
+      const r = await call(alice.token, "POST", "/v1/live/messages", { to_user: owner.userId, body: "hi" });
+      expect(r.status).toBe(409);
+      expect(r.body.error).toContain("isn't working live");
+      expect((await call(alice.token, "POST", "/v1/live/messages", { to_user: outsider.userId, body: "hi" })).status).toBe(400);
+      expect((await call(alice.token, "POST", "/v1/live/messages", { from_live: aLive, to_live: aLive, body: "me" })).status).toBe(400);
+      expect((await call(alice.token, "POST", "/v1/live/messages", { to_live: bLive, to_user: bob.userId, body: "both" })).status).toBe(400);
+      expect((await call(alice.token, "POST", "/v1/live/messages", { from_live: bLive, to_live: bLive, body: "not mine" })).status).toBe(400);
+      expect((await call(alice.token, "POST", "/v1/live/messages", { to_live: bLive, body: "x".repeat(4001) })).status).toBe(400);
+    });
+
+    it("broadcasts to everyone live in a repo", async () => {
+      const r = await call(owner.token, "POST", "/v1/live/messages", { to_repo: repo, body: "deploy freeze at 5pm" });
+      expect(r.body.delivered_to).toBe(2);
+      expect((await call(alice.token, "POST", `/v1/live/${aLive}/poll`, {})).body.messages.map((m: any) => m.body)).toEqual(["deploy freeze at 5pm"]);
+      expect((await call(bob.token, "POST", "/v1/live/messages", { to_repo: "github.com/acme/empty", body: "anyone?" })).status).toBe(409);
+    });
+
+    it("warns about files a teammate touched recently", async () => {
+      expect((await call(bob.token, "POST", `/v1/live/${bLive}/poll`, { files: ["src/billing.ts"] })).body.overlaps).toEqual([]);
+      const r = (await call(alice.token, "POST", `/v1/live/${aLive}/poll`, { files: ["./src/billing.ts", "src/other.ts"] })).body;
+      expect(r.overlaps).toHaveLength(1);
+      expect(r.overlaps[0]).toMatchObject({ path: "src/billing.ts", live_id: bLive, owner: { name: "Bob" }, branch: "feat/b" });
+      const files = (await call(bob.token, "GET", `/v1/live/${aLive}`)).body.files.map((f: any) => f.path).sort();
+      expect(files).toEqual(["src/billing.ts", "src/other.ts"]);
+    });
+
+    it("lets the owner choose autonomy unless admins turned it off", async () => {
+      expect((await call(alice.token, "PATCH", `/v1/live/${aLive}`, { autonomy: true, status: "fixing tests" })).status).toBe(200);
+      expect((await call(bob.token, "PATCH", `/v1/live/${aLive}`, { autonomy: false })).status).toBe(403);
+      expect((await call(alice.token, "POST", `/v1/live/${aLive}/poll`, {})).body.autonomy).toBe(true);
+      // Turning it off for the org switches it off in running sessions too.
+      expect((await call(owner.token, "PATCH", "/v1/org", { live_autonomy: false })).status).toBe(200);
+      expect((await call(alice.token, "GET", "/v1/me")).body.settings.live_autonomy).toBe(false);
+      expect((await call(alice.token, "GET", `/v1/live/${aLive}`)).body).toMatchObject({ autonomy: false, status: "fixing tests" });
+      expect((await call(alice.token, "PATCH", `/v1/live/${aLive}`, { autonomy: true })).status).toBe(403);
+      expect((await call(alice.token, "POST", "/v1/live", { repo, autonomy: true })).status).toBe(403);
+      await call(owner.token, "PATCH", "/v1/org", { live_autonomy: true });
+    });
+
+    it("pauses agents that keep talking to each other without a person", async () => {
+      const send = (token: string, from: string, to: string, from_agent: boolean) =>
+        call(token, "POST", "/v1/live/messages", { from_live: from, to_live: to, body: "agent chatter", from_agent });
+      // A person spoke last (Bob's answer earlier was typed by him), so agents get a run of 8 from here.
+      await sql`DELETE FROM live_messages WHERE org_id = ${orgA}`;
+      for (let i = 0; i < 8; i++) {
+        const r = i % 2 ? await send(bob.token, bLive, aLive, true) : await send(alice.token, aLive, bLive, true);
+        expect(r.status).toBe(201);
+      }
+      const blocked = await send(alice.token, aLive, bLive, true);
+      expect(blocked.status).toBe(429);
+      expect(blocked.body.error).toContain("without a person");
+      // A person replying unblocks it.
+      expect((await send(bob.token, bLive, aLive, false)).status).toBe(201);
+      expect((await send(alice.token, aLive, bLive, true)).status).toBe(201);
+    });
+
+    it("rate-limits senders and caps live sessions per person", async () => {
+      await sql`DELETE FROM live_messages WHERE org_id = ${orgA}`;
+      for (let i = 0; i < 30; i++) expect((await call(owner.token, "POST", "/v1/live/messages", { to_live: aLive, body: `n${i}` })).status).toBe(201);
+      expect((await call(owner.token, "POST", "/v1/live/messages", { to_live: aLive, body: "one more" })).status).toBe(429);
+      // A poll returns at most 20, and says there are more.
+      const p = (await call(alice.token, "POST", `/v1/live/${aLive}/poll`, {})).body;
+      expect([p.messages.length, p.more]).toEqual([20, true]);
+      expect((await call(alice.token, "POST", `/v1/live/${aLive}/poll`, {})).body.messages).toHaveLength(10);
+
+      const extra: string[] = [];
+      for (let i = 0; i < 4; i++) extra.push((await call(alice.token, "POST", "/v1/live", { repo: `github.com/acme/x${i}` })).body.id);
+      expect((await call(alice.token, "POST", "/v1/live", { repo })).status).toBe(429);
+      for (const id of extra) expect((await call(alice.token, "POST", `/v1/live/${id}/end`)).status).toBe(200);
+    });
+
+    it("ends live sessions (owner or admin), and old ones expire", async () => {
+      expect((await call(bob.token, "POST", `/v1/live/${aLive}/end`)).status).toBe(403);
+      expect((await call(owner.token, "POST", `/v1/live/${aLive}/end`)).status).toBe(200);
+      expect((await call(alice.token, "POST", `/v1/live/${aLive}/poll`, {})).body.ended).toBe(true);
+      expect((await call(bob.token, "POST", "/v1/live/messages", { to_live: aLive, body: "still there?" })).status).toBe(404);
+      expect((await call(bob.token, "GET", "/v1/live")).body.live.map((l: any) => l.id)).toEqual([bLive]);
+      expect((await call(bob.token, "GET", "/v1/live?ended=1")).body.live.map((l: any) => l.id)).toContain(aLive);
+
+      await sql`UPDATE live_sessions SET heartbeat_at = now() - interval '13 hours' WHERE id = ${bLive}`;
+      expect((await call(alice.token, "GET", "/v1/live")).body.live.find((l: any) => l.id === bLive).state).toBe("away");
+      await purgeExpired(sql, storage);
+      expect((await call(alice.token, "GET", "/v1/live")).body.live).toEqual([]);
+      await sql`UPDATE live_sessions SET ended_at = now() - interval '8 days' WHERE org_id = ${orgA}`;
+      await purgeExpired(sql, storage);
+      const [left] = await sql`SELECT count(*)::int AS n FROM live_sessions WHERE org_id = ${orgA}`;
+      expect(left!.n).toBe(0);
+      const actions = (await sql`SELECT DISTINCT action FROM audit_log WHERE org_id = ${orgA} AND action LIKE 'live.%'`).map((r) => r.action).sort();
+      expect(actions).toEqual(["live.end", "live.message", "live.start", "live.update"]);
+    });
   });
 
   it("records usage and audit events", async () => {

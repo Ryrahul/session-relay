@@ -13,6 +13,7 @@ const ACTIONS = [
   { value: "session.comment", label: "Comments" },
   { value: "session.export", label: "Exports" },
   { value: "session.delete", label: "Deletes" },
+  { value: "live", label: "Live" },
   { value: "member", label: "Members" },
   { value: "invite", label: "Invites" },
   { value: "token", label: "Tokens" },
@@ -25,6 +26,7 @@ const SETTING_NAMES: Record<string, string> = {
   repo_allowlist: "allowed repositories",
   redaction_patterns: "secret patterns",
   share_templates: "handoff templates",
+  live_autonomy: "whether agents may act on live messages without asking",
 };
 const EDIT_NAMES: Record<string, string> = { title: "title", summary: "summary", assignee: "who it's for", pr_url: "pull request", draft: "draft", visibility: "visibility" };
 const list = (keys: string[], names: Record<string, string>) => keys.map((k) => names[k] ?? k.replace(/_/g, " ")).join(", ");
@@ -80,6 +82,14 @@ function describe(e: AuditEntry, people: Map<string, string>): string {
       const keys = Object.keys(m);
       return keys.length ? `changed ${list(keys, SETTING_NAMES)}` : "changed settings";
     }
+    case "live.start":
+      return `started working live${m.repo ? ` in ${m.repo}` : ""}${m.autonomy ? " (agent acts on messages without asking)" : ""}`;
+    case "live.end":
+      return "ended a live session";
+    case "live.update":
+      return m.autonomy ? "let their agent act on teammates' messages without asking" : "made their agent ask before acting on teammates' messages";
+    case "live.message":
+      return `sent a live ${m.kind === "question" ? "question" : m.kind === "answer" ? "answer" : "message"}${Number(m.to) > 1 ? ` to ${m.to} live sessions` : ""}${m.agent ? " (written by their agent)" : ""}`;
     default:
       return e.action.replace(/[._]/g, " ");
   }
@@ -124,7 +134,7 @@ export function Audit({ me }: { me: MeResponse }) {
       <header className="page-head">
         <div>
           <h1>Audit log</h1>
-          <p className="muted">Every share, view, pickup, edit, comment, export and settings change in {me.org.name}.</p>
+          <p className="muted">Every share, view, pickup, edit, comment, export, live message and settings change in {me.org.name}.</p>
         </div>
       </header>
       <div className="toolbar toolbar-filters">
@@ -167,6 +177,7 @@ export function Audit({ me }: { me: MeResponse }) {
                   ) : (
                     e.action.startsWith("session.") && e.target_id && <span className="faint">a deleted session</span>
                   )}
+                  {e.action.startsWith("live.") && e.target_id && <a href={`#/live/${e.target_id}`}>{e.target_id}</a>}
                 </span>
               </li>
             ))}

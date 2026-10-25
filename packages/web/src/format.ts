@@ -42,6 +42,7 @@ export type Route =
   | { page: "device"; code: string }
   | { page: "sessions" }
   | { page: "activity" }
+  | { page: "live"; id?: string }
   | { page: "stats" }
   | { page: "audit" }
   | { page: "session"; id: string }
@@ -58,6 +59,8 @@ export function parseRoute(hash: string): Route {
   if (m) return { page: "session", id: m[1]! };
   if (hash.startsWith("#/start")) return { page: "start" };
   if (hash.startsWith("#/activity")) return { page: "activity" };
+  const live = /^#\/live(?:\/([\w-]+))?/.exec(hash);
+  if (live) return { page: "live", id: live[1] };
   if (hash.startsWith("#/stats")) return { page: "stats" };
   if (hash.startsWith("#/audit")) return { page: "audit" };
   if (hash.startsWith("#/members")) return { page: "members" };

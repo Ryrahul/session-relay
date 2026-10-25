@@ -16,6 +16,7 @@ Handing off agent work means copy-pasting chat logs, or the next person starting
 - **`/share`**: the agent writes a handoff (goal, decisions, done, next steps, open questions) and shares it with the recent conversation and the files touched.
 - **`/pickup`**: the next person's agent finds it, reads it, checks the code and continues, in any of the supported agents.
 - **Handoff chains**: work picked up and shared again is linked, so every session shows who started it and who continued it.
+- **Work live together** (`/live`): when two people work at the same time, see who's on what and which files they touch, and send messages that reach each other's agent between steps. Agents show messages to you first, unless you let them act on their own.
 - **Handoffs for someone**: share "for Akshat" and it's first in their `/pickup`. Edit a share any time (next steps, title, who it's for).
 - **Auto-share drafts** (opt-in): every Claude Code, Gemini CLI and Copilot CLI session is saved as a private draft when it ends; publish it when it's ready.
 - **Diff snapshots**: attach your uncommitted changes to a share; the next person `git apply`s them.
@@ -57,7 +58,7 @@ Open your server's URL, enter the setup code, and create your organization. You'
 ```sh
 npm install -g session-relay
 relay login --server https://relay.your-team.com    # approve in the browser
-relay setup        # adds /share and /pickup to every agent you have installed
+relay setup        # adds /share, /pickup and /live to every agent you have installed
 ```
 
 Full walkthrough: [Getting started](docs/getting-started.md).
@@ -72,6 +73,7 @@ Online at **https://relay.rahulweb.online**. Sources are in [`docs/`](docs/).
 - [Self-hosting](docs/self-hosting.md): Docker, HTTPS, backups, upgrades
 - [Deploy to Cloudflare](docs/cloudflare.md): Workers, Hyperdrive, R2, no server
 - [Agents](docs/agents.md): how each agent connects, manual setup, MCP tools
+- [Working live](docs/live.md): `/live`, messages between sessions, overlap warnings
 - [CLI reference](docs/cli.md)
 - [Security & privacy](docs/security.md): what's uploaded, redaction, permissions
 - [FAQ](docs/faq.md)

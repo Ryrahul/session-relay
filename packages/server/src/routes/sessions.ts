@@ -24,6 +24,7 @@ import type { Sql } from "../db/client.js";
 import { iso, parseBody } from "../http.js";
 import { diffKey, transcriptKey, type BlobStorage } from "../storage/types.js";
 import { purgeRateLimits } from "../ratelimit.js";
+import { purgeLive } from "./live.js";
 
 const MAX_LIST = 100;
 const MAX_CHAIN = 20;
@@ -95,7 +96,7 @@ export function parseQuery(q: string): { text: string; file?: string; branch?: s
   return out;
 }
 
-function repoAllowed(allowlist: string[], repo: string): boolean {
+export function repoAllowed(allowlist: string[], repo: string): boolean {
   return allowlist.length === 0 || allowlist.some((a) => repo === a || (a.endsWith("/*") && repo.startsWith(a.slice(0, -1))));
 }
 
@@ -548,5 +549,6 @@ export async function purgeExpired(sql: Sql, storage: BlobStorage): Promise<numb
   await sql`DELETE FROM session_comments c USING sessions s WHERE c.session_id = s.id AND s.deleted_at IS NOT NULL`;
   await backfillTranscriptSearch(sql, storage);
   await purgeRateLimits(sql);
+  await purgeLive(sql);
   return rows.length;
 }

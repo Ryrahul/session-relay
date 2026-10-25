@@ -39,19 +39,21 @@ function General({ me, onOrgChanged }: { me: MeResponse; onOrgChanged: () => voi
   const { org, reload } = useOrg();
   const [name, setName] = useState("");
   const [retention, setRetention] = useState("90");
+  const [liveAuto, setLiveAuto] = useState(true);
   const [status, setStatus] = useState<Status>(null);
   const isAdmin = me.role !== "member";
   useEffect(() => {
     if (!org) return;
     setName(org.name);
     setRetention(String(org.settings.retention_days));
+    setLiveAuto(org.settings.live_autonomy);
   }, [org]);
 
   async function save(e: FormEvent) {
     e.preventDefault();
     setStatus(null);
     try {
-      await api.updateOrg({ name: name.trim(), retention_days: Number(retention) });
+      await api.updateOrg({ name: name.trim(), retention_days: Number(retention), live_autonomy: liveAuto });
       await reload();
       onOrgChanged();
       setStatus({ kind: "ok", text: "Saved" });
@@ -61,7 +63,7 @@ function General({ me, onOrgChanged }: { me: MeResponse; onOrgChanged: () => voi
   }
 
   if (!org) return <section className="card"><div className="skeleton-list" aria-busy="true" /></section>;
-  const dirty = name !== org.name || retention !== String(org.settings.retention_days);
+  const dirty = name !== org.name || retention !== String(org.settings.retention_days) || liveAuto !== org.settings.live_autonomy;
 
   return (
     <>
@@ -94,6 +96,21 @@ function General({ me, onOrgChanged }: { me: MeResponse; onOrgChanged: () => voi
                 <span>days</span>
               </div>
               <p className="hint">Applies to new shares. Expired shares and their transcripts are deleted automatically.</p>
+            </div>
+            <div className="field">
+              <span className="label">Live sessions</span>
+              <label className="live-autonomy">
+                <span className="switch">
+                  <input type="checkbox" checked={liveAuto} onChange={(e) => setLiveAuto(e.target.checked)} />
+                  <span />
+                </span>
+                <span>
+                  <strong>People may let their agent act on teammates' messages without asking</strong>
+                  <span className="hint">
+                    Each person chooses for their own live session; it's off until they turn it on. Turning this off switches it off for everyone, including live sessions already running.
+                  </span>
+                </span>
+              </label>
             </div>
             {isAdmin && (
               <div className="row">

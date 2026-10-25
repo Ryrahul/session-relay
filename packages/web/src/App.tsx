@@ -4,6 +4,7 @@ import { api, getToken, setToken } from "./api";
 import { parseRoute, type Route } from "./format";
 import { Login } from "./pages/Login";
 import { Activity } from "./pages/Activity";
+import { Live, LivePage } from "./pages/Live";
 import { Audit } from "./pages/Audit";
 import { Members } from "./pages/Members";
 import { Stats } from "./pages/Stats";
@@ -18,6 +19,7 @@ import { Avatar, Icon, Mark, ThemeSwitch, useTheme } from "./ui";
 
 const NAV: { page: Route["page"]; href: string; label: string; icon: string }[] = [
   { page: "sessions", href: "#/", label: "Sessions", icon: "sessions" },
+  { page: "live", href: "#/live", label: "Live", icon: "live" },
   { page: "activity", href: "#/activity", label: "Activity", icon: "activity" },
   { page: "stats", href: "#/stats", label: "Stats", icon: "stats" },
   { page: "start", href: "#/start", label: "Get started", icon: "start" },
@@ -43,6 +45,16 @@ export function App() {
   }, []);
 
   const refreshMe = useCallback(() => api.me().then(setMe), []);
+
+  // How many teammates are live, for the nav. Checked every 30 seconds while the tab is open.
+  const [liveCount, setLiveCount] = useState(0);
+  useEffect(() => {
+    if (!me) return;
+    const check = () => document.visibilityState === "visible" && api.liveList().then((r) => setLiveCount(r.live.filter((l) => l.state === "live").length), () => undefined);
+    check();
+    const t = setInterval(check, 30_000);
+    return () => clearInterval(t);
+  }, [me]);
 
   useEffect(() => {
     // A fresh server shows first-run setup; otherwise sign in (or resume the saved session).
@@ -90,6 +102,11 @@ export function App() {
             <a key={n.page} href={n.href} className={active === n.page ? "on" : ""} aria-current={active === n.page ? "page" : undefined}>
               <Icon name={n.icon} />
               <span>{n.label}</span>
+              {n.page === "live" && liveCount > 0 && (
+                <span className="nav-count" aria-label={`${liveCount} live now`}>
+                  {liveCount}
+                </span>
+              )}
             </a>
           ))}
         </nav>
@@ -112,6 +129,7 @@ export function App() {
         {route.page === "device" && <Device key={route.code} code={route.code} me={me} />}
         {route.page === "session" && <SessionPage id={route.id} me={me} />}
         {route.page === "activity" && <Activity me={me} />}
+        {route.page === "live" && (route.id ? <LivePage key={route.id} id={route.id} me={me} /> : <Live me={me} />)}
         {route.page === "stats" && <Stats />}
         {route.page === "audit" && <Audit me={me} />}
         {route.page === "start" && <Start me={me} />}

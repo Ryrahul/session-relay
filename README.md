@@ -19,6 +19,7 @@ Handing off agent work means copy-pasting chat logs, or the next person starting
 - **Work live together** (`/live`): when two people work at the same time, see who's on what and which files they touch, and send messages that reach each other's agent between steps. Agents show messages to you first, unless you let them act on their own.
 - **Handoffs for someone**: share "for Akshat" and it's first in their `/pickup`. Edit a share any time (next steps, title, who it's for).
 - **Auto-share drafts** (opt-in): every Claude Code, Gemini CLI and Copilot CLI session is saved as a private draft when it ends; publish it when it's ready.
+- **Share without your prompts**: `/share without my prompts` or `relay config prompts hide` keeps what you typed on your laptop; teammates still get the agent's work and the summary.
 - **Diff snapshots**: attach your uncommitted changes to a share; the next person `git apply`s them.
 - **Handoff templates**: admins decide what a handoff must include per repo ("Tests run", "Migration notes") in a guided editor with ready-made sections and a preview; `/share` follows it.
 - **Comments**: teammates leave notes on a session; the agent that picks it up reads them.

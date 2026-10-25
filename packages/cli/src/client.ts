@@ -91,10 +91,10 @@ export class RelayClient {
   diff(id: string) {
     return apiText(this.config, `v1/sessions/${encodeURIComponent(id)}/diff`);
   }
-  export(id: string, format: "md" | "json") {
-    return apiText(this.config, `v1/sessions/${encodeURIComponent(id)}/export?format=${format}`);
+  export(id: string, format: "md" | "json", opts: { prompts?: boolean } = {}) {
+    return apiText(this.config, `v1/sessions/${encodeURIComponent(id)}/export?format=${format}${opts.prompts === false ? "&prompts=0" : ""}`);
   }
-  exportAll(query: { repo?: string; since?: string; author?: string; full?: boolean }) {
+  exportAll(query: { repo?: string; since?: string; author?: string; full?: boolean; prompts?: "0" }) {
     const params = new URLSearchParams();
     for (const [k, v] of Object.entries(query)) if (v) params.set(k, v === true ? "1" : String(v));
     return apiText(this.config, `v1/sessions/export?${params}`);

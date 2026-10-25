@@ -158,7 +158,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         done: z.array(z.string()).optional().describe("What was finished in this session"),
         next: z.array(z.string()).optional().describe("Concrete next steps for whoever continues"),
         open_questions: z.array(z.string()).optional().describe("Unresolved questions the next person should know about"),
-        title: z.string().max(200).optional().describe("Short title; defaults to the first prompt"),
+        title: z.string().max(200).optional().describe("Short title; defaults to the first prompt (or the goal, when the user's prompts are left out)"),
         include: z.enum(["summary", "summary+tail", "full"]).optional().describe('What to upload besides your summary: nothing, the last 30 messages, or the whole transcript. Default "summary+tail"'),
         people: z.array(z.string()).optional().describe("Names or emails who can see it; omit for the whole team"),
         continues: z
@@ -170,6 +170,10 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         ignore_template: z.boolean().optional().describe("Share even if the repo's template has required sections you left empty"),
         for: z.string().optional().describe("Name or email of the teammate this handoff is for"),
         pr_url: z.string().optional().describe('Pull request URL. Defaults to the current branch\'s open PR (via gh); "none" to leave out'),
+        hide_prompts: z
+          .boolean()
+          .optional()
+          .describe("Leave the user's typed prompts out (a marker takes their place); your replies and tool steps are kept. Pass true when the user asks to share without their messages. Defaults to the user's setting (relay config prompts)"),
       },
     },
     async (args) => {
@@ -185,6 +189,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
           assign: args.for,
           pr: args.pr_url,
           diff: args.include_diff,
+          hidePrompts: args.hide_prompts,
           summary: {
             goal: args.goal,
             decisions: args.decisions ?? [],
@@ -208,7 +213,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         }
         const { id, continues } = await uploadShare(client, prepared);
         return text(
-          `Shared as ${id}: "${session.title}" (${session.include}, ${session.messages.length} messages, ${session.visibility.team ? "whole team" : "selected people"}). ${describeRedactions(prepared.built.redactions)}${continues ? `\nContinues ${continues}.` : ""}${args.for ? `\nFor ${args.for}.` : ""}${session.pr_url ? `\nPR ${session.pr_url}.` : ""}\nTeammates can load it with get_session("${id}") or \`relay pull ${id}\`.`,
+          `Shared as ${id}: "${session.title}" (${session.include}, ${session.messages.length} messages, ${session.visibility.team ? "whole team" : "selected people"}${prepared.built.promptsHidden ? ", your prompts left out" : ""}). ${describeRedactions(prepared.built.redactions)}${continues ? `\nContinues ${continues}.` : ""}${args.for ? `\nFor ${args.for}.` : ""}${session.pr_url ? `\nPR ${session.pr_url}.` : ""}\nTeammates can load it with get_session("${id}") or \`relay pull ${id}\`.`,
         );
       } catch (err) {
         return fail(err);

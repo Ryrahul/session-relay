@@ -22,6 +22,19 @@ export const Message = z.object({
 });
 export type Message = z.infer<typeof Message>;
 
+/** Stands in for the author's typed prompts when they chose not to share them. */
+export const HIDDEN_PROMPT = "(prompt not shared)";
+
+/** Replaces the user's typed prompts with one marker per run of prompts; the agent's side is kept. */
+export function hidePrompts(messages: Message[]): Message[] {
+  const out: Message[] = [];
+  for (const m of messages) {
+    if (m.role !== "user") out.push(m);
+    else if (out.at(-1)?.role !== "user") out.push({ role: "user", text: HIDDEN_PROMPT, ...(m.at ? { at: m.at } : {}) });
+  }
+  return out;
+}
+
 /** An extra handoff section, usually asked for by the repo's template ("Tests run", "Migration notes"). */
 export const SummarySection = z.object({
   title: z.string().trim().min(1).max(60),

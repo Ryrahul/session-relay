@@ -8,7 +8,7 @@ export function meRoutes(sql: Sql) {
     const { orgId, userId, role } = c.get("auth");
     const [row] = await sql`
       SELECT u.name AS user_name, u.email, o.name AS org_name, o.slug AS org_slug,
-             s.retention_days, s.repo_allowlist, s.redaction_patterns, s.share_templates
+             s.retention_days, s.repo_allowlist, s.redaction_patterns, s.share_templates, s.live_autonomy
       FROM users u, orgs o
       JOIN org_settings s ON s.org_id = o.id
       WHERE u.id = ${userId} AND o.id = ${orgId}
@@ -22,6 +22,7 @@ export function meRoutes(sql: Sql) {
         repo_allowlist: row!.repo_allowlist,
         redaction_patterns: row!.redaction_patterns,
         share_templates: row!.share_templates,
+        live_autonomy: row!.live_autonomy,
       },
     };
     return c.json(body);

@@ -9,9 +9,10 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T>(config: CliConfig, method: string, route: string, body?: unknown): Promise<T> {
+export async function api<T>(config: CliConfig, method: string, route: string, body?: unknown, timeoutMs?: number): Promise<T> {
   const res = await fetch(new URL(route, config.server.replace(/\/?$/, "/")), {
     method,
+    signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
     headers: {
       authorization: `Bearer ${config.token}`,
       ...(body === undefined ? {} : { "content-type": "application/json" }),

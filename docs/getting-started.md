@@ -127,6 +127,8 @@ relay pull rs_7KQ2M9XA         # writes .relay/handoff-rs_7KQ2M9XA.md
 
 Then tell any agent: *"Read .relay/handoff-rs_7KQ2M9XA.md and continue."*
 
+Working at the same time as a teammate? Run `/live` in both agents: you see who's on what, get a warning before editing a file they just changed, and can message each other's sessions ("tell Akshat I renamed createInvoice"). Turn on `relay setup --live on` once so messages arrive in Claude Code and Gemini CLI by themselves. [Working live](live.md).
+
 To catch up on what the team did: `relay digest` (or `--days 7`), the **Activity** page, or ask your agent "what did the team do today?".
 
 ## The web app
@@ -137,11 +139,12 @@ Open your server's address in a browser and sign in with your token. You can:
 - switch between **All**, **For me** (handoffs shared for you), **Shared by me** and **My drafts**; filter by agent and repo, or search `file:` and `branch:`
 - **Edit** your shares: title, summary, next steps, who it's for, the pull request, template sections
 - **Comment** on any session you can see
+- see who's working **Live**, on what and which files, and message their sessions
 - see **Activity** (what the team shared, picked up and discussed) and **Stats** (who shares and picks up, by agent and repo)
 - **download** a session as Markdown or JSON
 - invite teammates with a link (admins, **Members**)
 - **Settings**, in tabs:
-  - **General**: the org's name and how long shares are kept
+  - **General**: the org's name, how long shares are kept, and whether people may let agents act on live messages without asking
   - **Privacy**: allowed repositories, extra secret patterns, and a box to test them on sample text
   - **Handoff templates**: sections every handoff in a repo should have ([how](agents.md#handoff-templates))
   - **Tokens**: create or revoke your own

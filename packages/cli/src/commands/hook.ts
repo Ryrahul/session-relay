@@ -6,6 +6,7 @@ import { RelayClient } from "../client.js";
 import { configPath } from "../config.js";
 import { repoInfo } from "../git.js";
 import { prepareShare, uploadShare } from "../share.js";
+import { liveHook, type LiveEvent } from "./live-hook.js";
 
 /** Below this many messages a session isn't worth a draft. */
 const MIN_MESSAGES = 4;
@@ -67,12 +68,25 @@ export async function sessionEnd(opts: { tool: string }): Promise<string> {
   return `draft ${id} for ${tool} ${nativeId} (${repo.repo})${sessions.length ? `, replaced ${sessions.map((s) => s.id).join(", ")}` : ""}`;
 }
 
-export async function hook(event: string, opts: { tool: string }): Promise<void> {
+const LIVE_EVENTS = new Set<LiveEvent>(["prompt", "pre-edit", "post-tool", "stop", "end"]);
+
+/** relay hook live <event>: see live-hook.ts. */
+async function live(event: string, opts: { tool: string }): Promise<void> {
+  if (!LIVE_EVENTS.has(event as LiveEvent)) throw new Error(`unknown live hook event "${event}"`);
+  const tool: SourceTool = opts.tool === "claude" ? "claude-code" : (opts.tool as SourceTool);
+  const input = JSON.parse((await readStdin()) || "{}");
+  const { out, log: line } = await liveHook(event as LiveEvent, tool, input);
+  if (out) process.stdout.write(out + "\n");
+  if (line) await log(line);
+}
+
+export async function hook(event: string, sub: string | undefined, opts: { tool: string }): Promise<void> {
   try {
-    if (event !== "session-end") throw new Error(`unknown hook event "${event}"`);
-    await log(await sessionEnd(opts));
+    if (event === "live") await live(sub ?? "", opts);
+    else if (event === "session-end") await log(await sessionEnd(opts));
+    else throw new Error(`unknown hook event "${event}"`);
   } catch (err) {
-    await log(`error: ${(err as Error).message}`);
+    await log(`error (${event}${sub ? " " + sub : ""}): ${(err as Error).message}`);
   }
   // Hooks must never break the agent.
   process.exitCode = 0;

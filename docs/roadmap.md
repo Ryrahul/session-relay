@@ -52,6 +52,8 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 
 | Version | Date | |
 |---|---|---|
+| CLI `0.6.0` on npm | 2026-10-25 | Working live: `/live`, `relay live`, `relay setup --live on` (hooks for Claude Code and Gemini CLI), MCP `start_live`, `live_status`, `send_live_message`, `check_live_inbox`, `update_live`, `stop_live` |
+| Server and web app | 2026-10-25 | Live sessions: Live page, messages between sessions, overlap warnings, auto per live session and an org switch, caps, audit (migration 0013) |
 | CLI `0.5.1` on npm | 2026-10-24 | Listed in the official MCP Registry (`io.github.Ryrahul/session-relay`) and on Glama; MCP tools have titles, read-only/destructive hints and a description for every input |
 | Web app | 2026-10-24 | Easier to use: Settings in tabs; a guided handoff-template editor (examples, one-click sections, required switches, reorder, preview, unsaved-changes bar, which repos it applies to); All / For me / Shared by me / My drafts views; plain-words audit log; session list fixed on phones |
 | CLI `0.5.0` on npm | 2026-10-24 | `relay share --diff`, `relay template`, `relay edit --section`, `relay export`, `relay audit`; dry-run lists redactions; MCP `share_template`, `get_session_diff` |
@@ -80,6 +82,7 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 | Comments | Done; integration, CLI, MCP and browser tested, with redaction |
 | Activity digest, stats | Done; integration, CLI, MCP and browser tested (desktop, phone, light, dark) |
 | Auto-share drafts | Done; integration, hook end-to-end (replace, skip shared, bad input), settings unit tests, browser tested |
+| Working live | Done; integration-tested (delivery, read state, broadcast, overlaps, auto, loop breaker, caps, expiry), hook unit tests, end-to-end with real Claude Code (prompt, edit, stop hooks; show-first and auto), browser tested |
 | Self-hosting (Docker, Caddy or nginx) | Done; running in production |
 | Cloudflare Workers | Done; smoke-tested in CI with wrangler dev + Postgres on every PR |
 | CI/CD (deploy branch, rehearsal, backup, rollback) | Done; see [deploy-pipeline.md](deploy-pipeline.md) |

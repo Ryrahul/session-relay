@@ -62,7 +62,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
     "list_sessions",
     {
       title: "List shared sessions",
-      annotations: { readOnlyHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
       description:
         "List sessions teammates have shared. Defaults to the current repo; pass all_repos to see everything. for_me lists handoffs assigned to you (from any repo).",
       inputSchema: {
@@ -92,7 +92,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
     "search_sessions",
     {
       title: "Search shared sessions",
-      annotations: { readOnlyHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
       description:
         'Full-text search over shared sessions (titles, summaries, messages). The query can include "file:<path>" and "branch:<name>" filters.',
       inputSchema: {
@@ -117,7 +117,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
     "get_session",
     {
       title: "Load a shared session",
-      annotations: { readOnlyHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
       description:
         'Load a shared session as a handoff: summary, decisions, next steps, files and conversation. mode "tail" (default) = summary + recent messages; "summary" = summary only; "full" = full transcript, paged with offset.',
       inputSchema: {
@@ -225,7 +225,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
     "get_session_diff",
     {
       title: "Get a session's code changes",
-      annotations: { readOnlyHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
       description:
         "The uncommitted changes a teammate attached to a shared session, as a unified diff. Use it to see exact code state; to apply it, write it to a file and run `git apply`.",
       inputSchema: {
@@ -249,7 +249,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
     "share_template",
     {
       title: "Get the repo's handoff template",
-      annotations: { readOnlyHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
       description: "The handoff template for the current repo: extra sections (some required) and instructions to follow when sharing. Call it before share_current_session.",
       inputSchema: {},
     },
@@ -270,7 +270,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
     "team_activity",
     {
       title: "Team activity",
-      annotations: { readOnlyHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
       description: "What the team did recently: new shares by repo, handoffs for you, who picked up what, and new comments.",
       inputSchema: { days: z.number().int().min(1).max(30).optional().describe("Look back this many days (default 1)") },
     },
@@ -411,7 +411,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
     "live_status",
     {
       title: "Who's working live",
-      annotations: { readOnlyHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
       description: "Who is working live right now: repo, branch, what they're doing, files they touched recently, and whether this session is live.",
       inputSchema: {},
     },

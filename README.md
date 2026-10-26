@@ -1,5 +1,7 @@
 # Session Relay
 
+[![M8ven Verified](https://m8ven.ai/badge/mcp/ryrahul-session-relay-w4odxx?variant=verified&v=2e7c8be135dfa4809ef619ee66839bec)](https://m8ven.ai/mcp/ryrahul-session-relay-w4odxx?s=readme)
+
 **Pick up where your teammate left off.** Share coding-agent sessions across **Claude Code**, **Codex**, **OpenCode**, **Gemini CLI**, **Copilot CLI**, **Cursor** and **ZCode**. Your teammate continues in whichever tool they use, with the goal, decisions, next steps and recent conversation.
 
 ```

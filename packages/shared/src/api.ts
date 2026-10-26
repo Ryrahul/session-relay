@@ -260,7 +260,7 @@ export const AuditEntry = z.object({
   target_id: z.string().nullable(),
   /** Title of the session the entry is about, if it still exists. */
   session_title: z.string().nullable(),
-  meta: z.record(z.unknown()),
+  meta: z.record(z.string(), z.unknown()),
   created_at: z.string(),
 });
 export type AuditEntry = z.infer<typeof AuditEntry>;

@@ -1,6 +1,6 @@
 {
   "name": "session-relay",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "mcpName": "io.github.Ryrahul/session-relay",
   "description": "Share coding-agent sessions (Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor, ZCode) with your team. /share in one agent, /pickup in another. Handoffs for teammates, PR links, edits.",
   "license": "AGPL-3.0-only",
@@ -50,10 +50,10 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
     "commander": "^12.1.0",
-    "zod": "^3.25.76"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "esbuild": "^0.24.2",
+    "esbuild": "^0.28.2",
     "@session-relay/shared": "*"
   },
   "publishConfig": {

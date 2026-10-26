@@ -52,6 +52,7 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 
 | Version | Date | |
 |---|---|---|
+| CLI `0.7.1` on npm | 2026-10-26 | zod 4 (fixes GHSA-mrhx-c7xc-m3w5, high), all four hints on every MCP tool, MCP server tests for every tool; production dependencies have no known vulnerabilities |
 | CLI `0.7.0` on npm | 2026-10-25 | Share without your prompts: `relay share --no-prompts`, `relay config prompts hide`, MCP `hide_prompts`, `relay export --no-prompts` |
 | Server and web app | 2026-10-25 | Export without prompts (`prompts=0`) |
 | CLI `0.6.0` on npm | 2026-10-25 | Working live: `/live`, `relay live`, `relay setup --live on` (hooks for Claude Code and Gemini CLI), MCP `start_live`, `live_status`, `send_live_message`, `check_live_inbox`, `update_live`, `stop_live` |

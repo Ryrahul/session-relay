@@ -161,7 +161,7 @@ function landing() {
   <section class="hero">
     <p class="eyebrow">For teams using Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Cursor and ZCode</p>
     <h1>Pick up where your teammate left off.</h1>
-    <p class="lede">Share a coding-agent session with one command. Your teammate continues it in whichever agent they use, with the goal, the decisions, the next steps and the recent conversation.</p>
+    <p class="lede">Share a coding-agent session with one command. Your teammate continues it in whichever agent they use, with the goal, the decisions, the next steps and the recent conversation. Working at the same time? Go live and your agents talk to each other.</p>
     <div class="cta">
       <a class="btn btn-primary" href="docs/self-hosting.html">Self-host it</a>
       <a class="btn btn-github" href="${REPO}">${GITHUB_ICON}<span>View on GitHub</span></a>
@@ -203,6 +203,37 @@ retry path. Starting with that now.</pre>
       <li><h3>Find</h3><p>Everything your team shares is in one place. Search it from the web app, the <code>relay</code> CLI, or straight from your agent.</p></li>
       <li><h3>Pick up</h3><p>Run <code>/pickup</code>. The agent reads the handoff, checks the current code, tells you where things stand and continues, in whichever agent they use.</p></li>
     </ol>
+  </section>
+
+  <section class="live-home" id="live">
+    <h2>Working at the same time? Go live.</h2>
+    <p class="section-lede">Both run <code>/live</code>. You see who's on what and which files they're touching, get warned before editing a file a teammate just changed, and send messages that reach each other's agent between its steps. Agents show you a message first and ask before acting on it, unless you turn on auto.</p>
+    <div class="handoff" aria-label="Example: two teammates working live, Alice's message reaches Bob's agent">
+      <div class="term">
+        <div class="term-bar"><span class="tool claude">Claude Code</span><span class="faint">Alice</span></div>
+        <pre><span class="prompt">&gt;</span> /live tell Bob I renamed createInvoice
+  to issueInvoice
+<span class="faint">⎿ relay · send_live_message</span>
+Sent to Bob (live in acme/billing,
+touching src/invoices.ts).</pre>
+      </div>
+      <div class="baton" aria-hidden="true">${MARK}</div>
+      <div class="term">
+        <div class="term-bar"><span class="tool opencode">OpenCode</span><span class="faint">Bob</span></div>
+        <pre><span class="faint">⎿ relay · check_live_inbox</span>
+Message from Alice:
+"I renamed createInvoice to issueInvoice"
+Your branch still calls createInvoice in
+src/checkout.ts. Update those calls? <b>(y/n)</b></pre>
+      </div>
+    </div>
+    <ul class="live-points">
+      <li><b>Who's live</b> in the repo and what they're working on</li>
+      <li><b>Overlap warnings</b> before you edit a file they just changed</li>
+      <li><b>Messages and questions</b> between agents, shown to you first</li>
+      <li><b>Caps and an org switch</b> so it never runs away</li>
+    </ul>
+    <p><a href="docs/live.html">How working live works →</a></p>
   </section>
 
   <section class="features-wrap">

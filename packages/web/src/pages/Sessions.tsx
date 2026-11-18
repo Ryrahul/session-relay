@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import type { MeResponse, SessionListItem } from "@session-relay/shared";
+import { linkLabel, type MeResponse, type SessionListItem } from "@session-relay/shared";
 import { api } from "../api";
-import { ago, dayLabel, prLabel, shortRepo, TOOL_NAMES } from "../format";
+import { ago, dayLabel, LINK_ICON, shareLinks, shortRepo, TOOL_NAMES } from "../format";
 import { Avatar, Empty, Icon, ToolBadge } from "../ui";
 
 const TOOLS = Object.keys(TOOL_NAMES);
@@ -172,11 +172,14 @@ export function Sessions({ me }: { me: MeResponse }) {
                           <Icon name="user" size={12} /> {s.assignee.id === me.user.id ? "For you" : `For ${s.assignee.name}`}
                         </span>
                       )}
-                      {s.pr_url && (
-                        <span className="badge" title={s.pr_url}>
-                          <Icon name="pr" size={12} /> {prLabel(s.pr_url)}
-                        </span>
-                      )}
+                      {shareLinks(s)
+                        .slice(0, 2)
+                        .map((l) => (
+                          <span key={l.url} className="badge" title={l.title ? `${l.title} · ${l.url}` : l.url}>
+                            <Icon name={LINK_ICON[l.kind]} size={12} /> {linkLabel({ url: l.url })}
+                          </span>
+                        ))}
+                      {shareLinks(s).length > 2 && <span className="badge">+{shareLinks(s).length - 2}</span>}
                       {s.has_diff && (
                         <span className="badge" title="Uncommitted changes attached">
                           <Icon name="diff" size={12} /> Diff

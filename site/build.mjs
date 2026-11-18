@@ -121,7 +121,7 @@ const FEATURES = [
   ["Handoffs for someone", "Share \"for Akshat\" and it shows up as <b>For you</b> in their list; <code>/pickup</code> checks their handoffs first."],
   ["Handoff templates", "Decide what every handoff in a repo must include, like \"Tests run\" or \"Rollout notes\". <code>/share</code> fills them in; missing ones are flagged. Set up in a guided editor with ready-made sections."],
   ["Diff snapshots", "Attach your uncommitted changes with <code>/share with the diff</code>. Your teammate sees them file by file and can <code>git apply</code> the patch."],
-  ["Linked to PRs and files", "Shares pick up the branch's open pull request automatically. Find every session that touched a file with <code>file:src/billing.ts</code>."],
+  ["Linked to PRs, issues and files", "A share links every pull request and issue the session worked on (GitHub, GitLab, Linear, Jira). Find every session on an issue, or every session that touched a file with <code>file:src/billing.ts</code>."],
   ["Comments and edits", "Leave a note on any session; the next agent reads it before it starts. Fix the title, next steps or who it's for any time after sharing."],
   ["Handoff chains", "Pick up a session and share your work later: it's linked automatically, so every session shows who started it and who continued."],
   ["Auto-share drafts", "Forget to share? Every Claude Code, Gemini CLI and Copilot CLI session can be saved as a private draft when it ends, for you to publish later."],
@@ -174,7 +174,7 @@ function landing() {
         <pre><span class="prompt">&gt;</span> /share
 <span class="faint">⎿ relay · share_current_session</span>
 Shared as <b>rs_P3AC0X4Y</b>: "Make Stripe webhooks
-idempotent with retries" (summary + 30 messages,
+idempotent with retries" (84 messages, PR #212,
 whole team). Removed 2 secrets.</pre>
       </div>
       <div class="baton" aria-hidden="true">${MARK}</div>
@@ -199,7 +199,7 @@ retry path. Starting with that now.</pre>
   <section class="how">
     <h2>How it works</h2>
     <ol class="how-steps">
-      <li><h3>Share</h3><p>Run <code>/share</code> in your agent. It writes a handoff (goal, decisions, done, next steps, open questions) and shares it with the last 30 messages and the files touched. Secrets are removed on your laptop first.</p></li>
+      <li><h3>Share</h3><p>Run <code>/share</code> in your agent. It writes a handoff (goal, decisions, done, next steps, open questions) and shares it with the recent conversation, the PRs and issues it worked on, and the files touched. Secrets are removed on your laptop first.</p></li>
       <li><h3>Find</h3><p>Everything your team shares is in one place. Search it from the web app, the <code>relay</code> CLI, or straight from your agent.</p></li>
       <li><h3>Pick up</h3><p>Run <code>/pickup</code>. The agent reads the handoff, checks the current code, tells you where things stand and continues, in whichever agent they use.</p></li>
     </ol>

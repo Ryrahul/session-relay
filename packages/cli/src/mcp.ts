@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { SourceTool } from "@session-relay/shared";
 import { z } from "zod";
 import { RelayClient, resolvePeople, resolvePerson } from "./client.js";
-import { describeTemplate, matchTemplate, missingSections, type SessionPatch } from "@session-relay/shared";
+import { describeTemplate, linkLabel, matchTemplate, mergeLinks, missingSections, toLink, type SessionPatch } from "@session-relay/shared";
 import { repoInfo } from "./git.js";
 import { renderHandoff } from "@session-relay/shared";
 import { recordPickup } from "./pickups.js";
@@ -20,7 +20,8 @@ import { VERSION } from "./version.js";
 const INSTRUCTIONS = `Session Relay shares coding-agent sessions between teammates (Claude Code, Codex, OpenCode, ZCode, Gemini CLI, Copilot CLI, Cursor).
 - To continue someone's work: search_sessions or list_sessions, then get_session (mode "tail") and read the summary, next steps and recent conversation before acting.
 - Handoffs assigned to you: list_sessions with for_me.
-- To share this session: call share_template first (some repos ask for extra sections), then write an honest handoff summary (goal, decisions, done, next, open questions, plus the template's sections; never secrets) and call share_current_session.
+- To share this session: call share_template first (some repos ask for extra sections), then write an honest, detailed handoff summary (goal, decisions, done, next, open questions, plus the template's sections; never secrets), list every pull request and issue the session worked on in links, and call share_current_session.
+- "Who worked on this PR/issue?": list_sessions with link.
 - To fix or extend a share you made (new next steps, PR link, who it's for): update_session.
 - "What did the team do today/this week?": team_activity.
 - To leave a note on someone's session (a question, "picked this up", a finding): comment_on_session. Comments show up in get_session.
@@ -48,7 +49,7 @@ function formatList(rows: Awaited<ReturnType<RelayClient["list"]>>["sessions"]):
     .map(
       (s) =>
         `- ${s.id} · "${s.title}" · ${s.author.name} · ${s.tool} · ${s.branch ?? "-"} · ${ago(s.created_at)}` +
-        `${s.assignee ? ` · for ${s.assignee.name}` : ""}${s.pr_url ? ` · ${s.pr_url}` : ""}${s.comment_count ? ` · ${s.comment_count} comments` : ""}${s.matched_in === "transcript" ? " · matched in the full transcript (get_session mode full)" : ""}` +
+        `${s.assignee ? ` · for ${s.assignee.name}` : ""}${s.links?.length ? ` · ${s.links.map((l) => l.url).join(", ")}` : s.pr_url ? ` · ${s.pr_url}` : ""}${s.comment_count ? ` · ${s.comment_count} comments` : ""}${s.matched_in === "transcript" ? " · matched in the full transcript (get_session mode full)" : ""}` +
         `\n  goal: ${s.goal.slice(0, 200)}`,
     )
     .join("\n");
@@ -71,16 +72,18 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         branch: z.string().optional().describe("Only sessions shared from this git branch"),
         file: z.string().optional().describe("Only sessions that touched this file (part of the path is fine)"),
         for_me: z.boolean().optional().describe("Only handoffs assigned to you"),
+        link: z.string().optional().describe("Only sessions linked to this pull request or issue URL (from any repo)"),
         all_repos: z.boolean().optional().describe("List sessions from every repo, not just the current one"),
         limit: z.number().int().min(1).max(50).optional().describe("How many to return, newest first (default 10)"),
       },
     },
-    async ({ author, tool, branch, file, for_me, all_repos, limit }) => {
+    async ({ author, tool, branch, file, for_me, link, all_repos, limit }) => {
       try {
         const client = await getClient();
-        const repo = all_repos || for_me ? undefined : await currentRepo();
-        const { sessions } = await client.list({ repo, author, tool, branch, file, assignee: for_me ? "me" : undefined, limit: limit ?? 10 });
-        const head = for_me ? "Handoffs for you:\n" : repo ? `Shared sessions for ${repo}:\n` : "Shared sessions:\n";
+        const repo = all_repos || for_me || link ? undefined : await currentRepo();
+        const url = link ? toLink(link).url : undefined;
+        const { sessions } = await client.list({ repo, author, tool, branch, file, link: url, assignee: for_me ? "me" : undefined, limit: limit ?? 10 });
+        const head = for_me ? "Handoffs for you:\n" : url ? `Shared sessions linked to ${url}:\n` : repo ? `Shared sessions for ${repo}:\n` : "Shared sessions:\n";
         return text(head + formatList(sessions));
       } catch (err) {
         return fail(err);
@@ -151,7 +154,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
       title: "Share this session",
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
       description:
-        "Share the session you are in right now with the team. Write the summary yourself from the conversation: it is what teammates read first. Never include secrets.",
+        "Share the session you are in right now with the team. Write the summary yourself from the conversation: it is what teammates read first, so make it complete enough to continue from without the conversation. List every pull request and issue the session worked on in links. Never include secrets.",
       inputSchema: {
         goal: z.string().describe("What this session is trying to achieve"),
         decisions: z.array(z.string()).optional().describe("Key decisions and why"),
@@ -159,7 +162,11 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         next: z.array(z.string()).optional().describe("Concrete next steps for whoever continues"),
         open_questions: z.array(z.string()).optional().describe("Unresolved questions the next person should know about"),
         title: z.string().max(200).optional().describe("Short title; defaults to the first prompt (or the goal, when the user's prompts are left out)"),
-        include: z.enum(["summary", "summary+tail", "full"]).optional().describe('What to upload besides your summary: nothing, the last 30 messages, or the whole transcript. Default "summary+tail"'),
+        include: z
+          .enum(["summary", "summary+tail", "full"])
+          .optional()
+          .describe('What to upload besides your summary: nothing, the recent conversation (the last 150 messages, up to about 40k tokens), or the whole transcript. Default "summary+tail"'),
+        tail: z.number().int().min(1).max(500).optional().describe("With summary+tail: how many recent messages to keep (default 150)"),
         people: z.array(z.string()).optional().describe("Names or emails who can see it; omit for the whole team"),
         continues: z
           .string()
@@ -169,7 +176,14 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         include_diff: z.boolean().optional().describe("Attach the uncommitted changes in this repo (redacted), so the next person gets the exact code state"),
         ignore_template: z.boolean().optional().describe("Share even if the repo's template has required sections you left empty"),
         for: z.string().optional().describe("Name or email of the teammate this handoff is for"),
-        pr_url: z.string().optional().describe('Pull request URL. Defaults to the current branch\'s open PR (via gh); "none" to leave out'),
+        pr_url: z.string().optional().describe('The main pull request URL. Defaults to the current branch\'s open PR (via gh); "none" to leave out'),
+        links: z
+          .array(z.object({ url: z.string().describe("Pull request, issue or ticket URL"), title: z.string().max(200).optional().describe("Short title, e.g. the issue's title") }))
+          .max(30)
+          .optional()
+          .describe(
+            "Every pull request and issue this session worked on: created, fixed, reviewed, or the task came from (GitHub, GitLab, Linear, Jira…). Links in the conversation to this repo's owner are added automatically; add the rest, with titles where you know them",
+          ),
         hide_prompts: z
           .boolean()
           .optional()
@@ -183,6 +197,8 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         const prepared = await prepareShare(client, {
           tool,
           include: args.include ?? "summary+tail",
+          tail: args.tail,
+          links: args.links,
           title: args.title,
           people: args.people,
           continues: args.continues,
@@ -213,7 +229,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         }
         const { id, continues } = await uploadShare(client, prepared);
         return text(
-          `Shared as ${id}: "${session.title}" (${session.include}, ${session.messages.length} messages, ${session.visibility.team ? "whole team" : "selected people"}${prepared.built.promptsHidden ? ", your prompts left out" : ""}). ${describeRedactions(prepared.built.redactions)}${continues ? `\nContinues ${continues}.` : ""}${args.for ? `\nFor ${args.for}.` : ""}${session.pr_url ? `\nPR ${session.pr_url}.` : ""}\nTeammates can load it with get_session("${id}") or \`relay pull ${id}\`.`,
+          `Shared as ${id}: "${session.title}" (${session.include}, ${session.messages.length} messages, ${session.visibility.team ? "whole team" : "selected people"}${prepared.built.promptsHidden ? ", your prompts left out" : ""}). ${describeRedactions(prepared.built.redactions)}${continues ? `\nContinues ${continues}.` : ""}${args.for ? `\nFor ${args.for}.` : ""}${session.links.length ? `\nLinked: ${session.links.map((l) => linkLabel(l)).join(", ")}.` : ""}\nTeammates can load it with get_session("${id}") or \`relay pull ${id}\`.`,
         );
       } catch (err) {
         return fail(err);
@@ -313,7 +329,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
       title: "Edit a shared session",
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
       description:
-        "Change a share you made (or any share, if you're an admin): title, summary fields, who it's for, the PR link or visibility. Summary lists you pass replace the old ones; use add_next to append next steps.",
+        "Change a share you made (or any share, if you're an admin): title, summary fields, who it's for, linked pull requests and issues, or visibility. Summary lists you pass replace the old ones; use add_next to append next steps and add_links to link more PRs or issues.",
       inputSchema: {
         id: z.string().describe("Id of the session to change"),
         title: z.string().max(200).optional().describe("New title"),
@@ -325,7 +341,13 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         open_questions: z.array(z.string()).optional().describe("Replaces the open questions"),
         sections: z.array(z.object({ title: z.string(), items: z.array(z.string()) })).optional().describe("Replaces the extra sections"),
         for: z.string().optional().describe('Teammate name or email, or "none"'),
-        pr_url: z.string().optional().describe('Pull request URL, or "none"'),
+        pr_url: z.string().optional().describe('The main pull request URL, or "none"'),
+        add_links: z
+          .array(z.object({ url: z.string(), title: z.string().max(200).optional() }))
+          .max(30)
+          .optional()
+          .describe("Pull requests or issues to link, besides the ones already linked"),
+        remove_links: z.array(z.string()).optional().describe("Linked URLs to remove"),
         people: z.array(z.string()).optional().describe("Make it visible only to these people; an empty list makes it visible to the whole team"),
         publish: z.boolean().optional().describe("Publish a draft (saved automatically at session end) to the team, or to `people`"),
       },
@@ -349,6 +371,11 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         }
         if (args.for) patch.assignee = args.for === "none" ? null : await resolvePerson(client, args.for);
         if (args.pr_url) patch.pr_url = args.pr_url === "none" ? null : args.pr_url;
+        if (args.add_links?.length || args.remove_links?.length) {
+          const s = await client.get(args.id, "summary");
+          const drop = new Set((args.remove_links ?? []).map((u) => toLink(u).url));
+          patch.links = mergeLinks(s.links ?? [], (args.add_links ?? []).map((l) => toLink(l.url, l.title))).filter((l) => !drop.has(l.url));
+        }
         if (args.people) {
           patch.visibility = args.people.length ? { team: false, people: await resolvePeople(client, args.people) } : { team: true, people: [] };
         }

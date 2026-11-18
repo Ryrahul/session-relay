@@ -1,12 +1,26 @@
 import path from "node:path";
-import type { IncludeMode, Message, SessionUpload, Summary, Visibility, RedactionHit } from "@session-relay/shared";
-import { hidePrompts } from "@session-relay/shared";
+import type { IncludeMode, Message, SessionLink, SessionUpload, Summary, Visibility, RedactionHit } from "@session-relay/shared";
+import { findLinks, hidePrompts, mergeLinks } from "@session-relay/shared";
 import type { LocalSession } from "./adapters/types.js";
 import type { RepoInfo } from "./git.js";
 import { createRedactor } from "@session-relay/shared";
 
-export const DEFAULT_TAIL = 30;
+export const DEFAULT_TAIL = 150;
+/** The tail also stops at this many characters (about 40k tokens), so a pickup stays readable. */
+export const TAIL_CHARS = 150_000;
 const MAX_MESSAGE_CHARS = 8000;
+
+/** The most recent messages: at most `n`, and no more than TAIL_CHARS of text (always at least one). */
+export function takeTail(messages: Message[], n: number, maxChars = TAIL_CHARS): Message[] {
+  let chars = 0;
+  let start = messages.length;
+  while (start > 0 && messages.length - start < n) {
+    chars += messages[start - 1]!.text.length;
+    if (chars > maxChars && start < messages.length) break;
+    start--;
+  }
+  return messages.slice(start);
+}
 
 export interface BuildOptions {
   include: IncludeMode;
@@ -17,6 +31,8 @@ export interface BuildOptions {
   redactionPatterns?: string[];
   /** Leave the user's typed prompts out: a marker takes their place, and no title or goal is taken from them. */
   hidePrompts?: boolean;
+  /** Pull requests and issues to link, besides the ones found in the conversation. */
+  links?: SessionLink[];
 }
 
 export interface BuiltShare {
@@ -94,7 +110,9 @@ export function buildShare(local: LocalSession, repo: RepoInfo, opts: BuildOptio
     title: clean(title).slice(0, 200),
     summary,
     files_touched: [...new Set(local.filesTouched.map((f) => relativeTo(repo.root, f)))].sort(),
-    messages: opts.include === "summary" ? [] : all.slice(-tail),
+    messages: opts.include === "summary" ? [] : takeTail(all, tail),
+    // Found in the whole conversation, not only the tail.
+    links: mergeLinks(opts.links, findLinks(all.map((m) => m.text), repo.repo)),
     include: opts.include,
     visibility: opts.visibility ?? { team: true, people: [] },
     redactions: 0,

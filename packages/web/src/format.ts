@@ -1,3 +1,4 @@
+import { mergeLinks, type SessionLink } from "@session-relay/shared";
 export const TOOL_NAMES: Record<string, string> = { "claude-code": "Claude Code", opencode: "OpenCode", codex: "Codex", zcode: "ZCode", gemini: "Gemini CLI", copilot: "Copilot CLI", cursor: "Cursor" };
 
 export function ago(iso: string): string {
@@ -69,9 +70,10 @@ export function parseRoute(hash: string): Route {
   return { page: "sessions" };
 }
 
-/** "github.com/acme/api/pull/42" → "acme/api#42"; other URLs → their host and path. */
-export function prLabel(url: string): string {
-  const m = /^https?:\/\/[^/]+\/(.+?)\/(?:pull|merge_requests|pull-requests)\/(\d+)/.exec(url);
-  if (m) return `${m[1]!.split("/").slice(-2).join("/")}#${m[2]}`;
-  return url.replace(/^https?:\/\//, "");
+
+/** A share's PRs and issues; shares from older servers only have pr_url. */
+export function shareLinks(s: { pr_url?: string | null; links?: SessionLink[] }): SessionLink[] {
+  return mergeLinks(s.pr_url ? [{ url: s.pr_url, kind: "pr" }] : [], s.links);
 }
+
+export const LINK_ICON = { pr: "pr", issue: "issue", other: "chain" } as const;

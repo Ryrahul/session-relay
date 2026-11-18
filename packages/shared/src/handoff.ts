@@ -1,4 +1,5 @@
 import type { SessionDetail } from "./api.js";
+import { mergeLinks, parseLink } from "./links.js";
 
 const TOOL_NAMES = { "claude-code": "Claude Code", codex: "Codex", opencode: "OpenCode", zcode: "ZCode", gemini: "Gemini CLI", copilot: "Copilot CLI", cursor: "Cursor" } as const;
 
@@ -18,7 +19,6 @@ export function renderHandoff(s: SessionDetail): string {
       ? [`Continues ${s.chain.map((c) => `"${c.title}" (${c.author.name}, \`${c.id}\`)`).join(" → ")}`]
       : []),
     ...(s.assigned_to ? [`For **${s.assigned_to.name}**`] : []),
-    ...(s.pr_url ? [`Pull request: ${s.pr_url}`] : []),
     ...(s.diff
       ? [`Uncommitted changes attached: ${s.diff.files} file${s.diff.files === 1 ? "" : "s"} (+${s.diff.additions} −${s.diff.deletions}). \`relay pull ${s.id}\` writes them as a patch you can \`git apply\`.`]
       : []),
@@ -31,7 +31,17 @@ export function renderHandoff(s: SessionDetail): string {
     s.summary.goal || "(not stated)",
   ].join("\n");
 
+  // Shares from older servers only have pr_url.
+  const links = mergeLinks(s.pr_url ? [{ url: s.pr_url, kind: "pr" }] : [], s.links);
+  const kinds = { pr: "PR", issue: "Issue", other: "Link" } as const;
   const body =
+    list(
+      "Pull requests and issues",
+      links.map((l) => {
+        const short = parseLink(l.url)?.label;
+        return `${kinds[l.kind]} ${short ? `${short}${l.title ? ` (${l.title})` : ""}: ${l.url}` : `${l.title ? `${l.title}: ` : ""}${l.url}`}`;
+      }),
+    ) +
     list("Decisions", s.summary.decisions) +
     list("Done", s.summary.done) +
     list("Next steps", s.summary.next) +

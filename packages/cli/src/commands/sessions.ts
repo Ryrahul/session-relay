@@ -2,7 +2,7 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { describeTemplate, diffStats, IncludeMode, matchTemplate, missingSections, SourceTool, Summary, type DetailMode, type SessionPatch, type SummarySection } from "@session-relay/shared";
+import { describeTemplate, diffStats, IncludeMode, linkLabel, matchTemplate, mergeLinks, missingSections, parseLink, toLink, SourceTool, Summary, type DetailMode, type SessionPatch, type SummarySection } from "@session-relay/shared";
 import { findSessions } from "../adapters/index.js";
 import { RelayClient, resolvePeople, resolvePerson } from "../client.js";
 import { repoInfo } from "../git.js";
@@ -28,6 +28,7 @@ interface ShareOpts {
   continues?: string;
   for?: string;
   pr?: string;
+  link?: string[];
   diff?: boolean;
   prompts?: boolean;
 }
@@ -71,7 +72,7 @@ export async function share(opts: ShareOpts): Promise<void> {
   }
   if (!include && ask_) {
     include = await choose<IncludeMode>("Include", [
-      { label: "summary + last 30 messages", value: "summary+tail" },
+      { label: "summary + recent conversation (last 150 messages)", value: "summary+tail" },
       { label: "summary only", value: "summary" },
       { label: "full transcript", value: "full" },
     ]);
@@ -93,6 +94,7 @@ export async function share(opts: ShareOpts): Promise<void> {
     continues: opts.continues,
     assign: opts.for,
     pr: opts.pr,
+    links: opts.link,
     diff: opts.diff,
     hidePrompts: opts.prompts === undefined ? undefined : !opts.prompts,
   });
@@ -121,13 +123,13 @@ export async function share(opts: ShareOpts): Promise<void> {
       const missing = missingSections(t, session.summary);
       if (missing.length) console.log(`Note: this repo's handoff template asks for ${missing.join(", ")}. Add them with --summary-file, or later: relay edit <id> --section "${missing[0]}=…"`);
     }
-    if (session.pr_url) console.log(`PR ${session.pr_url}${opts.pr ? "" : " (this branch's open PR; --pr none to leave it out)"}`);
+    if (session.links.length) console.log(`Linked: ${session.links.map((l) => linkLabel(l)).join(", ")} (add more with --link <url>)`);
   }
   if (ask_ && !(await confirm("Share it?"))) return console.log("Cancelled.");
 
   const { id, continues } = await uploadShare(client!, prepared);
   if (opts.json) {
-    return console.log(JSON.stringify({ id, title: session.title, redactions: session.redactions, continues: continues ?? null, pr_url: session.pr_url ?? null }));
+    return console.log(JSON.stringify({ id, title: session.title, redactions: session.redactions, continues: continues ?? null, pr_url: session.pr_url ?? null, links: session.links }));
   }
   console.log(`Shared as ${id}. Teammates can run: relay pull ${id}`);
 }
@@ -141,6 +143,7 @@ interface ListOpts {
   author?: string;
   forMe?: boolean;
   file?: string;
+  link?: string;
   limit?: string;
   json?: boolean;
 }
@@ -153,7 +156,7 @@ async function printList(query: Record<string, string | number | undefined>, jso
   for (const s of sessions) {
     const tags = [
       s.assignee ? `for ${s.assignee.name}` : "",
-      s.pr_url ? `PR #${s.pr_url.split("/").pop()}` : "",
+      s.links?.length ? s.links.slice(0, 3).map((l) => parseLink(l.url)?.label ?? linkLabel(l)).join(" ") + (s.links.length > 3 ? ` +${s.links.length - 3}` : "") : s.pr_url ? `PR #${s.pr_url.split("/").pop()}` : "",
       s.comment_count ? `${s.comment_count} comment${s.comment_count === 1 ? "" : "s"}` : "",
       s.draft ? "draft" : "",
       s.matched_in === "transcript" ? "matched in full transcript" : "",
@@ -169,7 +172,7 @@ async function printList(query: Record<string, string | number | undefined>, jso
 export async function list(opts: ListOpts): Promise<void> {
   let repo = opts.repo;
   // Handoffs for you and your drafts are worth seeing from any repo.
-  if (!repo && !opts.all && !opts.forMe && !opts.drafts) repo = await repoInfo().then((r) => r.repo).catch(() => undefined);
+  if (!repo && !opts.all && !opts.forMe && !opts.drafts && !opts.link) repo = await repoInfo().then((r) => r.repo).catch(() => undefined);
   await printList(
     {
       repo,
@@ -178,6 +181,7 @@ export async function list(opts: ListOpts): Promise<void> {
       author: opts.drafts ? "me" : opts.author,
       assignee: opts.forMe ? "me" : undefined,
       file: opts.file,
+      link: opts.link ? toLink(opts.link).url : undefined,
       drafts: opts.drafts ? "only" : undefined,
       limit: opts.limit,
     },
@@ -187,7 +191,7 @@ export async function list(opts: ListOpts): Promise<void> {
 
 export async function search(query: string, opts: ListOpts): Promise<void> {
   await printList(
-    { q: query, repo: opts.repo, branch: opts.branch, author: opts.author, tool: parseTool(opts.tool), assignee: opts.forMe ? "me" : undefined, file: opts.file, limit: opts.limit },
+    { q: query, repo: opts.repo, branch: opts.branch, author: opts.author, tool: parseTool(opts.tool), assignee: opts.forMe ? "me" : undefined, file: opts.file, link: opts.link ? toLink(opts.link).url : undefined, limit: opts.limit },
     opts.json,
   );
 }
@@ -205,6 +209,8 @@ interface EditOpts {
   summaryFile?: string;
   for?: string;
   pr?: string;
+  link?: string[];
+  unlink?: string[];
   team?: boolean;
   people?: string;
 }
@@ -254,6 +260,11 @@ export async function edit(id: string, opts: EditOpts): Promise<void> {
   }
   if (opts.for) patch.assignee = opts.for === "none" ? null : await resolvePerson(client, opts.for);
   if (opts.pr) patch.pr_url = opts.pr === "none" ? null : opts.pr;
+  if (opts.link?.length || opts.unlink?.length) {
+    const drop = new Set((opts.unlink ?? []).map((u) => toLink(u).url));
+    const current = (await client.get(id, "summary")).links ?? [];
+    patch.links = mergeLinks(current, (opts.link ?? []).map((u) => toLink(u))).filter((l) => !drop.has(l.url));
+  }
   if (opts.team) patch.visibility = { team: true, people: [] };
   else if (opts.people) {
     patch.visibility = { team: false, people: await resolvePeople(client, opts.people.split(",").map((p) => p.trim()).filter(Boolean)) };

@@ -15,13 +15,14 @@ Share this session with the team using the relay MCP tool \`share_current_sessio
 
 First call the relay MCP tool \`share_template\`: this repo may ask for extra sections.
 
-Then write a handoff for a teammate who will continue this work, based on this conversation:
+Then write a handoff for a teammate who will continue this work, based on the whole conversation (not only the last part). Assume they won't read the conversation: be specific, with file paths, commands, test results and error messages where they matter.
 - goal: what we are trying to achieve, in one or two sentences
-- decisions: key decisions made and why
-- done: what is finished
-- next: concrete next steps
-- open_questions: anything unresolved
+- decisions: key decisions made and why, including approaches tried and dropped
+- done: what is finished (and how it was checked)
+- next: concrete next steps, in order
+- open_questions: anything unresolved, blocked or risky
 - sections: the template's sections, if it has any
+- links: every pull request and issue this session worked on (created, fixed, reviewed, or where the task came from: GitHub, GitLab, Linear, Jira…), with a short title each. If unsure, check \`gh pr list --author @me\`, \`git log\` and the conversation
 Never include secrets, tokens or passwords.
 
 Then call \`share_current_session\` with those fields. If the user says who it's for ("for Akshat"), pass \`for\`. If this session continued a teammate's shared session you loaded earlier, it is linked automatically; if the work is unrelated, pass \`continues: "none"\`. Extra instructions from the user (title, who should see it, "full transcript", "with the diff" → include_diff, "without my prompts"/"no prompts" → hide_prompts): $ARGUMENTS
@@ -37,7 +38,7 @@ description: Load a teammate's shared session and continue it (Session Relay)
 Load a teammate's shared session and continue it. Request: $ARGUMENTS
 
 Use the relay MCP tools. If the request is empty, first check \`list_sessions\` with \`for_me: true\` (handoffs assigned to me). Otherwise use \`search_sessions\` or \`list_sessions\` to find the best match for this repo. Then \`get_session\` with mode "tail".
-Read the goal, decisions, next steps and recent conversation. Check the current state of the code (git status, the files touched) before changing anything.
+Read the goal, decisions, next steps, linked pull requests and issues, and recent conversation. Check the current state of the code (git status, the files touched) and, when they matter, the linked PRs and issues (\`gh pr view\`, \`gh issue view\`) before changing anything. If you need earlier context and the session has a full transcript, page it with \`get_session\` mode "full".
 Then say in a few lines where things stand and continue with the first next step.
 `;
 

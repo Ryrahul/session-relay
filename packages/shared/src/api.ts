@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { IncludeMode, Message, PrUrl, SessionRecord, SessionUpload, SourceTool, Summary, Visibility } from "./session.js";
+import { IncludeMode, MAX_LINKS, Message, PrUrl, SessionLink, SessionRecord, SessionUpload, SourceTool, Summary, Visibility } from "./session.js";
 
 export const Role = z.enum(["owner", "admin", "member"]);
 export type Role = z.infer<typeof Role>;
@@ -32,6 +32,7 @@ export const SessionListItem = z.object({
   continues_id: z.string().nullable(),
   assignee: z.object({ id: z.string(), name: z.string() }).nullable(),
   pr_url: z.string().nullable(),
+  links: z.array(SessionLink),
   comment_count: z.number().int(),
   draft: z.boolean(),
   has_diff: z.boolean(),
@@ -95,6 +96,8 @@ export const SessionPatch = z.object({
   summary: Summary.optional(),
   assignee: z.string().max(40).nullable().optional(),
   pr_url: PrUrl.nullable().optional(),
+  /** Replaces the links (a new pr_url is added to them). */
+  links: z.array(SessionLink).max(MAX_LINKS).optional(),
   /** false publishes a draft (it can't be turned back into one). */
   draft: z.literal(false).optional(),
 });

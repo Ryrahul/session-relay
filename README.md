@@ -1,5 +1,7 @@
 # Session Relay
 
+[![M8ven Verified](https://m8ven.ai/badge/mcp/ryrahul-session-relay-w4odxx?variant=verified&v=2e7c8be135dfa4809ef619ee66839bec)](https://m8ven.ai/mcp/ryrahul-session-relay-w4odxx?s=readme)
+
 **Pick up where your teammate left off.** Share coding-agent sessions across **Claude Code**, **Codex**, **OpenCode**, **Gemini CLI**, **Copilot CLI**, **Cursor** and **ZCode**. Your teammate continues in whichever tool they use, with the goal, decisions, next steps and recent conversation.
 
 ```
@@ -23,7 +25,7 @@ Handing off agent work means copy-pasting chat logs, or the next person starting
 - **Diff snapshots**: attach your uncommitted changes to a share; the next person `git apply`s them.
 - **Handoff templates**: admins decide what a handoff must include per repo ("Tests run", "Migration notes") in a guided editor with ready-made sections and a preview; `/share` follows it.
 - **Comments**: teammates leave notes on a session; the agent that picks it up reads them.
-- **Linked to PRs and files**: shares carry the branch's pull request; find every session that touched a file with `file:src/billing.ts`.
+- **Linked to PRs, issues and files**: a share links every pull request and issue the session worked on (GitHub, GitLab, Bitbucket, Linear, Jira), found in the conversation and listed by the agent. Find every session on an issue with `relay list --link <url>`, or every session that touched a file with `file:src/billing.ts`.
 - **Web app**: browse, search and read everything your team has shared (All, For me, Shared by me, My drafts), plus an **Activity** digest, team **Stats** and Settings in simple tabs. Light and dark, works on phones.
 - **Export and audit**: download any session as Markdown or JSON; admins see an audit log of everything.
 - **Easy onboarding**: invite links, and `relay login` signs in through the browser.

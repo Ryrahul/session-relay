@@ -29,13 +29,14 @@ The config is at `~/.config/session-relay/config.json` (mode `600`). Override it
 | `--id <id>` | A specific session (prefix is fine; see `relay sessions`) |
 | `--latest` | The newest session, without asking |
 | `--include <mode>` | `summary`, `summary+tail` (default) or `full` |
-| `--tail <n>` | Messages to keep with `summary+tail` (default 30) |
+| `--tail <n>` | Messages to keep with `summary+tail` (default 150, and at most about 150,000 characters) |
 | `--title <title>` | Title teammates see |
 | `--people <names>` | Comma-separated names or emails. Default: the whole team |
 | `--no-prompts` | Leave your typed prompts out. Each becomes `(prompt not shared)`; the agent's replies, tool steps, files and summary are kept, and the title isn't taken from your first prompt. `--prompts` includes them when your default is hide |
 | `--diff` | Attach your uncommitted changes: `git diff HEAD` plus new untracked files (respecting `.gitignore`), redacted, up to 500 KB |
 | `--for <name>` | Teammate this handoff is for (name or email). It's first in their `/pickup` and visible to them even if private |
-| `--pr <url>` | Pull request it belongs to. Default: the current branch's open PR, found with the GitHub CLI (`gh`). `none` to leave it out |
+| `--pr <url>` | The main pull request. Default: the current branch's open PR, found with the GitHub CLI (`gh`). `none` to leave it out |
+| `--link <url>` | Another pull request or issue this work belongs to (repeatable). PRs and issues of the repo's owner mentioned in the conversation, and Linear and Jira issues, are linked automatically |
 | `--continues <id>` | Shared session this work continues. Default: the one you last picked up in this repo (within 7 days). `none` to unlink |
 | `--summary-file <file>` | JSON `{goal, decisions, done, next, open_questions, sections: [{title, items}]}`. Without it, the summary is the first request and the last answer. If the repo has a handoff template with required sections, `relay share` prints a note when they're missing |
 | `--dry-run` | List each redaction (with the text around it) and write what would be uploaded to `.relay/dry-run-*.json`; upload nothing |
@@ -104,7 +105,9 @@ With `hide`, `/share`, `relay share` and auto-share drafts all leave your prompt
 | `--section "<title>=<item>"` | Add an item to a section (e.g. one the repo's template asks for); creates the section if needed. Repeatable |
 | `--summary-file <file>` | Replace the whole summary with JSON `{goal, decisions, done, next, open_questions, sections}` |
 | `--for <name>` | Who it's for; `none` to clear |
-| `--pr <url>` | Pull request; `none` to clear |
+| `--pr <url>` | Main pull request; `none` to clear |
+| `--link <url>` | Link a pull request or issue (repeatable) |
+| `--unlink <url>` | Remove a linked URL (repeatable) |
 | `--team` / `--people <names>` | Visible to the whole team, or only these people |
 
 ## Working live

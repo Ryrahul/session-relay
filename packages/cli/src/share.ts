@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { IncludeMode, SourceTool, Summary } from "@session-relay/shared";
+import { mergeLinks, toLink, type IncludeMode, type SourceTool, type Summary } from "@session-relay/shared";
 import { ADAPTERS, findSessions, type SessionRef } from "./adapters/index.js";
 import { buildShare, type BuiltShare } from "./build.js";
 import { resolvePeople, resolvePerson, type RelayClient } from "./client.js";
@@ -28,6 +28,8 @@ export interface ShareInput {
   assign?: string;
   /** Pull request URL, "none", or undefined to look up the current branch's PR with gh. */
   pr?: string;
+  /** Other pull requests and issues this work belongs to (URLs, or links with titles). */
+  links?: (string | { url: string; title?: string })[];
   /** Attach uncommitted changes (`git diff HEAD` plus new files), redacted. */
   diff?: boolean;
   /** Leave your typed prompts out. Defaults to hide_prompts in the CLI config. */
@@ -70,12 +72,17 @@ export async function prepareShare(client: RelayClient | null, input: ShareInput
     visibility: { team: people.length === 0, people },
     redactionPatterns: me?.settings.redaction_patterns,
     hidePrompts: input.hidePrompts ?? (await readConfig().catch(() => null))?.hide_prompts ?? false,
+    links: (input.links ?? []).map((l) => (typeof l === "string" ? toLink(l) : toLink(l.url, l.title))),
   });
   const continues = await resolveContinues(repo.root, input.continues);
   if (continues.id) built.session.continues = continues.id;
   if (client && input.assign) built.session.assignee = await resolvePerson(client, input.assign);
-  const pr = input.pr === "none" ? undefined : (input.pr ?? (await currentPr(repo.root)));
-  if (pr) built.session.pr_url = pr;
+  // The PR: the one given, else this branch's open PR, else the first PR the conversation links.
+  const pr = input.pr === "none" ? undefined : (input.pr ?? (await currentPr(repo.root)) ?? built.session.links.find((l) => l.kind === "pr")?.url);
+  if (pr) {
+    built.session.pr_url = toLink(pr).url;
+    built.session.links = mergeLinks([toLink(pr)], built.session.links);
+  }
   if (input.diff) {
     const { diff, truncated } = await workingDiff(repo.root);
     if (diff.trim()) {

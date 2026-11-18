@@ -12,7 +12,7 @@ Run Session Relay for your team on any machine with Docker. It's one container f
 - A domain or subdomain pointing at it, e.g. `relay.your-team.com`, if you want HTTPS (you do).
 - Ports 80 and 443 open if you use the built-in Caddy.
 
-Storage: a typical share (summary plus the last 30 messages) is 50–150 KB. A team of 10 sharing a few sessions a day uses well under 1 GB a year at the default 90-day retention.
+Storage: a typical share (summary plus the recent conversation) is 50–300 KB. A team of 10 sharing a few sessions a day uses well under 1 GB a year at the default 90-day retention.
 
 ## 1. Get the code
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LocalSession } from "./adapters/types.js";
-import { buildShare } from "./build.js";
+import { buildShare, takeTail } from "./build.js";
 import { normaliseRemote } from "./git.js";
 import { renderHandoff } from "@session-relay/shared";
 
@@ -20,7 +20,7 @@ const repo = { root: "/home/dev/app", repo: "github.com/acme/app", branch: "main
 
 describe("buildShare", () => {
   it("keeps a tail, makes paths relative and redacts", () => {
-    const { session, transcript, redactions } = buildShare(local, repo, { include: "summary+tail" });
+    const { session, transcript, redactions } = buildShare(local, repo, { include: "summary+tail", tail: 30 });
     expect(session.messages).toHaveLength(30);
     expect(session.messages.at(-1)!.text).toBe("step 49");
     expect(session.files_touched).toEqual(["README.md", "packages/api/src/hook.ts"]);
@@ -28,6 +28,32 @@ describe("buildShare", () => {
     expect(session.redactions).toBe(2); // first message (scanned, outside the tail) and the summary goal
     expect(redactions["stripe-key"]).toBe(2);
     expect(transcript).toBeUndefined();
+    expect(buildShare(local, repo, { include: "summary+tail" }).session.messages).toHaveLength(51);
+  });
+
+  it("stops the tail at a character budget, keeping at least the last message", () => {
+    const msgs = Array.from({ length: 10 }, (_, i) => ({ role: "assistant" as const, text: String(i).repeat(100) }));
+    expect(takeTail(msgs, 150, 350).map((m) => m.text[0])).toEqual(["7", "8", "9"]);
+    expect(takeTail(msgs, 2, 10_000)).toHaveLength(2);
+    expect(takeTail(msgs, 150, 10)).toHaveLength(1);
+  });
+
+  it("links PRs and issues from the whole conversation, plus the ones given", () => {
+    const talk: LocalSession = {
+      ...local,
+      messages: [
+        { role: "user", text: "fix https://github.com/acme/app/issues/12 please" },
+        ...Array.from({ length: 200 }, (_, i) => ({ role: "assistant" as const, text: `step ${i}` })),
+        { role: "tool", text: "ran `gh pr create` → https://github.com/acme/app/pull/40" },
+        { role: "assistant", text: "Upstream: https://github.com/vitest-dev/vitest/issues/1" },
+      ],
+    };
+    const { session } = buildShare(talk, repo, { include: "summary+tail", links: [{ url: "https://acme.atlassian.net/browse/PAY-3", kind: "issue", title: "Payments" }] });
+    expect(session.links).toEqual([
+      { url: "https://github.com/acme/app/pull/40", kind: "pr" },
+      { url: "https://acme.atlassian.net/browse/PAY-3", kind: "issue", title: "Payments" },
+      { url: "https://github.com/acme/app/issues/12", kind: "issue" },
+    ]);
   });
 
   it("sends everything for full, nothing for summary", () => {

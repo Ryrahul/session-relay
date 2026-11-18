@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { HIDDEN_PROMPT, matchTemplate, splitDiff, type DiffFile, type ChainLink, type Member, type MeResponse, type Message, type SessionDetail, type SummarySection } from "@session-relay/shared";
+import { HIDDEN_PROMPT, linkLabel, matchTemplate, parseLink, splitDiff, toLink, type DiffFile, type ChainLink, type Member, type MeResponse, type Message, type SessionDetail, type SummarySection } from "@session-relay/shared";
 import { api, download } from "../api";
-import { ago, dateTime, prLabel, shortRepo, TOOL_NAMES } from "../format";
+import { ago, dateTime, LINK_ICON, shareLinks, shortRepo, TOOL_NAMES } from "../format";
 import { RichText } from "../text";
 import { Avatar, Command, Icon, ToolBadge } from "../ui";
 
@@ -106,6 +106,12 @@ function EditPanel({ s, me, onSaved, onCancel }: { s: SessionDetail; me: MeRespo
   const [questions, setQuestions] = useState(s.summary.open_questions);
   const [assignee, setAssignee] = useState(s.assigned_to?.id ?? "");
   const [pr, setPr] = useState(s.pr_url ?? "");
+  const [links, setLinks] = useState(
+    shareLinks(s)
+      .filter((l) => l.url !== s.pr_url)
+      .map((l) => l.url)
+      .join("\n"),
+  );
   const [members, setMembers] = useState<Member[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -131,6 +137,11 @@ function EditPanel({ s, me, onSaved, onCancel }: { s: SessionDetail; me: MeRespo
         },
         assignee: assignee || null,
         pr_url: pr.trim() || null,
+        // Titles the agent gave are kept for links that stay.
+        links: links
+          .split(/\s+/)
+          .filter(Boolean)
+          .map((url) => shareLinks(s).find((l) => l.url === url) ?? toLink(url)),
       });
       onSaved();
     } catch (err) {
@@ -187,6 +198,16 @@ function EditPanel({ s, me, onSaved, onCancel }: { s: SessionDetail; me: MeRespo
           <label htmlFor="edit-pr">Pull request</label>
           <input id="edit-pr" type="url" placeholder="https://github.com/acme/api/pull/42" value={pr} onChange={(e) => setPr(e.target.value)} />
         </div>
+      </div>
+      <div className="field">
+        <label htmlFor="edit-links">Other pull requests and issues</label>
+        <textarea
+          id="edit-links"
+          rows={Math.min(8, Math.max(2, links.split("\n").length + 1))}
+          placeholder={"One URL per line\nhttps://github.com/acme/api/issues/12"}
+          value={links}
+          onChange={(e) => setLinks(e.target.value)}
+        />
       </div>
       {error && <p className="error">{error}</p>}
       <div className="row">
@@ -483,11 +504,14 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
               <Icon name="user" size={12} /> {s.assigned_to.id === me.user.id ? "For you" : `For ${s.assigned_to.name}`}
             </span>
           )}
-          {s.pr_url && (
-            <a className="badge badge-link" href={s.pr_url} target="_blank" rel="noreferrer">
-              <Icon name="pr" size={12} /> {prLabel(s.pr_url)}
-            </a>
-          )}
+          {shareLinks(s)
+            .slice(0, 6)
+            .map((l) => (
+              <a key={l.url} className="badge badge-link" href={l.url} target="_blank" rel="noreferrer" title={l.title ? `${l.title} · ${l.url}` : l.url}>
+                <Icon name={LINK_ICON[l.kind]} size={12} /> {parseLink(l.url)?.label ?? linkLabel(l)}
+              </a>
+            ))}
+          {shareLinks(s).length > 6 && <span className="badge">+{shareLinks(s).length - 6} more</span>}
           {canEdit && !editing && (
             <button type="button" className="btn-ghost btn-sm push" onClick={() => setEditing(true)}>
               <Icon name="edit" size={14} /> Edit
@@ -622,13 +646,21 @@ export function SessionPage({ id, me }: { id: string; me: MeResponse }) {
                   <dd className="mono">{s.commit}</dd>
                 </>
               )}
-              {s.pr_url && (
+              {shareLinks(s).length > 0 && (
                 <>
-                  <dt>Pull request</dt>
+                  <dt>PRs and issues</dt>
                   <dd>
-                    <a href={s.pr_url} target="_blank" rel="noreferrer">
-                      {prLabel(s.pr_url)}
-                    </a>
+                    <ul className="link-list">
+                      {shareLinks(s).map((l) => (
+                        <li key={l.url}>
+                          <Icon name={LINK_ICON[l.kind]} size={12} />{" "}
+                          <a href={l.url} target="_blank" rel="noreferrer">
+                            {parseLink(l.url)?.label ?? linkLabel(l)}
+                          </a>
+                          {l.title && <span className="faint"> {l.title}</span>}
+                        </li>
+                      ))}
+                    </ul>
                   </dd>
                 </>
               )}

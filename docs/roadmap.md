@@ -52,6 +52,8 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 
 | Version | Date | |
 |---|---|---|
+| CLI `0.8.0` on npm | 2026-11-18 | More context and links: a share keeps the last 150 messages (was 30, capped at about 150,000 characters); links every PR and issue it worked on (`--link`, MCP `links`, found automatically in the conversation); `relay list --link`, `relay edit --link/--unlink`, MCP `add_links`; `/share` asks for a detailed handoff from the whole conversation |
+| Server and web app | 2026-11-18 | Links on shares (migration 0014): shown on the session and in the list, editable, `?link=` filter, in handoffs and exports |
 | CLI `0.7.1` on npm | 2026-10-26 | zod 4 (fixes GHSA-mrhx-c7xc-m3w5, high), all four hints on every MCP tool, MCP server tests for every tool; production dependencies have no known vulnerabilities |
 | CLI `0.7.0` on npm | 2026-10-25 | Share without your prompts: `relay share --no-prompts`, `relay config prompts hide`, MCP `hide_prompts`, `relay export --no-prompts` |
 | Server and web app | 2026-10-25 | Export without prompts (`prompts=0`) |
@@ -82,6 +84,7 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 | Handoff chains | Done; integration and end-to-end tested (CLI + MCP) |
 | Invite links, browser login | Done; integration and browser tested |
 | Edit, assign, PR links, file search | Done; integration, CLI, MCP and browser tested |
+| Links to many PRs and issues, bigger conversation tail (150 messages) | Done; unit, integration, CLI and browser tested |
 | Comments | Done; integration, CLI, MCP and browser tested, with redaction |
 | Activity digest, stats | Done; integration, CLI, MCP and browser tested (desktop, phone, light, dark) |
 | Auto-share drafts | Done; integration, hook end-to-end (replace, skip shared, bad input), settings unit tests, browser tested |

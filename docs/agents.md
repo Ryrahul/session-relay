@@ -6,20 +6,20 @@ Session Relay works with **Claude Code**, **Codex**, **OpenCode**, **Gemini CLI*
 
    | Tool | What it does |
    |---|---|
-   | `list_sessions` | Shared sessions for the current repo (or all repos), newest first. `for_me` lists handoffs assigned to you; `file` filters by touched file |
+   | `list_sessions` | Shared sessions for the current repo (or all repos), newest first. `for_me` lists handoffs assigned to you; `file` filters by touched file; `link` finds every session on a pull request or issue |
    | `search_sessions` | Full-text search over titles, summaries and conversations. The query can include `file:` and `branch:` |
    | `get_session` | A session as a handoff: goal, decisions, done, next steps, open questions, files, conversation. `mode`: `tail` (default), `summary`, or `full` (paged) |
-   | `share_current_session` | Shares the session the agent is in, with a summary the agent writes (plus the template's `sections`). Refuses while required template sections are empty, unless `ignore_template`. `include_diff` attaches uncommitted changes. `hide_prompts` leaves the user's typed prompts out ("/share without my prompts"; defaults to `relay config prompts`). `for` assigns it to a teammate; the branch's PR is attached |
+   | `share_current_session` | Shares the session the agent is in, with a summary the agent writes (plus the template's `sections`). Refuses while required template sections are empty, unless `ignore_template`. `include_diff` attaches uncommitted changes. `hide_prompts` leaves the user's typed prompts out ("/share without my prompts"; defaults to `relay config prompts`). `for` assigns it to a teammate. `links` lists every PR and issue it worked on (the branch's PR and the PRs and issues in the conversation are added automatically). Keeps the last 150 messages by default (`tail` to change) |
    | `get_session_diff` | The uncommitted changes attached to a session, as a patch |
    | `share_template` | The repo's handoff template: extra sections and instructions. `/share` calls it first |
    | `team_activity` | What the team did in the last day(s): new shares by repo, handoffs for you, pickups, comments |
    | `comment_on_session` | Leaves a note on a session: a question, a finding, "picked this up". `get_session` shows comments before the conversation |
-   | `update_session` | Changes a share: title, summary, extra next steps, who it's for, PR, visibility. `publish` shares a draft |
+   | `update_session` | Changes a share: title, summary, extra next steps, who it's for, PR, `add_links` / `remove_links`, visibility. `publish` shares a draft |
    | `start_live`, `live_status`, `send_live_message`, `check_live_inbox`, `update_live`, `stop_live` | [Working live](live.md): go live, see who else is, message their sessions, take messages |
 
 2. **Three commands**:
-   - `/share [instructions]`: write a handoff and share this session. "for Akshat" makes it a handoff for them.
-   - `/pickup [what or whose]`: find a shared session, read it, check the code and continue. With nothing after it, handoffs for you come first.
+   - `/share [instructions]`: write a detailed handoff from the whole conversation, list every PR and issue it worked on, and share this session. "for Akshat" makes it a handoff for them.
+   - `/pickup [what or whose]`: find a shared session, read it (and its linked PRs and issues), check the code and continue. With nothing after it, handoffs for you come first.
    - `/live [with someone | who | stop | auto on]`: work live with teammates at the same time; their messages reach your agent between steps ([Working live](live.md)).
 
 `relay setup` installs all of these for every agent it finds. Restart your agents afterwards. Add `--live on` for the hooks that bring live messages into Claude Code and Gemini CLI automatically.

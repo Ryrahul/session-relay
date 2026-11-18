@@ -192,7 +192,7 @@ button:disabled { cursor: default; opacity: 0.55; }
 /* Session page */
 .back { font-size: 14px; color: var(--muted); justify-self: start; }
 .session-head { display: grid; gap: 8px; }
-.session-meta-top { display: flex; gap: 8px; align-items: center; }
+.session-meta-top { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .session-head h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.015em; }
 .session-byline { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
 .session-byline strong { color: var(--ink); font-weight: 600; }
@@ -552,3 +552,14 @@ a.badge-link:hover { color: var(--accent); }
 .live-msg .comment-head { flex-wrap: wrap; row-gap: 2px; }
 .live-msg .comment-head > * { white-space: nowrap; }
 .live-autonomy .hint { font-weight: 400; }
+
+.link-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.link-list li {
+  overflow-wrap: anywhere;
+}

@@ -69,7 +69,7 @@ The agent writes a handoff:
 - **Next steps:** concrete things to do next.
 - **Open questions:** anything unresolved.
 
-It then shares the session together with the last 30 messages and the list of files touched. You get back an id like `rs_7KQ2M9XA`.
+It then shares the session together with the recent conversation (the last 150 messages), the pull requests and issues it worked on, and the list of files touched. You get back an id like `rs_7KQ2M9XA`.
 
 You can add instructions:
 
@@ -83,7 +83,7 @@ You can add instructions:
 
 Some repos have a **handoff template** (set by an admin) asking for extra sections, like "Tests run". `/share` fills them in; `relay template` shows what's asked.
 
-If your branch has an open pull request (and the GitHub CLI `gh` is installed), the share links to it.
+If your branch has an open pull request (and the GitHub CLI `gh` is installed), the share links to it. Other PRs and issues mentioned in the conversation are linked too, and the agent adds any it worked on.
 
 Or share from a terminal, inside the repo:
 
@@ -137,7 +137,7 @@ Open your server's address in a browser and sign in with your token. You can:
 
 - browse, search and read shared sessions, including the full conversation and tool calls
 - switch between **All**, **For me** (handoffs shared for you), **Shared by me** and **My drafts**; filter by agent and repo, or search `file:` and `branch:`
-- **Edit** your shares: title, summary, next steps, who it's for, the pull request, template sections
+- **Edit** your shares: title, summary, next steps, who it's for, linked pull requests and issues, template sections
 - **Comment** on any session you can see
 - see who's working **Live**, on what and which files, and message their sessions
 - see **Activity** (what the team shared, picked up and discussed) and **Stats** (who shares and picks up, by agent and repo)

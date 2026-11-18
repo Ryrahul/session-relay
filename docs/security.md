@@ -13,7 +13,7 @@ A share contains:
 |---|---|---|---|
 | Summary (goal, decisions, done, next, open questions) | ✓ | ✓ | ✓ |
 | Repo, branch, commit, title, files touched | ✓ | ✓ | ✓ |
-| Last 30 messages | ✓ | | ✓ |
+| Last 150 messages | ✓ | | ✓ |
 | Every message | | | ✓ |
 
 Messages are your prompts, the agent's replies, and **one line per tool call**, such as ``ran `npm test` → 3 passed`` or `edited src/a.ts`.
@@ -60,7 +60,7 @@ The number of redactions is shown when you share and on the session page. Redact
 - **Diffs** are only attached when you ask (`--diff`, "with the diff"). They contain your code changes; secrets in them are redacted like the conversation, files over 100 KB are left out, and the total is capped at 500 KB. They're stored next to full transcripts and deleted with the share.
 - **Drafts** (from `--auto-share`) are visible only to their author, admins included, until published. Turning auto-share on uploads drafts automatically, so only enable it if that's fine for your repos; redaction applies as usual.
 - **Live sessions** ([Working live](live.md)) are opt-in. While you're live, everyone in the org sees your repo, branch, title, status and the paths of files you touched recently (not their contents). Live messages are visible only to the sender and the recipient, are redacted on both the laptop and the server, and are deleted 7 days after the live session ends. Teammates' messages reach your agent framed as information, not instructions; it asks you before acting on them unless you turn on auto, which admins can disable org-wide.
-- Only the author or an admin can edit a share. Pull request links must be `http(s)` URLs.
+- Only the author or an admin can edit a share. Pull request and issue links must be `http(s)` URLs (at most 30 per share).
 - The author or an org admin can change or delete a share.
 
 | Role | Can |

@@ -18,6 +18,8 @@ import {
   type ChainLink,
   renderHandoff,
   hidePrompts,
+  mergeLinks,
+  toLink,
 } from "@session-relay/shared";
 import type { AppEnv, AuthContext } from "../auth.js";
 import { audit, recordUsage } from "../audit.js";
@@ -142,6 +144,8 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
     if (patch && dKey) await storage.put(dKey, patch);
     const dStats = patch ? diffStats(diff!) : null;
     const messages = s.include === "summary" ? [] : s.messages;
+    // Older CLIs send only pr_url.
+    const links = mergeLinks(s.pr_url ? [toLink(s.pr_url)] : [], s.links);
 
     try {
       await sql.begin(async (tx) => {
@@ -150,7 +154,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
             id, org_id, author_id, source_tool, source_version, native_id, repo, branch, commit_sha,
             title, summary, files_touched, messages, include_mode, visibility_team, redactions,
             transcript_key, transcript_bytes, started_at, expires_at, continues_session_id, assignee_id, pr_url, draft,
-            diff_key, diff_stats
+            diff_key, diff_stats, links
           ) VALUES (
             ${id}, ${auth.orgId}, ${auth.userId}, ${s.source.tool}, ${s.source.version ?? null}, ${s.source.native_id},
             ${s.repo}, ${s.branch ?? null}, ${s.commit ?? null}, ${s.title}, ${tx.json(s.summary)},
@@ -158,7 +162,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
             ${key}, ${blob?.byteLength ?? null}, ${s.started_at ?? null},
             now() + make_interval(days => ${settings!.retention_days}),
             ${s.continues ?? null}, ${s.assignee ?? null}, ${s.pr_url ?? null}, ${s.draft},
-            ${dKey}, ${dStats ? tx.json({ ...dStats }) : null}
+            ${dKey}, ${dStats ? tx.json({ ...dStats }) : null}, ${tx.json(links)}
           )
         `;
         if (!s.visibility.team) await setPeople(tx as unknown as Sql, auth.orgId, id, s.visibility.people);
@@ -191,7 +195,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
     const rows = await sql`
       SELECT s.id, s.title, s.repo, s.branch, s.source_tool, s.summary->>'goal' AS goal, s.include_mode,
              jsonb_array_length(s.messages) AS message_count, s.transcript_key IS NOT NULL AS has_full,
-             s.visibility_team, s.continues_session_id, s.pr_url, s.draft, s.diff_key IS NOT NULL AS has_diff, s.created_at, s.updated_at,
+             s.visibility_team, s.continues_session_id, s.pr_url, s.links, s.draft, s.diff_key IS NOT NULL AS has_diff, s.created_at, s.updated_at,
              u.id AS author_id, u.name AS author_name, a.id AS assignee_id, a.name AS assignee_name,
              (SELECT count(*)::int FROM session_comments c WHERE c.session_id = s.id AND c.deleted_at IS NULL) AS comment_count
              ${
@@ -209,7 +213,8 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
         ${author ? sql`AND (u.id = ${author} OR u.name ILIKE ${"%" + author + "%"} OR u.email ILIKE ${author + "%"})` : sql``}
         ${assignee ? sql`AND s.assignee_id = ${assignee}` : sql``}
         ${file ? sql`AND EXISTS (SELECT 1 FROM unnest(s.files_touched) f WHERE f ILIKE ${"%" + file.replace(/[\\%_]/g, (ch) => "\\" + ch) + "%"})` : sql``}
-        ${q.pr ? sql`AND s.pr_url = ${q.pr}` : sql``}
+        ${q.pr ? sql`AND (s.pr_url = ${q.pr} OR s.links @> ${sql.json([{ url: toLink(q.pr).url }])}::jsonb)` : sql``}
+        ${q.link ? sql`AND s.links @> ${sql.json([{ url: toLink(q.link).url }])}::jsonb` : sql``}
         ${
           text
             ? sql`AND (s.search @@ websearch_to_tsquery('english', ${text}) OR s.title ILIKE ${"%" + text + "%"}
@@ -238,6 +243,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       continues_id: r.continues_session_id,
       assignee: r.assignee_id ? { id: r.assignee_id, name: r.assignee_name } : null,
       pr_url: r.pr_url,
+      links: r.links ?? [],
       comment_count: r.comment_count,
       draft: r.draft,
       has_diff: r.has_diff,
@@ -365,6 +371,7 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       continues: r.continues_session_id ?? undefined,
       assignee: r.assignee_id ?? undefined,
       pr_url: r.pr_url ?? undefined,
+      links: r.links ?? [],
       draft: r.draft,
       updated_at: iso(r.updated_at),
       chain: chain.map(link),
@@ -438,7 +445,12 @@ export function sessionRoutes(sql: Sql, storage: BlobStorage) {
       if (patch.title) await tx`UPDATE sessions SET title = ${patch.title} WHERE id = ${id}`;
       if (patch.summary) await tx`UPDATE sessions SET summary = ${tx.json(patch.summary)} WHERE id = ${id}`;
       if (patch.assignee !== undefined) await tx`UPDATE sessions SET assignee_id = ${patch.assignee} WHERE id = ${id}`;
+      if (patch.links) await tx`UPDATE sessions SET links = ${tx.json(mergeLinks(patch.links))} WHERE id = ${id}`;
       if (patch.pr_url !== undefined) await tx`UPDATE sessions SET pr_url = ${patch.pr_url} WHERE id = ${id}`;
+      // A new main PR is linked too.
+      if (patch.pr_url) {
+        await tx`UPDATE sessions SET links = ${tx.json(mergeLinks([toLink(patch.pr_url)]))}::jsonb || links WHERE id = ${id} AND NOT links @> ${tx.json([{ url: toLink(patch.pr_url).url }])}::jsonb`;
+      }
       // Publishing restarts the clock: it counts as shared now, and expires from now.
       if (patch.draft === false) {
         await tx`

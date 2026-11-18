@@ -33,6 +33,8 @@ export interface ListQuery {
   /** ISO time: only sessions shared since then. */
   since?: string;
   native_id?: string;
+  /** Only sessions linked to this pull request or issue URL. */
+  link?: string;
   /** Drafts are left out unless "include" or "only". */
   drafts?: "include" | "only";
   q?: string;

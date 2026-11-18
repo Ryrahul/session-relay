@@ -395,6 +395,46 @@ describe.skipIf(!DB)("API (integration)", () => {
     expect(cleared.pr_url).toBeUndefined();
   });
 
+  it("links many PRs and issues: stored, listed, filtered, edited; old clients' pr_url is linked too", async () => {
+    const repo = "github.com/acme/links";
+    const a = await call(alice.token, "POST", "/v1/sessions", {
+      session: upload({
+        repo,
+        pr_url: "https://github.com/acme/links/pull/7",
+        links: [
+          { url: "https://github.com/acme/links/issues/3", kind: "issue", title: "Retries fail" },
+          { url: "https://linear.app/acme/issue/ENG-9", kind: "issue" },
+        ],
+      }),
+    });
+    expect(a.status).toBe(201);
+    // An old CLI: pr_url only.
+    const b = await call(bob.token, "POST", "/v1/sessions", { session: upload({ repo, pr_url: "https://github.com/acme/links/pull/7/files" }) });
+    expect(b.status).toBe(201);
+    const got = (await call(bob.token, "GET", `/v1/sessions/${a.body.id}?mode=summary`)).body;
+    expect(got.links.map((l: any) => l.url)).toEqual([
+      "https://github.com/acme/links/pull/7",
+      "https://github.com/acme/links/issues/3",
+      "https://linear.app/acme/issue/ENG-9",
+    ]);
+    const md = (await app.request(`/v1/sessions/${a.body.id}/export`, { headers: { authorization: `Bearer ${alice.token}` } }).then((r) => r.text()));
+    expect(md).toContain("## Pull requests and issues");
+    expect(md).toContain("- Issue acme/links#3 (Retries fail): https://github.com/acme/links/issues/3");
+
+    const byPr = (await call(owner.token, "GET", `/v1/sessions?link=${encodeURIComponent("https://github.com/acme/links/pull/7#discussion")}`)).body.sessions;
+    expect(byPr.map((x: any) => x.id).sort()).toEqual([a.body.id, b.body.id].sort());
+    const byIssue = (await call(owner.token, "GET", `/v1/sessions?link=${encodeURIComponent("https://github.com/acme/links/issues/3")}`)).body.sessions;
+    expect(byIssue.map((x: any) => x.id)).toEqual([a.body.id]);
+    expect(byIssue[0].links).toHaveLength(3);
+
+    expect((await call(alice.token, "PATCH", `/v1/sessions/${a.body.id}`, { links: [{ url: "javascript:alert(1)" }] })).status).toBe(400);
+    expect((await call(alice.token, "PATCH", `/v1/sessions/${a.body.id}`, { links: [{ url: "https://github.com/acme/links/issues/4" }] })).status).toBe(200);
+    await call(alice.token, "PATCH", `/v1/sessions/${a.body.id}`, { pr_url: "https://github.com/acme/links/pull/8" });
+    const edited = (await call(alice.token, "GET", `/v1/sessions/${a.body.id}?mode=summary`)).body;
+    expect(edited.links.map((l: any) => l.url)).toEqual(["https://github.com/acme/links/pull/8", "https://github.com/acme/links/issues/4"]);
+    expect((await call(owner.token, "GET", `/v1/sessions?link=${encodeURIComponent("https://github.com/acme/links/issues/3")}`)).body.sessions).toEqual([]);
+  });
+
   it("handoffs for someone: listed with assignee=me and visible to them even when private", async () => {
     const r = await call(alice.token, "POST", "/v1/sessions", {
       session: upload({ title: "for bob only", repo: "github.com/acme/assign", assignee: bob.userId, visibility: { team: false, people: [] } }),

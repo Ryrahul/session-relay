@@ -25,7 +25,7 @@ No. By default it shows the message to you and asks before acting. You can turn 
 Check you're live in that repo (`relay live status`). For Claude Code and Gemini CLI, run `relay setup --live on` and restart the agent; the hooks only deliver to the agent session that ran `/live`. Other agents get messages when they call `check_live_inbox` (or say "check live messages"). `relay live inbox` shows them in a terminal. Hook problems are logged to `hook.log` next to your relay config.
 
 **Is the whole session shared?**
-By default: the summary, the last 30 messages and the files touched. Ask for `/share full transcript` or use `--include full` for everything. Tool calls are always reduced to one line each. See [Security & privacy](security.md).
+By default: the summary, the last 150 messages (at most about 150,000 characters), the linked pull requests and issues, and the files touched. Ask for `/share full transcript` or use `--include full` for everything. Tool calls are always reduced to one line each. See [Security & privacy](security.md).
 
 **`relay share` says no sessions were found.**
 Run it inside the git repo where you used the agent; sessions are matched by folder. Check with `relay sessions`. For OpenCode, the `opencode` command must be on your PATH.

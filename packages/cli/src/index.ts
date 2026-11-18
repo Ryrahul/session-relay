@@ -29,6 +29,8 @@ program
   .option("--tool <tool>", "claude, opencode, codex, zcode, gemini, copilot or cursor")
   .action(localSessions);
 
+const collect = (v: string, prev: string[] = []) => [...prev, v];
+
 program
   .command("share")
   .description("Pick a local session and share it with your team")
@@ -36,7 +38,7 @@ program
   .option("--id <id>", "native session id (prefix is fine)")
   .option("--latest", "share the newest session without asking")
   .option("--include <mode>", "summary | summary+tail | full")
-  .option("--tail <n>", "messages to keep with summary+tail", "30")
+  .option("--tail <n>", "messages to keep with summary+tail (default 150, up to about 40k tokens)")
   .option("--title <title>", "title shown to teammates")
   .option("--people <names>", "comma-separated names/emails; default is the whole team")
   .option("--summary-file <file>", "JSON summary {goal, decisions, done, next, open_questions}")
@@ -49,6 +51,7 @@ program
   .option("--no-prompts", "leave your typed prompts out; the agent's replies and tool steps are kept")
   .option("--diff", "attach your uncommitted changes (git diff plus new files), redacted")
   .option("--pr <url>", 'pull request it belongs to (default: this branch\'s open PR via gh; "none" to leave out)')
+  .option("--link <url>", "another pull request or issue this work belongs to (repeatable; ones in the conversation are found automatically)", collect)
   .action(share);
 
 const listOpts = (cmd: Command) =>
@@ -59,6 +62,7 @@ const listOpts = (cmd: Command) =>
     .option("--branch <branch>")
     .option("--file <path>", "only sessions that touched this file (part of the path is fine)")
     .option("--for-me", "only handoffs assigned to you")
+    .option("--link <url>", "only sessions linked to this pull request or issue")
     .option("--limit <n>", "max results", "20")
     .option("--json", "print JSON");
 
@@ -86,10 +90,9 @@ program
   .option("--out <file>", "output file")
   .action(pull);
 
-const collect = (v: string, prev: string[] = []) => [...prev, v];
 program
   .command("edit <id>")
-  .description("Change one of your shares: title, summary, who it's for, PR, visibility")
+  .description("Change one of your shares: title, summary, who it's for, linked PRs and issues, visibility")
   .option("--title <title>")
   .option("--goal <text>", "replace the goal")
   .option("--add-next <text>", "add a next step (repeatable)", collect)
@@ -101,6 +104,8 @@ program
   .option("--summary-file <file>", "replace the whole summary with this JSON")
   .option("--for <name>", 'teammate it\'s for, or "none"')
   .option("--pr <url>", 'pull request URL, or "none"')
+  .option("--link <url>", "link a pull request or issue (repeatable)", collect)
+  .option("--unlink <url>", "remove a linked URL (repeatable)", collect)
   .option("--team", "make it visible to the whole team")
   .option("--people <names>", "make it visible only to these people")
   .action(edit);

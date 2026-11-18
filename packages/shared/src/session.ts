@@ -67,6 +67,20 @@ export const PrUrl = z
   .url()
   .refine((u) => /^https?:\/\//i.test(u), "must be an http(s) URL");
 
+export const LinkKind = z.enum(["pr", "issue", "other"]);
+export type LinkKind = z.infer<typeof LinkKind>;
+
+/** Most links one share carries. */
+export const MAX_LINKS = 30;
+
+/** A pull request, issue or other page the session worked on. */
+export const SessionLink = z.object({
+  url: PrUrl,
+  kind: LinkKind.default("other"),
+  title: z.string().trim().max(200).optional(),
+});
+export type SessionLink = z.infer<typeof SessionLink>;
+
 /** Payload the CLI uploads. Already redacted and normalised on the client. */
 export const SessionUpload = z.object({
   source: z.object({
@@ -94,6 +108,8 @@ export const SessionUpload = z.object({
   assignee: z.string().max(40).optional(),
   /** Pull request the work belongs to. */
   pr_url: PrUrl.optional(),
+  /** Every pull request and issue the session worked on (pr_url included). */
+  links: z.array(SessionLink).max(MAX_LINKS).default([]),
   /** Saved automatically at session end: only the author sees it until it's published. */
   draft: z.boolean().default(false),
 });

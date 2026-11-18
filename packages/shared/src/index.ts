@@ -6,3 +6,4 @@ export * from "./handoff.js";
 export * from "./templates.js";
 export * from "./diff.js";
 export * from "./live.js";
+export * from "./links.js";

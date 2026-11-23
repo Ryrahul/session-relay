@@ -21,6 +21,10 @@ export interface LocalLive {
   polled?: string;
   /** Last time a stop hook made the agent continue, so it can't loop. */
   continued?: string;
+  /** Last time the user sent a prompt: an idle waiter started before it stops. */
+  prompted?: string;
+  /** The idle waiter that owns this live session now; older ones stop. */
+  waiter?: string;
 }
 
 /** One file per account config, like pickups. */

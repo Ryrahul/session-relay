@@ -6,7 +6,7 @@ import { RelayClient } from "../client.js";
 import { configPath } from "../config.js";
 import { repoInfo } from "../git.js";
 import { prepareShare, uploadShare } from "../share.js";
-import { liveHook, type LiveEvent } from "./live-hook.js";
+import { liveHook, waitWhileIdle, type LiveEvent } from "./live-hook.js";
 
 /** Below this many messages a session isn't worth a draft. */
 const MIN_MESSAGES = 4;
@@ -68,13 +68,25 @@ export async function sessionEnd(opts: { tool: string }): Promise<string> {
   return `draft ${id} for ${tool} ${nativeId} (${repo.repo})${sessions.length ? `, replaced ${sessions.map((s) => s.id).join(", ")}` : ""}`;
 }
 
+let woke = false;
+
 const LIVE_EVENTS = new Set<LiveEvent>(["prompt", "pre-edit", "post-tool", "stop", "end"]);
 
 /** relay hook live <event>: see live-hook.ts. */
 async function live(event: string, opts: { tool: string }): Promise<void> {
-  if (!LIVE_EVENTS.has(event as LiveEvent)) throw new Error(`unknown live hook event "${event}"`);
+  if (!LIVE_EVENTS.has(event as LiveEvent) && event !== "idle") throw new Error(`unknown live hook event "${event}"`);
   const tool: SourceTool = opts.tool === "claude" ? "claude-code" : (opts.tool as SourceTool);
   const input = JSON.parse((await readStdin()) || "{}");
+  if (event === "idle") {
+    const { wake, log: line } = await waitWhileIdle(tool, input);
+    if (line) await log(line);
+    // Exit code 2 from an asyncRewake hook wakes Claude Code with stderr.
+    if (wake) {
+      process.stderr.write(wake + "\n");
+      woke = true;
+    }
+    return;
+  }
   const { out, log: line } = await liveHook(event as LiveEvent, tool, input);
   if (out) process.stdout.write(out + "\n");
   if (line) await log(line);
@@ -89,5 +101,5 @@ export async function hook(event: string, sub: string | undefined, opts: { tool:
     await log(`error (${event}${sub ? " " + sub : ""}): ${(err as Error).message}`);
   }
   // Hooks must never break the agent.
-  process.exitCode = 0;
+  process.exitCode = woke ? 2 : 0;
 }

@@ -1,3 +1,4 @@
+import { appendFileSync } from "node:fs";
 import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import type { SourceTool } from "@session-relay/shared";
@@ -6,7 +7,7 @@ import { RelayClient } from "../client.js";
 import { configPath } from "../config.js";
 import { repoInfo } from "../git.js";
 import { prepareShare, uploadShare } from "../share.js";
-import { liveHook, waitWhileIdle, type LiveEvent } from "./live-hook.js";
+import { armedWaiter, liveHook, waitWhileIdle, type LiveEvent } from "./live-hook.js";
 
 /** Below this many messages a session isn't worth a draft. */
 const MIN_MESSAGES = 4;
@@ -25,8 +26,10 @@ async function readStdin(): Promise<string> {
   return data;
 }
 
+const logFile = () => path.join(path.dirname(configPath()), "hook.log");
+
 async function log(line: string) {
-  const file = path.join(path.dirname(configPath()), "hook.log");
+  const file = logFile();
   await mkdir(path.dirname(file), { recursive: true }).catch(() => undefined);
   await appendFile(file, `${new Date().toISOString()} ${line}\n`).catch(() => undefined);
 }
@@ -78,6 +81,19 @@ async function live(event: string, opts: { tool: string }): Promise<void> {
   const tool: SourceTool = opts.tool === "claude" ? "claude-code" : (opts.tool as SourceTool);
   const input = JSON.parse((await readStdin()) || "{}");
   if (event === "idle") {
+    // The agent ends a background hook with a signal (at its timeout, or when it quits): say so.
+    for (const sig of ["SIGTERM", "SIGHUP", "SIGINT"] as const) {
+      process.once(sig, () => {
+        const w = armedWaiter;
+        if (w) {
+          const line = `live ${w.live}: idle waiter stopped by ${sig} after ${Math.round((Date.now() - w.start) / 60_000)}m; if that is sooner than expected, rerun relay setup --live on`;
+          try {
+            appendFileSync(logFile(), `${new Date().toISOString()} ${line}\n`);
+          } catch {}
+        }
+        process.exit(0);
+      });
+    }
     const { wake, log: line } = await waitWhileIdle(tool, input);
     if (line) await log(line);
     // Exit code 2 from an asyncRewake hook wakes Claude Code with stderr.

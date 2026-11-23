@@ -1,5 +1,8 @@
+import { appendFile } from "node:fs/promises";
+import path from "node:path";
 import { renderLiveMessages, renderOverlaps, type LivePollResult, type SourceTool } from "@session-relay/shared";
 import { RelayClient } from "../client.js";
+import { configPath } from "../config.js";
 import { dropLive, liveForHook, loadLive, repoPath, updateLive, type LocalLive } from "../live.js";
 
 /**
@@ -107,6 +110,11 @@ export function idleDelay(elapsedMs: number): number {
 
 /** An idle waiter gives up after this; the next turn starts a new one. */
 export const IDLE_MAX_MS = 8 * 60 * 60_000;
+/**
+ * The timeout `relay setup` gives the idle hook, in seconds. Claude Code ends a background hook at
+ * its timeout (10 minutes when none is set), so it has to outlast IDLE_MAX_MS.
+ */
+export const IDLE_HOOK_TIMEOUT_S = IDLE_MAX_MS / 1000 + 600;
 
 export interface IdleDeps {
   now: () => number;
@@ -114,6 +122,10 @@ export interface IdleDeps {
   client: () => Promise<Pick<RelayClient, "livePoll">>;
   /** The process that started the hook; a different one means the agent exited (we were orphaned). */
   parent: () => number;
+  /** Whether a process is still running, to notice a waiter that was killed. */
+  alive: (pid: number) => boolean;
+  /** Writes a line to hook.log straight away (the waiter itself may be killed later). */
+  log: (line: string) => Promise<void>;
 }
 
 const realDeps: IdleDeps = {
@@ -121,7 +133,21 @@ const realDeps: IdleDeps = {
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
   client: () => RelayClient.fromConfig(),
   parent: () => process.ppid,
+  alive: (pid) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (err) {
+      return (err as NodeJS.ErrnoException).code === "EPERM";
+    }
+  },
+  log: (line) => appendFile(path.join(path.dirname(configPath()), "hook.log"), `${new Date().toISOString()} ${line}\n`).catch(() => undefined),
 };
+
+/** The waiter running in this process, for a log line if it is killed. */
+export let armedWaiter: { live: string; start: number } | null = null;
+
+const minutes = (ms: number) => `${Math.round(ms / 60_000)}m`;
 
 /**
  * Claude Code's async "rewake" Stop hook: after the agent finishes a turn it waits in the background
@@ -129,6 +155,7 @@ const realDeps: IdleDeps = {
  * would see nothing until its user typed. Returns the text to wake the agent with, or "" to exit
  * quietly: when the user sends a prompt (the turn's own hooks take over), a newer waiter starts,
  * the live session ends, the agent quits, or after IDLE_MAX_MS. Its polls also keep the session from showing as away.
+ * Unusual exits go to hook.log, and so does a waiter that died without exiting (killed by its timeout).
  */
 export async function waitWhileIdle(tool: SourceTool, input: HookInput, deps: IdleDeps = realDeps): Promise<{ wake: string; log?: string }> {
   const live = await liveForHook(input.session_id, input.cwd ?? process.cwd(), tool);
@@ -136,28 +163,46 @@ export async function waitWhileIdle(tool: SourceTool, input: HookInput, deps: Id
   const start = deps.now();
   const parent = deps.parent();
   const me = `${process.pid}-${start}`;
+  // A waiter clears its mark when it exits, so one still here whose process is gone was killed.
+  const prev = live.waiter ? Number(live.waiter.split("-")[0]) : NaN;
+  if (prev && prev !== process.pid && !deps.alive(prev)) {
+    await deps.log(`live ${live.id}: the previous idle waiter (${live.waiter}) was killed while waiting; if this keeps happening, rerun relay setup --live on`);
+  }
   await updateLive(live.id, { waiter: me });
+  armedWaiter = { live: live.id, start };
+  const done = async (wake: string, why?: string) => {
+    armedWaiter = null;
+    // Clear our mark unless a newer waiter took over.
+    const cur = (await loadLive()).find((l) => l.id === live.id);
+    if (cur?.waiter === me) await updateLive(live.id, { waiter: undefined });
+    return { wake, log: why ? `live ${live.id}: ${why}` : undefined };
+  };
   const client = await deps.client();
   for (;;) {
     await deps.sleep(idleDelay(deps.now() - start));
+    const waited = minutes(deps.now() - start);
     // Orphaned (the agent quit) or too old: stop, so no message is taken that nobody will see.
-    if (deps.now() - start > IDLE_MAX_MS || deps.parent() !== parent) return { wake: "" };
+    if (deps.now() - start > IDLE_MAX_MS) return done("", `idle waiter stopped after ${waited} (the limit); the next turn starts a new one`);
+    if (deps.parent() !== parent) return done("", `idle waiter stopped after ${waited}: the agent exited`);
     const cur = (await loadLive()).find((l) => l.id === live.id);
-    if (!cur || cur.waiter !== me) return { wake: "" };
-    if (cur.prompted && new Date(cur.prompted).getTime() > start) return { wake: "" };
+    if (!cur) return done("");
+    // A newer waiter (a newer stop) owns the session. If our mark was lost, put it back.
+    if (cur.waiter && cur.waiter !== me) return done("");
+    if (!cur.waiter) await updateLive(live.id, { waiter: me });
+    if (cur.prompted && new Date(cur.prompted).getTime() > start) return done("");
     const r = await client.livePoll(live.id, {}, HOOK_TIMEOUT_MS).catch(() => null);
     if (!r) continue;
     if (r.ended) {
       await dropLive(live.id);
-      return { wake: "", log: `live ${live.id} ended on the server (idle waiter)` };
+      return done("", "ended on the server (idle waiter)");
     }
     const text = describePoll(r);
     if (text) {
       await updateLive(live.id, { polled: new Date(deps.now()).toISOString() });
-      return {
-        wake: `${text}\n\n(This arrived while the session was idle. Tell the user now, and follow the instructions above about asking before acting.)`,
-        log: `live ${live.id}: ${r.messages.length} messages woke the idle agent`,
-      };
+      return done(
+        `${text}\n\n(This arrived while the session was idle. Tell the user now, and follow the instructions above about asking before acting.)`,
+        `${r.messages.length} messages woke the idle agent after ${waited}`,
+      );
     }
   }
 }

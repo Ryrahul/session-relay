@@ -4,9 +4,9 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { LiveMessage, LivePollResult } from "@session-relay/shared";
 import { addLive, dropLive, liveForCwd, liveForHook, loadLive, repoPath } from "./live.js";
-import { describePoll, editedFile, hookOutput, IDLE_MAX_MS, idleDelay, liveHook, waitWhileIdle, type IdleDeps } from "./commands/live-hook.js";
+import { describePoll, editedFile, hookOutput, IDLE_HOOK_TIMEOUT_S, IDLE_MAX_MS, idleDelay, liveHook, waitWhileIdle, type IdleDeps } from "./commands/live-hook.js";
 import { updateLive } from "./live.js";
-import { setupClaudeAutoShare, setupLiveHooks } from "./commands/setup.js";
+import { setupClaudeAutoShare, setupLiveHooks, upgradeIdleHook } from "./commands/setup.js";
 
 let dir: string;
 const saved = process.env.RELAY_CONFIG;
@@ -132,7 +132,9 @@ describe("relay setup --live", () => {
     expect(cfg.theme).toBe("dark");
     expect(Object.keys(cfg.hooks).sort()).toEqual(["PostToolUse", "PreToolUse", "SessionEnd", "Stop", "UserPromptSubmit"]);
     expect(cfg.hooks.Stop.flatMap((g: any) => g.hooks.map((h: any) => h.command))).toEqual(["echo hi", '"relay" hook live stop --tool claude', '"relay" hook live idle --tool claude']);
-    expect(cfg.hooks.Stop.at(-1).hooks[0]).toEqual({ type: "command", command: '"relay" hook live idle --tool claude', asyncRewake: true });
+    // Claude Code ends a background hook at its timeout (10 minutes unless set), so the waiter gets 8h+.
+    expect(cfg.hooks.Stop.at(-1).hooks[0]).toEqual({ type: "command", command: '"relay" hook live idle --tool claude', asyncRewake: true, timeout: IDLE_HOOK_TIMEOUT_S });
+    expect(IDLE_HOOK_TIMEOUT_S * 1000).toBeGreaterThan(IDLE_MAX_MS);
     expect(cfg.hooks.PreToolUse).toEqual([{ matcher: "Edit|Write|MultiEdit|NotebookEdit", hooks: [{ type: "command", command: '"relay" hook live pre-edit --tool claude', timeout: 10 }] }]);
     expect(cfg.hooks.SessionEnd.flatMap((g: any) => g.hooks.map((h: any) => h.command))).toEqual(['"relay" hook session-end --tool claude', '"relay" hook live end --tool claude']);
 
@@ -164,7 +166,7 @@ describe("live hooks at session end", () => {
 
 describe("idle waiter (Claude Code asyncRewake Stop hook)", () => {
   /** A fake clock: sleeping moves time on, and `onSleep` can change things in between. */
-  function deps(polls: (LivePollResult | null)[], onSleep: (n: number) => Promise<void> | void = () => undefined, parent = () => 42): IdleDeps & { calls: number; slept: number[] } {
+  function deps(polls: (LivePollResult | null)[], onSleep: (n: number) => Promise<void> | void = () => undefined, parent = () => 42): IdleDeps & { calls: number; slept: number[]; logged: string[] } {
     let t = Date.parse("2026-11-23T10:00:00Z");
     const d = {
       calls: 0,
@@ -184,6 +186,9 @@ describe("idle waiter (Claude Code asyncRewake Stop hook)", () => {
         },
       }),
       parent,
+      alive: () => false,
+      logged: [] as string[],
+      log: async (line: string) => void d.logged.push(line),
     };
     return d as any;
   }
@@ -231,5 +236,68 @@ describe("idle waiter (Claude Code asyncRewake Stop hook)", () => {
     d = deps([poll({ ended: true })]);
     expect((await waitWhileIdle("claude-code", { session_id: "s1", cwd: "/work/api" }, d as any)).wake).toBe("");
     expect(await loadLive()).toEqual([]);
+  });
+
+  it("logs a waiter that was killed, puts back a lost mark, and clears its mark when it exits", async () => {
+    await bound();
+    await updateLive("lv_1", { waiter: "999999-1" });
+    let d = deps([poll(), poll({ messages: [msg()] })], (n) => (n === 1 ? updateLive("lv_1", { waiter: undefined }) : undefined));
+    const r = await waitWhileIdle("claude-code", { session_id: "s1", cwd: "/work/api" }, d as any);
+    expect(r.wake).toContain("buildInvoice");
+    expect(d.logged).toEqual([expect.stringContaining("previous idle waiter (999999-1) was killed")]);
+    expect(r.log).toBe("live lv_1: 1 messages woke the idle agent after 0m");
+    expect((await loadLive())[0]!.waiter).toBeUndefined();
+
+    // A waiter still running isn't reported.
+    await updateLive("lv_1", { waiter: "999999-1" });
+    d = deps([poll({ messages: [msg()] })]);
+    d.alive = () => true;
+    await waitWhileIdle("claude-code", { session_id: "s1", cwd: "/work/api" }, d as any);
+    expect(d.logged).toEqual([]);
+  });
+
+  it("says why it stopped when orphaned or out of time", async () => {
+    await bound();
+    let parent = 42;
+    let d = deps([], () => void (parent = 1), () => parent);
+    expect((await waitWhileIdle("claude-code", { session_id: "s1", cwd: "/work/api" }, d as any)).log).toContain("the agent exited");
+    d = deps(Array.from({ length: 2000 }, () => poll()));
+    expect((await waitWhileIdle("claude-code", { session_id: "s1", cwd: "/work/api" }, d as any)).log).toContain("(the limit)");
+  });
+});
+
+describe("live file", () => {
+  it("keeps every change when hooks update it at the same time", async () => {
+    await bound2();
+    await Promise.all(Array.from({ length: 20 }, (_, i) => updateLive("lv_1", { [`k${i}`]: String(i) } as any)));
+    const cur = (await loadLive())[0] as any;
+    for (let i = 0; i < 20; i++) expect(cur[`k${i}`]).toBe(String(i));
+  });
+});
+
+const bound2 = () => addLive({ id: "lv_1", root: "/work/api", repo: "r", native: "s1", tool: "claude-code", started: "x" });
+
+describe("upgrading 0.8.1 idle hooks", () => {
+  it("gives the idle hook its timeout and leaves everything else alone", async () => {
+    const file = path.join(dir, "settings.json");
+    expect(await upgradeIdleHook(file)).toBeNull();
+    const old = {
+      theme: "dark",
+      hooks: {
+        Stop: [
+          { hooks: [{ type: "command", command: '"relay" hook live stop --tool claude', timeout: 10 }] },
+          { hooks: [{ type: "command", command: '"relay" hook live idle --tool claude', asyncRewake: true }] },
+          { hooks: [{ type: "command", command: "echo hi" }] },
+        ],
+      },
+    };
+    await writeFile(file, JSON.stringify(old));
+    expect(await upgradeIdleHook(file)).toContain("8 hours");
+    const cfg = JSON.parse(await readFile(file, "utf8"));
+    expect(cfg.hooks.Stop[1].hooks[0]).toEqual({ ...old.hooks.Stop[1]!.hooks[0], timeout: IDLE_HOOK_TIMEOUT_S });
+    expect(cfg.hooks.Stop[0]).toEqual(old.hooks.Stop[0]);
+    expect(cfg.hooks.Stop[2]).toEqual(old.hooks.Stop[2]);
+    expect(cfg.theme).toBe("dark");
+    expect(await upgradeIdleHook(file)).toBeNull();
   });
 });

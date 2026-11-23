@@ -52,6 +52,7 @@ The codebase is already multi-tenant (every record belongs to an organization), 
 
 | Version | Date | |
 |---|---|---|
+| CLI `0.8.2` on npm | 2026-11-24 | Live: the idle wake keeps working for the full 8 hours (Claude Code ended the background hook after 10 minutes; going live fixes 0.8.1 settings), hook.log says when and why an idle waiter stopped, and hooks no longer overwrite each other's live state |
 | CLI `0.8.1` on npm | 2026-11-23 | Live: an idle Claude Code session wakes up for a teammate's message (background `asyncRewake` Stop hook; rerun `relay setup --live on`), and idle sessions stay shown as live |
 | CLI `0.8.0` on npm | 2026-11-18 | More context and links: a share keeps the last 150 messages (was 30, capped at about 150,000 characters); links every PR and issue it worked on (`--link`, MCP `links`, found automatically in the conversation); `relay list --link`, `relay edit --link/--unlink`, MCP `add_links`; `/share` asks for a detailed handoff from the whole conversation |
 | Server and web app | 2026-11-18 | Links on shares (migration 0014): shown on the session and in the list, editable, `?link=` filter, in handoffs and exports |

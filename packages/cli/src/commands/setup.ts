@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { repoInfo } from "../git.js";
+import { IDLE_HOOK_TIMEOUT_S } from "./live-hook.js";
 
 const run = promisify(execFile);
 
@@ -122,12 +123,34 @@ export async function setupLiveHooks(on: boolean, cmd: string[], env: Record<str
           PreToolUse: h("pre-edit", { matcher: "Edit|Write|MultiEdit|NotebookEdit" }),
           PostToolUse: h("post-tool"),
           // The second Stop hook waits in the background while the session is idle and wakes it for a message.
-          Stop: [...h("stop"), { hooks: [{ type: "command", command: hookCommand(cmd, env, tool, "live idle"), asyncRewake: true }] }],
+          // Claude Code ends a background hook at its timeout (10 minutes by default), so it gets a long one.
+          Stop: [...h("stop"), { hooks: [{ type: "command", command: hookCommand(cmd, env, tool, "live idle"), asyncRewake: true, timeout: IDLE_HOOK_TIMEOUT_S }] }],
           SessionEnd: h("end"),
         }
       : { BeforeAgent: h("prompt"), AfterTool: h("post-tool"), AfterAgent: h("stop"), SessionEnd: h("end") };
   await setHooks(file, LIVE_MARK, add);
   return on ? `live hooks on: teammates' messages and file overlap warnings arrive between steps${tool === "claude" ? ", and wake Claude Code when it's idle" : ""} (${file})` : `live hooks off (${file})`;
+}
+
+/**
+ * Live hooks set up before 0.8.2 gave Claude Code's idle hook no timeout, so Claude Code ended it
+ * after 10 idle minutes. Gives it the long timeout in place, touching nothing else. Returns a note
+ * when it changed something.
+ */
+export async function upgradeIdleHook(file = claudeSettings()): Promise<string | null> {
+  const cfg = await readJson(file).catch(() => null);
+  let changed = false;
+  for (const group of (cfg?.hooks?.Stop ?? []) as HookGroup[]) {
+    for (const hook of group?.hooks ?? []) {
+      if (!String(hook.command ?? "").includes(`${LIVE_MARK}idle`)) continue;
+      if ((hook.timeout ?? 0) >= IDLE_HOOK_TIMEOUT_S) continue;
+      hook.timeout = IDLE_HOOK_TIMEOUT_S;
+      changed = true;
+    }
+  }
+  if (!changed) return null;
+  await writeText(file, JSON.stringify(cfg, null, 2) + "\n");
+  return `Updated the idle wake hook in ${file} so it keeps waiting for 8 hours instead of 10 minutes. New Claude Code sessions pick it up; restart running ones.`;
 }
 
 /** Agents with live hooks installed. */

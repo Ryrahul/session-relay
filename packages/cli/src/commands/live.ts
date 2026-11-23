@@ -3,7 +3,7 @@ import { RelayClient, resolvePerson } from "../client.js";
 import { repoInfo } from "../git.js";
 import { addLive, dropLive, liveForCwd, loadLive, type LocalLive } from "../live.js";
 import { ago, toolLabel } from "../ui.js";
-import { liveHooksInstalled } from "./setup.js";
+import { liveHooksInstalled, upgradeIdleHook } from "./setup.js";
 
 const TOOLS: Record<string, SourceTool> = { claude: "claude-code", "claude-code": "claude-code", opencode: "opencode", codex: "codex", zcode: "zcode", gemini: "gemini", copilot: "copilot", cursor: "cursor" };
 
@@ -60,6 +60,8 @@ export async function liveCommand(action: string | undefined, args: string[], op
     case "start": {
       const entry = await liveStart(opts);
       console.log(`Live in ${entry.repo} as ${entry.id}.`);
+      const upgraded = await upgradeIdleHook().catch(() => null);
+      if (upgraded) console.log(upgraded);
       const hooks = await liveHooksInstalled();
       if (hooks.length) console.log(`Teammates' messages reach ${hooks.join(" and ")} between steps. By default your agent shows them to you before acting.`);
       else console.log("No live hooks installed: messages arrive when your agent calls check_live_inbox, or with relay live inbox. For automatic delivery: relay setup --live on");

@@ -10,7 +10,7 @@ import { recordPickup } from "./pickups.js";
 import { renderLiveMessages, type LiveMessage } from "@session-relay/shared";
 import { dropLive, liveForCwd } from "./live.js";
 import { formatLiveRow, liveStart, resolveLiveTarget } from "./commands/live.js";
-import { liveHooksInstalled } from "./commands/setup.js";
+import { liveHooksInstalled, upgradeIdleHook } from "./commands/setup.js";
 import { renderDigest } from "./digest.js";
 import { describeRedactions, prepareShare, uploadShare } from "./share.js";
 import { ago } from "./ui.js";
@@ -417,6 +417,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
         if (title || autonomy !== undefined) await client.liveUpdate(entry.id, { ...(title ? { title } : {}), ...(autonomy !== undefined ? { autonomy } : {}) });
         const me = (await client.me()).user.id;
         const others = (await client.liveList()).live.filter((l) => l.repo === entry.repo && l.id !== entry.id);
+        const upgraded = await upgradeIdleHook().catch(() => null);
         const hooks = await liveHooksInstalled();
         const hooked = (tool() === "claude-code" && hooks.includes("Claude Code")) || (tool() === "gemini" && hooks.includes("Gemini CLI"));
         return text(
@@ -426,6 +427,7 @@ export function createMcpServer(getClient: () => Promise<RelayClient> = RelayCli
             hooked
               ? "Teammates' messages and file overlap warnings will arrive automatically between your steps."
               : "This agent has no live hooks: call check_live_inbox before each new task and before finishing a reply. (For automatic delivery in Claude Code or Gemini CLI, the user can run: relay setup --live on)",
+            ...(upgraded ? [`${upgraded} Tell the user. Until then, call check_live_inbox before finishing each reply.`] : []),
           ].join("\n\n"),
         );
       } catch (err) {

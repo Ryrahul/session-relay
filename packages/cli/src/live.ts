@@ -1,4 +1,4 @@
-import { mkdir, readFile, realpath, rename, writeFile } from "node:fs/promises";
+import { mkdir, open as openFile, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { SourceTool } from "@session-relay/shared";
 import { configPath } from "./config.js";
@@ -51,21 +51,58 @@ export async function saveLive(sessions: LocalLive[]): Promise<void> {
   await rename(tmp, file);
 }
 
+/** Waits this long for another hook's change to the live file, then goes ahead without the lock. */
+const LOCK_WAIT_MS = 2_000;
+/** A lock older than this was left by a hook that died mid-change. */
+const LOCK_STALE_MS = 10_000;
+
+/**
+ * Runs a read-modify-write of the live file while holding a lock file, so two hooks running at
+ * once (Claude Code starts both Stop hooks together) can't overwrite each other's change.
+ */
+async function withLock<T>(fn: () => Promise<T>): Promise<T> {
+  const lock = `${liveFile()}.lock`;
+  await mkdir(path.dirname(lock), { recursive: true });
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  let held = false;
+  while (!held) {
+    try {
+      await (await openFile(lock, "wx")).close();
+      held = true;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") break;
+      const age = await stat(lock).then((s) => Date.now() - s.mtimeMs, () => Infinity);
+      if (age > LOCK_STALE_MS) await rm(lock, { force: true });
+      else if (Date.now() > deadline) break;
+      else await new Promise((r) => setTimeout(r, 15));
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    if (held) await rm(lock, { force: true });
+  }
+}
+
 export async function addLive(entry: LocalLive): Promise<void> {
-  await saveLive([...(await loadLive()).filter((l) => l.id !== entry.id), entry]);
+  await withLock(async () => saveLive([...(await loadLive()).filter((l) => l.id !== entry.id), entry]));
 }
 
 export async function updateLive(id: string, patch: Partial<LocalLive>): Promise<void> {
-  const all = await loadLive();
-  const i = all.findIndex((l) => l.id === id);
-  if (i === -1) return;
-  all[i] = { ...all[i]!, ...patch };
-  await saveLive(all);
+  await withLock(async () => {
+    const all = await loadLive();
+    const i = all.findIndex((l) => l.id === id);
+    if (i === -1) return;
+    all[i] = { ...all[i]!, ...patch };
+    await saveLive(all);
+  });
 }
 
 export async function dropLive(id: string): Promise<void> {
-  const all = await loadLive();
-  if (all.some((l) => l.id === id)) await saveLive(all.filter((l) => l.id !== id));
+  await withLock(async () => {
+    const all = await loadLive();
+    if (all.some((l) => l.id === id)) await saveLive(all.filter((l) => l.id !== id));
+  });
 }
 
 const inRoot = (cwd: string, root: string) => samePathVariants(cwd).some((c) => isInside(c, root));
@@ -87,7 +124,14 @@ export async function liveForHook(native: string | undefined, cwd: string, tool:
   if (native) {
     open.native = native;
     open.tool ??= tool;
-    await saveLive(all);
+    await withLock(async () => {
+      const now = await loadLive();
+      const cur = now.find((l) => l.id === open.id);
+      if (!cur || cur.native) return;
+      cur.native = native;
+      cur.tool ??= tool;
+      await saveLive(now);
+    });
   }
   return open;
 }

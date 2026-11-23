@@ -4,7 +4,8 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { LiveMessage, LivePollResult } from "@session-relay/shared";
 import { addLive, dropLive, liveForCwd, liveForHook, loadLive, repoPath } from "./live.js";
-import { describePoll, editedFile, hookOutput, liveHook } from "./commands/live-hook.js";
+import { describePoll, editedFile, hookOutput, IDLE_MAX_MS, idleDelay, liveHook, waitWhileIdle, type IdleDeps } from "./commands/live-hook.js";
+import { updateLive } from "./live.js";
 import { setupClaudeAutoShare, setupLiveHooks } from "./commands/setup.js";
 
 let dir: string;
@@ -130,7 +131,8 @@ describe("relay setup --live", () => {
     const cfg = JSON.parse(await readFile(file, "utf8"));
     expect(cfg.theme).toBe("dark");
     expect(Object.keys(cfg.hooks).sort()).toEqual(["PostToolUse", "PreToolUse", "SessionEnd", "Stop", "UserPromptSubmit"]);
-    expect(cfg.hooks.Stop.flatMap((g: any) => g.hooks.map((h: any) => h.command))).toEqual(["echo hi", '"relay" hook live stop --tool claude']);
+    expect(cfg.hooks.Stop.flatMap((g: any) => g.hooks.map((h: any) => h.command))).toEqual(["echo hi", '"relay" hook live stop --tool claude', '"relay" hook live idle --tool claude']);
+    expect(cfg.hooks.Stop.at(-1).hooks[0]).toEqual({ type: "command", command: '"relay" hook live idle --tool claude', asyncRewake: true });
     expect(cfg.hooks.PreToolUse).toEqual([{ matcher: "Edit|Write|MultiEdit|NotebookEdit", hooks: [{ type: "command", command: '"relay" hook live pre-edit --tool claude', timeout: 10 }] }]);
     expect(cfg.hooks.SessionEnd.flatMap((g: any) => g.hooks.map((h: any) => h.command))).toEqual(['"relay" hook session-end --tool claude', '"relay" hook live end --tool claude']);
 
@@ -157,5 +159,77 @@ describe("live hooks at session end", () => {
     // Ending a session it doesn't belong to does nothing.
     expect(await liveHook("end", "claude-code", { session_id: "s9", cwd: "/work/api" })).toEqual({ out: "" });
     expect(await loadLive()).toHaveLength(1);
+  });
+});
+
+describe("idle waiter (Claude Code asyncRewake Stop hook)", () => {
+  /** A fake clock: sleeping moves time on, and `onSleep` can change things in between. */
+  function deps(polls: (LivePollResult | null)[], onSleep: (n: number) => Promise<void> | void = () => undefined, parent = () => 42): IdleDeps & { calls: number; slept: number[] } {
+    let t = Date.parse("2026-11-23T10:00:00Z");
+    const d = {
+      calls: 0,
+      slept: [] as number[],
+      now: () => t,
+      sleep: async (ms: number) => {
+        d.slept.push(ms);
+        t += ms;
+        await onSleep(d.slept.length);
+      },
+      client: async () => ({
+        livePoll: async () => {
+          d.calls++;
+          const r = polls.shift();
+          if (r === null) throw new Error("offline");
+          return r ?? poll();
+        },
+      }),
+      parent,
+    };
+    return d as any;
+  }
+  const bound = () => addLive({ id: "lv_1", root: "/work/api", repo: "r", native: "s1", tool: "claude-code", started: "x" });
+
+  it("waits quietly, rides out errors, and wakes the agent when a message arrives", async () => {
+    await bound();
+    const d = deps([poll(), null, poll(), poll({ messages: [msg()] })]);
+    const r = await waitWhileIdle("claude-code", { session_id: "s1", cwd: "/work/api" }, d as any);
+    expect(r.wake).toContain("I renamed createInvoice to buildInvoice");
+    expect(r.wake).toContain("arrived while the session was idle");
+    expect(d.calls).toBe(4);
+    expect(d.slept).toEqual([10_000, 10_000, 10_000, 10_000]);
+  });
+
+  it("stops when the user sends a prompt, a newer waiter starts, or the live session goes away", async () => {
+    await bound();
+    let d = deps([], (n) => (n === 2 ? updateLive("lv_1", { prompted: new Date(Date.parse("2026-11-23T10:00:15Z")).toISOString() }) : undefined));
+    expect((await waitWhileIdle("claude-code", { session_id: "s1", cwd: "/work/api" }, d as any)).wake).toBe("");
+    expect(d.calls).toBe(1);
+
+    d = deps([], (n) => (n === 1 ? updateLive("lv_1", { waiter: "someone-else" }) : undefined));
+    expect((await waitWhileIdle("claude-code", { session_id: "s1", cwd: "/work/api" }, d as any)).wake).toBe("");
+    expect(d.calls).toBe(0);
+
+    d = deps([], (n) => (n === 1 ? dropLive("lv_1") : undefined));
+    expect((await waitWhileIdle("claude-code", { session_id: "s1", cwd: "/work/api" }, d as any)).wake).toBe("");
+  });
+
+  it("stops when orphaned, when the server ended it, after the time limit, and does nothing when not live", async () => {
+    expect((await waitWhileIdle("claude-code", { session_id: "s1", cwd: "/work/api" }, deps([]) as any)).wake).toBe("");
+    await bound();
+    let parent = 42;
+    let d = deps([], () => void (parent = 1), () => parent);
+    expect((await waitWhileIdle("claude-code", { session_id: "s1", cwd: "/work/api" }, d as any)).wake).toBe("");
+    expect(d.calls).toBe(0);
+
+    d = deps(Array.from({ length: 2000 }, () => poll()));
+    expect((await waitWhileIdle("claude-code", { session_id: "s1", cwd: "/work/api" }, d as any)).wake).toBe("");
+    expect(d.slept.reduce((a, b) => a + b, 0)).toBeGreaterThan(IDLE_MAX_MS);
+    expect(idleDelay(0)).toBe(10_000);
+    expect(idleDelay(30 * 60_000)).toBe(30_000);
+    expect(idleDelay(2 * 60 * 60_000)).toBe(60_000);
+
+    d = deps([poll({ ended: true })]);
+    expect((await waitWhileIdle("claude-code", { session_id: "s1", cwd: "/work/api" }, d as any)).wake).toBe("");
+    expect(await loadLive()).toEqual([]);
   });
 });

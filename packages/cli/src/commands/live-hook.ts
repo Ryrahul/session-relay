@@ -1,6 +1,6 @@
 import { renderLiveMessages, renderOverlaps, type LivePollResult, type SourceTool } from "@session-relay/shared";
 import { RelayClient } from "../client.js";
-import { dropLive, liveForHook, repoPath, updateLive, type LocalLive } from "../live.js";
+import { dropLive, liveForHook, loadLive, repoPath, updateLive, type LocalLive } from "../live.js";
 
 /**
  * Live hooks: between an agent's steps, take teammates' messages and warn about files a teammate
@@ -93,6 +93,71 @@ export async function liveHook(event: LiveEvent, tool: SourceTool, input: HookIn
   }
   const text = describePoll(r);
   if (event === "stop" && text) patch.continued = patch.polled;
+  if (event === "prompt") patch.prompted = patch.polled;
   await updateLive(live.id, patch);
   return { out: hookOutput(tool, event, text), log: text ? `live ${live.id}: ${r.messages.length} messages, ${r.overlaps.length} overlaps (${event})` : undefined };
+}
+
+/** How long an idle waiter sleeps between checks: often at first, less after a while. */
+export function idleDelay(elapsedMs: number): number {
+  if (elapsedMs < 10 * 60_000) return 10_000;
+  if (elapsedMs < 60 * 60_000) return 30_000;
+  return 60_000;
+}
+
+/** An idle waiter gives up after this; the next turn starts a new one. */
+export const IDLE_MAX_MS = 8 * 60 * 60_000;
+
+export interface IdleDeps {
+  now: () => number;
+  sleep: (ms: number) => Promise<void>;
+  client: () => Promise<Pick<RelayClient, "livePoll">>;
+  /** The process that started the hook; a different one means the agent exited (we were orphaned). */
+  parent: () => number;
+}
+
+const realDeps: IdleDeps = {
+  now: Date.now,
+  sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+  client: () => RelayClient.fromConfig(),
+  parent: () => process.ppid,
+};
+
+/**
+ * Claude Code's async "rewake" Stop hook: after the agent finishes a turn it waits in the background
+ * for teammates' messages. Hooks only run while the agent works, so without this an idle session
+ * would see nothing until its user typed. Returns the text to wake the agent with, or "" to exit
+ * quietly: when the user sends a prompt (the turn's own hooks take over), a newer waiter starts,
+ * the live session ends, the agent quits, or after IDLE_MAX_MS. Its polls also keep the session from showing as away.
+ */
+export async function waitWhileIdle(tool: SourceTool, input: HookInput, deps: IdleDeps = realDeps): Promise<{ wake: string; log?: string }> {
+  const live = await liveForHook(input.session_id, input.cwd ?? process.cwd(), tool);
+  if (!live) return { wake: "" };
+  const start = deps.now();
+  const parent = deps.parent();
+  const me = `${process.pid}-${start}`;
+  await updateLive(live.id, { waiter: me });
+  const client = await deps.client();
+  for (;;) {
+    await deps.sleep(idleDelay(deps.now() - start));
+    // Orphaned (the agent quit) or too old: stop, so no message is taken that nobody will see.
+    if (deps.now() - start > IDLE_MAX_MS || deps.parent() !== parent) return { wake: "" };
+    const cur = (await loadLive()).find((l) => l.id === live.id);
+    if (!cur || cur.waiter !== me) return { wake: "" };
+    if (cur.prompted && new Date(cur.prompted).getTime() > start) return { wake: "" };
+    const r = await client.livePoll(live.id, {}, HOOK_TIMEOUT_MS).catch(() => null);
+    if (!r) continue;
+    if (r.ended) {
+      await dropLive(live.id);
+      return { wake: "", log: `live ${live.id} ended on the server (idle waiter)` };
+    }
+    const text = describePoll(r);
+    if (text) {
+      await updateLive(live.id, { polled: new Date(deps.now()).toISOString() });
+      return {
+        wake: `${text}\n\n(This arrived while the session was idle. Tell the user now, and follow the instructions above about asking before acting.)`,
+        log: `live ${live.id}: ${r.messages.length} messages woke the idle agent`,
+      };
+    }
+  }
 }

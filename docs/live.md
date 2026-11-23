@@ -62,8 +62,8 @@ An agent only takes in new input between steps, so delivery depends on the agent
 
 | Agent | How messages arrive |
 |---|---|
-| **Claude Code** | Hooks, automatically: before each of your prompts, before edits (with overlap warnings), after tools, and when the agent is about to stop. If a message arrives while it's finishing, it keeps going to tell you about it. |
-| **Gemini CLI** | Hooks, automatically: before each turn, after tools (overlap warnings after edits), and after the reply. |
+| **Claude Code** | Hooks, automatically: before each of your prompts, before edits (with overlap warnings), after tools, and when the agent is about to stop. If a message arrives while it's finishing, it keeps going to tell you about it. **While it's idle** (waiting for you), a background hook keeps checking and wakes it within about 10 seconds of a message, so it can tell you straight away. |
+| **Gemini CLI** | Hooks, automatically: before each turn, after tools (overlap warnings after edits), and after the reply. While it's idle, messages wait for your next prompt (Gemini CLI has no way to wake an idle session). |
 | **Codex, OpenCode, Copilot CLI, Cursor, ZCode** | The agent checks with `check_live_inbox` before each new task and before finishing a reply (Session Relay's MCP instructions tell it to). You can also say "check live messages", or `/live inbox`. |
 | **You** | The web app's **Live** page, or `relay live watch` in a terminal. |
 
@@ -75,6 +75,8 @@ relay setup --live off      # remove them
 ```
 
 The hooks only talk to the server while you're live: when you aren't, they exit immediately. They time out after a few seconds and never fail the agent's step, so a server outage doesn't get in your way. Tool hooks check for messages at most every 15 seconds; prompts, edits and stops always check.
+
+The idle hook (Claude Code) runs in the background after each reply: it checks every 10 seconds for the first 10 minutes, then every 30 seconds, then every minute, and gives up after 8 hours (your next prompt starts a new one). It stops as soon as you type, when you leave live, or when Claude Code quits, and it keeps you showing as live rather than away while you're idle. Turned on by `relay setup --live on`; if you set up live hooks before 0.8.1, run it again.
 
 `/live` is tied to the agent session that started it. Another Claude Code window in the same repo isn't live unless it runs `/live` too. `/clear` keeps you live in the new conversation; closing the agent ends it.
 

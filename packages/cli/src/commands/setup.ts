@@ -79,7 +79,7 @@ function hookCommand(cmd: string[], env: Record<string, string>, tool: string, e
   return `${prefix}${cmd.slice(0, -1).map((c) => JSON.stringify(c)).join(" ")} hook ${event} --tool ${tool}`;
 }
 
-type HookGroup = { matcher?: string; hooks: { type: string; command: string; timeout?: number }[] };
+type HookGroup = { matcher?: string; hooks: { type: string; command: string; timeout?: number; asyncRewake?: boolean }[] };
 
 /**
  * Sets relay's hooks in a Claude Code or Gemini CLI settings.json (same shape): removes every hook
@@ -107,6 +107,7 @@ const claudeSettings = () => path.join(process.env.CLAUDE_CONFIG_DIR ?? path.joi
  * Live hooks: messages from teammates and file overlap warnings reach the agent between steps.
  * Claude Code: before each prompt, before edits, after tools, at stop. Gemini CLI: before each
  * turn, after tools, after the reply. Both also end the live session when the agent session ends.
+ * Claude Code also gets a background Stop hook that wakes an idle session when a message arrives.
  */
 export async function setupLiveHooks(on: boolean, cmd: string[], env: Record<string, string>, tool: "claude" | "gemini", settingsFile?: string): Promise<string> {
   const file = settingsFile ?? (tool === "claude" ? claudeSettings() : path.join(geminiHome(), "settings.json"));
@@ -120,12 +121,13 @@ export async function setupLiveHooks(on: boolean, cmd: string[], env: Record<str
           UserPromptSubmit: h("prompt"),
           PreToolUse: h("pre-edit", { matcher: "Edit|Write|MultiEdit|NotebookEdit" }),
           PostToolUse: h("post-tool"),
-          Stop: h("stop"),
+          // The second Stop hook waits in the background while the session is idle and wakes it for a message.
+          Stop: [...h("stop"), { hooks: [{ type: "command", command: hookCommand(cmd, env, tool, "live idle"), asyncRewake: true }] }],
           SessionEnd: h("end"),
         }
       : { BeforeAgent: h("prompt"), AfterTool: h("post-tool"), AfterAgent: h("stop"), SessionEnd: h("end") };
   await setHooks(file, LIVE_MARK, add);
-  return on ? `live hooks on: teammates' messages and file overlap warnings arrive between steps (${file})` : `live hooks off (${file})`;
+  return on ? `live hooks on: teammates' messages and file overlap warnings arrive between steps${tool === "claude" ? ", and wake Claude Code when it's idle" : ""} (${file})` : `live hooks off (${file})`;
 }
 
 /** Agents with live hooks installed. */
